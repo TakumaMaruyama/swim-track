@@ -119,6 +119,91 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Create new record
+  app.post("/api/records", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { studentId, style, distance, time, date, isCompetition } = req.body;
+
+      // Verify student exists
+      const [student] = await db
+        .select()
+        .from(users)
+        .where(and(eq(users.id, studentId), eq(users.role, "student")))
+        .limit(1);
+
+      if (!student) {
+        return res.status(404).json({ message: "選手が見つかりません" });
+      }
+
+      const [record] = await db
+        .insert(swimRecords)
+        .values({
+          studentId,
+          style,
+          distance,
+          time,
+          date: new Date(date),
+          isCompetition,
+        })
+        .returning();
+
+      res.json(record);
+    } catch (error) {
+      console.error('Error creating record:', error);
+      res.status(500).json({ message: "記録の作成に失敗しました" });
+    }
+  });
+
+  // Update record
+  app.put("/api/records/:id", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { style, distance, time, date, isCompetition } = req.body;
+
+      const [record] = await db
+        .update(swimRecords)
+        .set({
+          style,
+          distance,
+          time,
+          date: new Date(date),
+          isCompetition,
+        })
+        .where(eq(swimRecords.id, parseInt(id)))
+        .returning();
+
+      if (!record) {
+        return res.status(404).json({ message: "記録が見つかりません" });
+      }
+
+      res.json(record);
+    } catch (error) {
+      console.error('Error updating record:', error);
+      res.status(500).json({ message: "記録の更新に失敗しました" });
+    }
+  });
+
+  // Delete record
+  app.delete("/api/records/:id", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const [deletedRecord] = await db
+        .delete(swimRecords)
+        .where(eq(swimRecords.id, parseInt(id)))
+        .returning();
+
+      if (!deletedRecord) {
+        return res.status(404).json({ message: "記録が見つかりません" });
+      }
+
+      res.json({ message: "記録を削除しました" });
+    } catch (error) {
+      console.error('Error deleting record:', error);
+      res.status(500).json({ message: "記録の削除に失敗しました" });
+    }
+  });
+
   // Documents API
   app.post(
     "/api/documents/upload",
