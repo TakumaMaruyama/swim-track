@@ -2,13 +2,20 @@ import React from 'react';
 import { useSwimRecords } from '../hooks/use-swim-records';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Edit2, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { EditRecordForm } from '../components/EditRecordForm';
+import { useUser } from '../hooks/use-user';
+import { useToast } from '@/hooks/use-toast';
 
 type GroupedRecords = {
   [style: string]: {
     [distance: number]: {
+      id: number;
       time: string;
       date: Date;
+      studentId: number;
+      isCompetition: boolean;
     };
   };
 };
@@ -22,7 +29,10 @@ const formatDate = (date: Date) => {
 };
 
 export default function BestTimes() {
-  const { records, isLoading, error } = useSwimRecords();
+  const { user } = useUser();
+  const { toast } = useToast();
+  const { records, isLoading, error, mutate } = useSwimRecords();
+  const [editingRecord, setEditingRecord] = React.useState<number | null>(null);
 
   const groupedRecords: GroupedRecords = React.useMemo(() => {
     if (!records) return {};
@@ -35,14 +45,80 @@ export default function BestTimes() {
       const currentBest = acc[record.style][record.distance];
       if (!currentBest || record.time < currentBest.time) {
         acc[record.style][record.distance] = {
+          id: record.id,
           time: record.time,
           date: new Date(record.date),
+          studentId: record.studentId,
+          isCompetition: record.isCompetition,
         };
       }
       
       return acc;
     }, {} as GroupedRecords);
   }, [records]);
+
+  const handleEdit = async (recordId: number, data: any) => {
+    try {
+      const response = await fetch(`/api/records/${recordId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update record');
+      }
+
+      await mutate();
+      toast({
+        title: "更新成功",
+        description: "記録が更新されました",
+      });
+    } catch (error) {
+      console.error('Error updating record:', error);
+      toast({
+        variant: "destructive",
+        title: "エラー",
+        description: "記録の更新に失敗しました",
+      });
+      throw error;
+    }
+  };
+
+  const handleDelete = async (recordId: number) => {
+    if (!confirm('この記録を削除してもよろしいですか？')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/records/${recordId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete record');
+      }
+
+      await mutate();
+      toast({
+        title: "削除成功",
+        description: "記録が削除されました",
+      });
+    } catch (error) {
+      console.error('Error deleting record:', error);
+      toast({
+        variant: "destructive",
+        title: "エラー",
+        description: "記録の削除に失敗しました",
+      });
+    }
+  };
+
+  const record = records?.find(r => r.id === editingRecord);
 
   if (isLoading) {
     return (
@@ -89,7 +165,27 @@ export default function BestTimes() {
                         {formatDate(record.date)}
                       </p>
                     </div>
-                    <p className="text-xl font-bold text-primary">{record.time}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xl font-bold text-primary">{record.time}</p>
+                      {user?.role === 'coach' && (
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setEditingRecord(record.id)}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(record.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -97,6 +193,17 @@ export default function BestTimes() {
           </Card>
         ))}
       </div>
+
+      {record && (
+        <EditRecordForm
+          record={record}
+          isOpen={!!editingRecord}
+          onClose={() => setEditingRecord(null)}
+          onSubmit={async (data) => {
+            await handleEdit(record.id, data);
+          }}
+        />
+      )}
     </div>
   );
 }
