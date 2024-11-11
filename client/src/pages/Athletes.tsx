@@ -2,19 +2,48 @@ import React from 'react';
 import { useAthletes } from '../hooks/use-athletes';
 import { useSwimRecords } from '../hooks/use-swim-records';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Edit2 } from "lucide-react";
+import { EditAthleteForm } from '../components/EditAthleteForm';
+import { useUser } from '../hooks/use-user';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Athletes() {
-  const { athletes, isLoading: athletesLoading, error: athletesError } = useAthletes();
+  const { user } = useUser();
+  const { toast } = useToast();
+  const { athletes, isLoading: athletesLoading, error: athletesError, mutate: mutateAthletes } = useAthletes();
   const { records, isLoading: recordsLoading, error: recordsError } = useSwimRecords();
+  const [editingAthlete, setEditingAthlete] = React.useState<number | null>(null);
 
   const getLatestPerformance = (studentId: number) => {
     if (!records) return null;
     return records
       .filter(record => record.studentId === studentId)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+  };
+
+  const handleEdit = async (athleteId: number, data: { username: string }) => {
+    try {
+      const response = await fetch(`/api/athletes/${athleteId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update athlete');
+      }
+
+      await mutateAthletes();
+    } catch (error) {
+      console.error('Error updating athlete:', error);
+      throw error;
+    }
   };
 
   if (athletesLoading || recordsLoading) {
@@ -40,6 +69,8 @@ export default function Athletes() {
     );
   }
 
+  const athlete = athletes?.find(a => a.id === editingAthlete);
+
   return (
     <div className="container py-8 px-4 md:px-8">
       <h1 className="text-2xl md:text-3xl font-bold mb-8">選手一覧</h1>
@@ -55,10 +86,19 @@ export default function Athletes() {
                       {athlete.username.substring(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
-                  <div>
+                  <div className="flex-1">
                     <span className="text-lg">{athlete.username}</span>
                     <p className="text-sm text-muted-foreground mt-1">選手</p>
                   </div>
+                  {user?.role === 'coach' && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setEditingAthlete(athlete.id)}
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -94,6 +134,17 @@ export default function Athletes() {
           );
         })}
       </div>
+
+      {athlete && (
+        <EditAthleteForm
+          athlete={athlete}
+          isOpen={!!editingAthlete}
+          onClose={() => setEditingAthlete(null)}
+          onSubmit={async (data) => {
+            await handleEdit(athlete.id, data);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -28,6 +28,14 @@ export function registerRoutes(app: Express) {
     next();
   };
 
+  // Ensure user is a coach
+  const requireCoach = (req: any, res: any, next: any) => {
+    if (req.user?.role !== "coach") {
+      return res.status(403).json({ message: "コーチ権限が必要です" });
+    }
+    next();
+  };
+
   // Athletes API
   app.get("/api/athletes", requireAuth, async (req, res) => {
     try {
@@ -38,6 +46,50 @@ export function registerRoutes(app: Express) {
       res.json(athletes);
     } catch (error) {
       res.status(500).json({ message: "選手の取得に失敗しました" });
+    }
+  });
+
+  // Update athlete
+  app.put("/api/athletes/:id", requireAuth, requireCoach, async (req, res) => {
+    const { id } = req.params;
+    const { username } = req.body;
+
+    try {
+      // Check if athlete exists and is a student
+      const [athlete] = await db
+        .select()
+        .from(users)
+        .where(and(eq(users.id, parseInt(id)), eq(users.role, "student")))
+        .limit(1);
+
+      if (!athlete) {
+        return res.status(404).json({ message: "選手が見つかりません" });
+      }
+
+      // Check if username is already taken by another user
+      if (username !== athlete.username) {
+        const [existingUser] = await db
+          .select()
+          .from(users)
+          .where(eq(users.username, username))
+          .limit(1);
+
+        if (existingUser) {
+          return res.status(400).json({ message: "このユーザー名は既に使用されています" });
+        }
+      }
+
+      // Update athlete
+      const [updatedAthlete] = await db
+        .update(users)
+        .set({ username })
+        .where(eq(users.id, parseInt(id)))
+        .returning();
+
+      res.json(updatedAthlete);
+    } catch (error) {
+      console.error('Error updating athlete:', error);
+      res.status(500).json({ message: "選手の更新に失敗しました" });
     }
   });
 
@@ -71,14 +123,11 @@ export function registerRoutes(app: Express) {
   app.post(
     "/api/documents/upload",
     requireAuth,
+    requireCoach,
     upload.single("file"),
     async (req, res) => {
       if (!req.file || !req.body.title) {
         return res.status(400).json({ message: "ファイルとタイトルが必要です" });
-      }
-
-      if (req.user?.role !== "coach") {
-        return res.status(403).json({ message: "権限がありません" });
       }
 
       try {
@@ -88,7 +137,7 @@ export function registerRoutes(app: Express) {
             title: req.body.title,
             filename: req.file.filename,
             mimeType: req.file.mimetype,
-            uploaderId: req.user.id,
+            uploaderId: req.user!.id,
           })
           .returning();
 
