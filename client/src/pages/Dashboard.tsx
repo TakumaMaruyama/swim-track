@@ -25,6 +25,8 @@ import {
 import { Bar, Line } from 'react-chartjs-2'
 import { useUser } from '../hooks/use-user'
 import { useLocation } from 'wouter'
+import { useMobile } from '../hooks/use-mobile'
+import { MobileNav } from '../components/MobileNav'
 
 ChartJS.register(
   CategoryScale,
@@ -39,7 +41,8 @@ ChartJS.register(
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
-  const { user, isLoading } = useUser();
+  const { user, isLoading, logout } = useUser();
+  const isMobile = useMobile();
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -54,6 +57,13 @@ export default function Dashboard() {
   if (!user) {
     return null;
   }
+
+  const navItems = [
+    { label: '選手一覧', icon: <Users className="h-4 w-4" />, href: '/athletes' },
+    { label: 'ベストタイム', icon: <Trophy className="h-4 w-4" />, href: '/best-times' },
+    { label: '大会記録', icon: <Calendar className="h-4 w-4" />, href: '/competitions' },
+    { label: '資料', icon: <ClipboardList className="h-4 w-4" />, href: '/documents' },
+  ];
 
   // Performance improvement data
   const performanceData = {
@@ -82,9 +92,14 @@ export default function Dashboard() {
 
   const chartOptions = {
     responsive: true,
+    maintainAspectRatio: !isMobile,
     scales: {
       x: {
         type: 'category' as const,
+        ticks: {
+          maxRotation: isMobile ? 45 : 0,
+          minRotation: isMobile ? 45 : 0
+        }
       },
       y: {
         beginAtZero: true
@@ -92,90 +107,80 @@ export default function Dashboard() {
     }
   }
 
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-gray-100">
       <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-gray-900">スイムコーチ ダッシュボード</h1>
-          <div className="flex items-center gap-4">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src="/placeholder.svg?height=32&width=32" alt={user.username} />
-              <AvatarFallback>{user.username.substring(0, 2).toUpperCase()}</AvatarFallback>
-            </Avatar>
-            <span className="text-sm font-medium text-gray-700">{user.username}</span>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => {
-                const { logout } = useUser();
-                logout();
-                navigate('/login');
-              }}
-            >
-              ログアウト
-            </Button>
+        <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center">
+              {isMobile && <MobileNav items={navItems} />}
+              <h1 className="text-xl sm:text-3xl font-bold text-gray-900 ml-2">スイムコーチ</h1>
+            </div>
+            <div className="flex items-center gap-4">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src="/placeholder.svg?height=32&width=32" alt={user.username} />
+                <AvatarFallback>{user.username.substring(0, 2).toUpperCase()}</AvatarFallback>
+              </Avatar>
+              <span className="text-sm font-medium text-gray-700 hidden sm:inline">{user.username}</span>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleLogout}
+              >
+                ログアウト
+              </Button>
+            </div>
           </div>
         </div>
       </header>
 
-      <nav className="bg-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 text-white font-bold">
-                SwimTrack
-              </div>
-              <div className="hidden md:block">
-                <div className="ml-10 flex items-baseline space-x-4">
-                  <Button variant="ghost" className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
-                    <Users className="mr-2 h-4 w-4" />
-                    選手一覧
-                  </Button>
-                  <Button variant="ghost" className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
-                    <Trophy className="mr-2 h-4 w-4" />
-                    ベストタイム
-                  </Button>
-                  <Button variant="ghost" className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
-                    <Calendar className="mr-2 h-4 w-4" />
-                    大会記録
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
-                    onClick={() => navigate('/documents')}
+      {!isMobile && (
+        <nav className="bg-gray-800">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center h-16">
+              <div className="hidden md:flex items-center space-x-4">
+                {navItems.map((item, index) => (
+                  <Button
+                    key={index}
+                    variant="ghost"
+                    className="text-gray-300 hover:bg-gray-700 hover:text-white"
+                    onClick={() => navigate(item.href)}
                   >
-                    <ClipboardList className="mr-2 h-4 w-4" />
-                    資料
+                    {item.icon}
+                    <span className="ml-2">{item.label}</span>
                   </Button>
-                </div>
+                ))}
               </div>
             </div>
           </div>
-        </div>
-      </nav>
+        </nav>
+      )}
 
       <main className="flex-grow">
-        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-          <div className="px-4 py-6 sm:px-0">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle>タイム改善推移</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Line data={performanceData} options={chartOptions} />
-                </CardContent>
-              </Card>
+        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>タイム改善推移</CardTitle>
+              </CardHeader>
+              <CardContent className="h-[300px] sm:h-[400px]">
+                <Line data={performanceData} options={chartOptions} />
+              </CardContent>
+            </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>種目別ランキング</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Bar data={rankingData} options={chartOptions} />
-                </CardContent>
-              </Card>
-            </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>種目別ランキング</CardTitle>
+              </CardHeader>
+              <CardContent className="h-[300px] sm:h-[400px]">
+                <Bar data={rankingData} options={chartOptions} />
+              </CardContent>
+            </Card>
           </div>
         </div>
       </main>
