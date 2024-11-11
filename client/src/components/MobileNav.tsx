@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, X } from 'lucide-react';
+import { 
+  Sheet, 
+  SheetContent, 
+  SheetTrigger,
+  SheetTitle,
+  SheetDescription 
+} from "@/components/ui/sheet";
+import { Menu } from 'lucide-react';
 import { useLocation } from 'wouter';
 
 interface NavItem {
@@ -28,11 +34,13 @@ export function MobileNav({ items }: MobileNavProps) {
       <SheetTrigger asChild>
         <Button variant="ghost" size="icon" className="md:hidden">
           <Menu className="h-5 w-5" />
-          <span className="sr-only">Toggle menu</span>
+          <span className="sr-only">メニューを開く</span>
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="w-[300px] sm:w-[400px]">
-        <nav className="flex flex-col gap-4">
+        <SheetTitle>メニュー</SheetTitle>
+        <SheetDescription>アプリケーションのナビゲーションメニューです</SheetDescription>
+        <nav className="flex flex-col gap-4 mt-6">
           {items.map((item, index) => (
             <Button
               key={index}
