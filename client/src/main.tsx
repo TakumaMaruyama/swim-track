@@ -11,6 +11,9 @@ import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Documents from "./pages/Documents";
+import Athletes from "./pages/Athletes";
+import BestTimes from "./pages/BestTimes";
+import Competitions from "./pages/Competitions";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -20,6 +23,9 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/login" component={Login} />
         <Route path="/register" component={Register} />
         <Route path="/documents" component={Documents} />
+        <Route path="/athletes" component={Athletes} />
+        <Route path="/best-times" component={BestTimes} />
+        <Route path="/competitions" component={Competitions} />
         <Route>404 ページが見つかりません</Route>
       </Switch>
       <Toaster />

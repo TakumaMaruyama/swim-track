@@ -2,8 +2,8 @@ import { Express } from "express";
 import { setupAuth } from "./auth";
 import multer from "multer";
 import { db } from "db";
-import { documents } from "db/schema";
-import { eq } from "drizzle-orm";
+import { documents, users, swimRecords } from "db/schema";
+import { eq, and, desc } from "drizzle-orm";
 import path from "path";
 import fs from "fs/promises";
 
@@ -27,6 +27,45 @@ export function registerRoutes(app: Express) {
     }
     next();
   };
+
+  // Athletes API
+  app.get("/api/athletes", requireAuth, async (req, res) => {
+    try {
+      const athletes = await db
+        .select()
+        .from(users)
+        .where(eq(users.role, "student"));
+      res.json(athletes);
+    } catch (error) {
+      res.status(500).json({ message: "選手の取得に失敗しました" });
+    }
+  });
+
+  // Swim Records API
+  app.get("/api/records", requireAuth, async (req, res) => {
+    try {
+      const records = await db
+        .select()
+        .from(swimRecords)
+        .orderBy(desc(swimRecords.date));
+      res.json(records);
+    } catch (error) {
+      res.status(500).json({ message: "記録の取得に失敗しました" });
+    }
+  });
+
+  app.get("/api/records/competitions", requireAuth, async (req, res) => {
+    try {
+      const records = await db
+        .select()
+        .from(swimRecords)
+        .where(eq(swimRecords.isCompetition, true))
+        .orderBy(desc(swimRecords.date));
+      res.json(records);
+    } catch (error) {
+      res.status(500).json({ message: "大会記録の取得に失敗しました" });
+    }
+  });
 
   // Documents API
   app.post(
@@ -87,7 +126,4 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ message: "ダウンロードに失敗しました" });
     }
   });
-
-  // Performance tracking API endpoints would go here
-  // Swimming records API endpoints would go here
 }
