@@ -1,15 +1,23 @@
 import useSWR from "swr";
 import type { User, InsertUser } from "db/schema";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 
 export function useUser() {
+  const [isLoginPending, setIsLoginPending] = useState(false);
   const { data, error, mutate, isLoading } = useSWR<User>("/api/user", {
-    revalidateOnFocus: false,
-    shouldRetryOnError: false
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
+    shouldRetryOnError: false,
+    refreshInterval: 300000, // Refresh session every 5 minutes
   });
 
   const login = useCallback(async (user: InsertUser) => {
+    if (isLoginPending) {
+      return { ok: false, message: "ログイン処理中です" };
+    }
+
     try {
+      setIsLoginPending(true);
       const response = await fetch("/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -27,8 +35,10 @@ export function useUser() {
       return { ok: true, user: data.user };
     } catch (e: any) {
       return { ok: false, message: "サーバーとの通信に失敗しました" };
+    } finally {
+      setIsLoginPending(false);
     }
-  }, [mutate]);
+  }, [mutate, isLoginPending]);
 
   const logout = useCallback(async () => {
     try {
@@ -75,6 +85,7 @@ export function useUser() {
   return {
     user: data,
     isLoading,
+    isLoginPending,
     isAuthenticated: !!data,
     error,
     login,

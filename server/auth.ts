@@ -28,7 +28,6 @@ const crypto = {
   },
 };
 
-// extend express user object with our schema
 declare global {
   namespace Express {
     interface User extends SelectUser {}
@@ -41,7 +40,12 @@ export function setupAuth(app: Express) {
     secret: process.env.REPL_ID || "porygon-supremacy",
     resave: false,
     saveUninitialized: false,
-    cookie: {},
+    rolling: true, // Refresh session with each request
+    cookie: {
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      httpOnly: true,
+      sameSite: "lax"
+    },
     store: new MemoryStore({
       checkPeriod: 86400000, // prune expired entries every 24h
     }),
@@ -50,6 +54,7 @@ export function setupAuth(app: Express) {
   if (app.get("env") === "production") {
     app.set("trust proxy", 1);
     sessionSettings.cookie = {
+      ...sessionSettings.cookie,
       secure: true,
     };
   }
@@ -58,9 +63,25 @@ export function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
+  // Rate limiting for login attempts
+  const loginAttempts = new Map<string, { count: number; lastAttempt: number }>();
+  const MAX_ATTEMPTS = 5;
+  const LOCKOUT_TIME = 15 * 60 * 1000; // 15 minutes
+
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
+        // Check login attempts
+        const ipKey = username.toLowerCase();
+        const attempts = loginAttempts.get(ipKey) || { count: 0, lastAttempt: 0 };
+        const now = Date.now();
+
+        if (attempts.count >= MAX_ATTEMPTS && now - attempts.lastAttempt < LOCKOUT_TIME) {
+          return done(null, false, { 
+            message: "アカウントが一時的にロックされています。しばらく待ってから再試行してください。" 
+          });
+        }
+
         const [user] = await db
           .select()
           .from(users)
@@ -68,12 +89,24 @@ export function setupAuth(app: Express) {
           .limit(1);
 
         if (!user) {
+          loginAttempts.set(ipKey, { 
+            count: attempts.count + 1, 
+            lastAttempt: now 
+          });
           return done(null, false, { message: "ユーザー名が正しくありません。" });
         }
+
         const isMatch = await crypto.compare(password, user.password);
         if (!isMatch) {
+          loginAttempts.set(ipKey, { 
+            count: attempts.count + 1, 
+            lastAttempt: now 
+          });
           return done(null, false, { message: "パスワードが正しくありません。" });
         }
+
+        // Reset attempts on successful login
+        loginAttempts.delete(ipKey);
         return done(null, user);
       } catch (err) {
         return done(err);
@@ -120,10 +153,8 @@ export function setupAuth(app: Express) {
         return res.status(400).json({ message: "このユーザー名は既に使用されています" });
       }
 
-      // Hash the password
       const hashedPassword = await crypto.hash(password);
 
-      // Create the new user
       const [newUser] = await db
         .insert(users)
         .values({
@@ -133,7 +164,6 @@ export function setupAuth(app: Express) {
         })
         .returning();
 
-      // Log the user in after registration
       req.login(newUser, (err) => {
         if (err) {
           return next(err);
@@ -179,11 +209,20 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/logout", (req, res) => {
+    const username = req.user?.username;
     req.logout((err) => {
       if (err) {
         return res.status(500).json({ message: "ログアウトに失敗しました" });
       }
-      res.json({ message: "ログアウトしました" });
+      if (username) {
+        loginAttempts.delete(username.toLowerCase());
+      }
+      req.session.destroy((err) => {
+        if (err) {
+          return res.status(500).json({ message: "セッションの削除に失敗しました" });
+        }
+        res.json({ message: "ログアウトしました" });
+      });
     });
   });
 
