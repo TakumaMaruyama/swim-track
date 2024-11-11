@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -41,12 +41,17 @@ export default function Dashboard() {
   const [, navigate] = useLocation();
   const { user, isLoading } = useUser();
 
+  useEffect(() => {
+    if (!isLoading && !user) {
+      navigate('/login');
+    }
+  }, [user, isLoading, navigate]);
+
   if (isLoading) {
-    return <div>読み込み中...</div>;
+    return <div className="flex items-center justify-center min-h-screen">読み込み中...</div>;
   }
 
   if (!user) {
-    navigate('/login');
     return null;
   }
 
@@ -92,12 +97,23 @@ export default function Dashboard() {
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
           <h1 className="text-3xl font-bold text-gray-900">スイムコーチ ダッシュボード</h1>
-          <div className="flex items-center">
+          <div className="flex items-center gap-4">
             <Avatar className="h-8 w-8">
               <AvatarImage src="/placeholder.svg?height=32&width=32" alt={user.username} />
               <AvatarFallback>{user.username.substring(0, 2).toUpperCase()}</AvatarFallback>
             </Avatar>
-            <span className="ml-2 text-sm font-medium text-gray-700">{user.username}</span>
+            <span className="text-sm font-medium text-gray-700">{user.username}</span>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => {
+                const { logout } = useUser();
+                logout();
+                navigate('/login');
+              }}
+            >
+              ログアウト
+            </Button>
           </div>
         </div>
       </header>

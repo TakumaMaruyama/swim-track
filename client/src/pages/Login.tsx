@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
 import { insertUserSchema } from "db/schema";
@@ -88,6 +88,18 @@ export default function Login() {
             </form>
           </Form>
         </CardContent>
+        <CardFooter className="flex flex-col space-y-2">
+          <div className="text-sm text-gray-500 text-center">
+            アカウントをお持ちでない方は
+          </div>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => navigate("/register")}
+          >
+            新規登録
+          </Button>
+        </CardFooter>
       </Card>
     </div>
   );

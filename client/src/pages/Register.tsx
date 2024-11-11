@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
 import { insertUserSchema } from "db/schema";
@@ -117,19 +117,21 @@ export default function Register() {
               <Button type="submit" className="w-full">
                 登録
               </Button>
-              <div className="text-center text-sm text-gray-500">
-                すでにアカウントをお持ちの方は
-                <Button
-                  variant="link"
-                  className="pl-1"
-                  onClick={() => navigate("/login")}
-                >
-                  ログイン
-                </Button>
-              </div>
             </form>
           </Form>
         </CardContent>
+        <CardFooter className="flex flex-col space-y-2">
+          <div className="text-sm text-gray-500 text-center">
+            すでにアカウントをお持ちの方は
+          </div>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => navigate("/login")}
+          >
+            ログインへ戻る
+          </Button>
+        </CardFooter>
       </Card>
     </div>
   );
