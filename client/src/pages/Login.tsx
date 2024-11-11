@@ -15,11 +15,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
 import { insertUserSchema } from "db/schema";
+import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
 
 export default function Login() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { login } = useUser();
+  const { login, isAuthenticated, isLoading: isAuthChecking } = useUser();
+  const [isLoading, setIsLoading] = useState(false);
+  
   const form = useForm({
     resolver: zodResolver(insertUserSchema),
     defaultValues: {
@@ -28,8 +32,17 @@ export default function Login() {
     },
   });
 
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate("/");
+    }
+  }, [isAuthenticated, navigate]);
+
   async function onSubmit(values: { username: string; password: string }) {
+    setIsLoading(true);
     const result = await login(values);
+    setIsLoading(false);
+    
     if (result.ok) {
       toast({
         title: "ログイン成功",
@@ -43,6 +56,14 @@ export default function Login() {
         description: result.message,
       });
     }
+  }
+
+  if (isAuthChecking) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
   }
 
   return (
@@ -63,7 +84,7 @@ export default function Login() {
                   <FormItem>
                     <FormLabel>ユーザー名</FormLabel>
                     <FormControl>
-                      <Input {...field} />
+                      <Input {...field} disabled={isLoading} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -76,14 +97,21 @@ export default function Login() {
                   <FormItem>
                     <FormLabel>パスワード</FormLabel>
                     <FormControl>
-                      <Input type="password" {...field} />
+                      <Input type="password" {...field} disabled={isLoading} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full">
-                ログイン
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ログイン中...
+                  </>
+                ) : (
+                  "ログイン"
+                )}
               </Button>
             </form>
           </Form>
@@ -96,6 +124,7 @@ export default function Login() {
             variant="outline"
             className="w-full"
             onClick={() => navigate("/register")}
+            disabled={isLoading}
           >
             新規登録
           </Button>

@@ -1,62 +1,84 @@
 import useSWR from "swr";
 import type { User, InsertUser } from "db/schema";
+import { useCallback } from "react";
 
 export function useUser() {
-  const { data, error, mutate } = useSWR<User, Error>("/api/user", {
+  const { data, error, mutate, isLoading } = useSWR<User>("/api/user", {
     revalidateOnFocus: false,
+    shouldRetryOnError: false
   });
+
+  const login = useCallback(async (user: InsertUser) => {
+    try {
+      const response = await fetch("/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(user),
+        credentials: "include",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return { ok: false, message: data.message || "ログインに失敗しました" };
+      }
+
+      await mutate();
+      return { ok: true, user: data.user };
+    } catch (e: any) {
+      return { ok: false, message: "サーバーとの通信に失敗しました" };
+    }
+  }, [mutate]);
+
+  const logout = useCallback(async () => {
+    try {
+      const response = await fetch("/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return { ok: false, message: data.message || "ログアウトに失敗しました" };
+      }
+
+      await mutate(undefined, false);
+      return { ok: true };
+    } catch (e: any) {
+      return { ok: false, message: "サーバーとの通信に失敗しました" };
+    }
+  }, [mutate]);
+
+  const register = useCallback(async (user: InsertUser) => {
+    try {
+      const response = await fetch("/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(user),
+        credentials: "include",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return { ok: false, message: data.message || "登録に失敗しました" };
+      }
+
+      await mutate();
+      return { ok: true, user: data.user };
+    } catch (e: any) {
+      return { ok: false, message: "サーバーとの通信に失敗しました" };
+    }
+  }, [mutate]);
 
   return {
     user: data,
-    isLoading: !error && !data,
+    isLoading,
+    isAuthenticated: !!data,
     error,
-    login: async (user: InsertUser) => {
-      const res = await handleRequest("/login", "POST", user);
-      mutate();
-      return res;
-    },
-    logout: async () => {
-      const res = await handleRequest("/logout", "POST");
-      mutate(undefined);
-      return res;
-    },
-    register: async (user: InsertUser) => {
-      const res = await handleRequest("/register", "POST", user);
-      mutate();
-      return res;
-    },
+    login,
+    logout,
+    register,
   };
-}
-
-type RequestResult =
-  | {
-      ok: true;
-    }
-  | {
-      ok: false;
-      message: string;
-    };
-
-async function handleRequest(
-  url: string,
-  method: string,
-  body?: InsertUser
-): Promise<RequestResult> {
-  try {
-    const response = await fetch(url, {
-      method,
-      headers: body ? { "Content-Type": "application/json" } : undefined,
-      body: body ? JSON.stringify(body) : undefined,
-      credentials: "include",
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      return { ok: false, message: errorData.message };
-    }
-
-    return { ok: true };
-  } catch (e: any) {
-    return { ok: false, message: e.toString() };
-  }
 }
