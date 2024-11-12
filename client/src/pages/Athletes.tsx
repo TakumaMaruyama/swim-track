@@ -5,12 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Edit2, Plus } from "lucide-react";
+import { AlertCircle, Edit2, Plus, Power } from "lucide-react";
 import { EditAthleteForm } from '../components/EditAthleteForm';
 import { EditRecordForm } from '../components/EditRecordForm';
 import { useUser } from '../hooks/use-user';
 import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '../components/PageHeader';
+import { Badge } from "@/components/ui/badge";
 
 export default function Athletes() {
   const { user } = useUser();
@@ -28,6 +29,36 @@ export default function Athletes() {
     return records
       .filter(record => record.studentId === studentId)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+  };
+
+  const handleToggleStatus = async (athleteId: number, currentStatus: boolean) => {
+    try {
+      const response = await fetch(`/api/athletes/${athleteId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isActive: !currentStatus }),
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update athlete status');
+      }
+
+      await mutateAthletes();
+      toast({
+        title: "更新成功",
+        description: `選手のステータスが${!currentStatus ? '有効' : '無効'}になりました`,
+      });
+    } catch (error) {
+      console.error('Error updating athlete status:', error);
+      toast({
+        variant: "destructive",
+        title: "エラー",
+        description: "ステータスの更新に失敗しました",
+      });
+    }
   };
 
   const handleEdit = async (athleteId: number, data: { username: string }) => {
@@ -164,7 +195,10 @@ export default function Athletes() {
           {athletes?.map((athlete) => {
             const latestRecord = getLatestPerformance(athlete.id);
             return (
-              <Card key={athlete.id} className="hover:shadow-lg transition-shadow">
+              <Card 
+                key={athlete.id} 
+                className={`hover:shadow-lg transition-shadow ${!athlete.isActive ? 'opacity-60' : ''}`}
+              >
                 <CardHeader>
                   <CardTitle className="flex items-center gap-4">
                     <Avatar className="h-12 w-12">
@@ -173,11 +207,23 @@ export default function Athletes() {
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1">
-                      <span className="text-lg">{athlete.username}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{athlete.username}</span>
+                        <Badge variant={athlete.isActive ? "default" : "secondary"}>
+                          {athlete.isActive ? '有効' : '無効'}
+                        </Badge>
+                      </div>
                       <p className="text-sm text-muted-foreground mt-1">選手</p>
                     </div>
                     {user?.role === 'coach' && (
                       <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleToggleStatus(athlete.id, athlete.isActive)}
+                        >
+                          <Power className={`h-4 w-4 ${athlete.isActive ? 'text-green-500' : 'text-red-500'}`} />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"

@@ -39,13 +39,47 @@ export function registerRoutes(app: Express) {
   // Athletes API
   app.get("/api/athletes", requireAuth, async (req, res) => {
     try {
-      const athletes = await db
+      const { isActive } = req.query;
+      const query = db
         .select()
         .from(users)
         .where(eq(users.role, "student"));
+
+      // Add optional isActive filter
+      if (isActive !== undefined) {
+        query.where(and(
+          eq(users.role, "student"), 
+          eq(users.isActive, isActive === 'true')
+        ));
+      }
+
+      const athletes = await query;
       res.json(athletes);
     } catch (error) {
       res.status(500).json({ message: "選手の取得に失敗しました" });
+    }
+  });
+
+  // Update athlete status
+  app.patch("/api/athletes/:id/status", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { isActive } = req.body;
+
+      const [athlete] = await db
+        .update(users)
+        .set({ isActive })
+        .where(and(eq(users.id, parseInt(id)), eq(users.role, "student")))
+        .returning();
+
+      if (!athlete) {
+        return res.status(404).json({ message: "選手が見つかりません" });
+      }
+
+      res.json(athlete);
+    } catch (error) {
+      console.error('Error updating athlete status:', error);
+      res.status(500).json({ message: "ステータスの更新に失敗しました" });
     }
   });
 
