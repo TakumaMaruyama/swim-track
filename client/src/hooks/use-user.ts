@@ -1,6 +1,6 @@
 import useSWR from "swr";
 import type { User, InsertUser } from "db/schema";
-import { useCallback, useState, useEffect, useRef } from "react";
+import { useCallback, useState, useEffect } from "react";
 
 interface AuthError {
   message: string;
@@ -11,7 +11,6 @@ interface AuthError {
 interface NavigationAttempt {
   inProgress: boolean;
   timestamp: number;
-  retryCount: number;
   success?: boolean;
 }
 
@@ -21,10 +20,6 @@ interface AuthState {
   navigationAttempt: NavigationAttempt;
 }
 
-const MAX_RETRIES = 3;
-const RETRY_DELAY = 1000;
-const NAVIGATION_TIMEOUT = 5000;
-
 export function useUser() {
   const [authState, setAuthState] = useState<AuthState>({
     isLoading: false,
@@ -32,13 +27,9 @@ export function useUser() {
     navigationAttempt: {
       inProgress: false,
       timestamp: 0,
-      retryCount: 0,
       success: undefined
     }
   });
-
-  const retryTimeoutRef = useRef<NodeJS.Timeout>();
-  const navigationTimeoutRef = useRef<NodeJS.Timeout>();
 
   const { 
     data, 
@@ -56,43 +47,17 @@ export function useUser() {
     }
   });
 
-  const clearTimeouts = useCallback(() => {
-    if (retryTimeoutRef.current) {
-      clearTimeout(retryTimeoutRef.current);
-    }
-    if (navigationTimeoutRef.current) {
-      clearTimeout(navigationTimeoutRef.current);
-    }
-  }, []);
-
   const resetNavigationState = useCallback(() => {
     console.log('[Auth] Resetting navigation state');
-    clearTimeouts();
     setAuthState(prev => ({
       ...prev,
       navigationAttempt: {
         inProgress: false,
         timestamp: 0,
-        retryCount: 0,
         success: undefined
       }
     }));
-  }, [clearTimeouts]);
-
-  // Handle navigation timeouts and cleanup
-  useEffect(() => {
-    if (authState.navigationAttempt.inProgress) {
-      console.log('[Auth] Setting up navigation timeout');
-      navigationTimeoutRef.current = setTimeout(() => {
-        console.log('[Auth] Navigation timeout reached');
-        resetNavigationState();
-      }, NAVIGATION_TIMEOUT);
-
-      return () => {
-        clearTimeouts();
-      };
-    }
-  }, [authState.navigationAttempt.inProgress, resetNavigationState, clearTimeouts]);
+  }, []);
 
   // Monitor authentication state changes
   useEffect(() => {
@@ -123,7 +88,6 @@ export function useUser() {
         navigationAttempt: {
           inProgress: true,
           timestamp: Date.now(),
-          retryCount: 0,
           success: undefined
         }
       }));
@@ -152,38 +116,17 @@ export function useUser() {
         return { ok: false, message: data.message, field: data.field, errors: data.errors };
       }
 
-      console.log('[Auth] Login successful, updating session');
+      console.log('[Auth] Login successful, forcing state update');
       await mutate();
-      
-      // Implement retry mechanism for session validation
-      const validateSession = async (retryCount: number = 0) => {
-        const sessionResponse = await fetch("/api/user", { credentials: "include" });
-        if (!sessionResponse.ok && retryCount < MAX_RETRIES) {
-          console.log(`[Auth] Session validation retry ${retryCount + 1}/${MAX_RETRIES}`);
-          retryTimeoutRef.current = setTimeout(() => {
-            validateSession(retryCount + 1);
-          }, RETRY_DELAY);
-          return;
+      setAuthState(prev => ({
+        ...prev,
+        isLoading: false,
+        navigationAttempt: {
+          inProgress: true,
+          timestamp: Date.now(),
+          success: true
         }
-
-        if (sessionResponse.ok) {
-          console.log('[Auth] Session validated successfully');
-          setAuthState(prev => ({
-            ...prev,
-            isLoading: false,
-            error: null,
-            navigationAttempt: {
-              ...prev.navigationAttempt,
-              success: true
-            }
-          }));
-        } else {
-          console.log('[Auth] Session validation failed after retries');
-          resetNavigationState();
-        }
-      };
-
-      await validateSession();
+      }));
       return { ok: true, user: data.user };
     } catch (e: any) {
       console.error('[Auth] Login error:', e);
@@ -240,13 +183,6 @@ export function useUser() {
       return { ok: false, ...error };
     }
   }, [authState.isLoading, mutate, resetNavigationState]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      clearTimeouts();
-    };
-  }, [clearTimeouts]);
 
   return {
     user: data,

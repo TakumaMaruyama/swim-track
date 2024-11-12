@@ -19,8 +19,6 @@ import { useUser } from "../hooks/use-user";
 import { insertUserSchema } from "db/schema";
 import { useEffect, useCallback, useRef } from "react";
 
-const FORCE_NAVIGATION_TIMEOUT = 3000; // 3 seconds
-
 export default function Login() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -32,8 +30,6 @@ export default function Login() {
     navigationSuccess,
     error: authError 
   } = useUser();
-
-  const navigationTimeoutRef = useRef<NodeJS.Timeout>();
   
   const form = useForm({
     resolver: zodResolver(insertUserSchema),
@@ -43,31 +39,19 @@ export default function Login() {
     },
   });
 
-  // Force navigation after timeout
+  // Force navigation using direct URL change
   const forceNavigation = useCallback(() => {
     console.log('[Login] Forcing navigation to dashboard');
-    navigate("/", { replace: true });
-  }, [navigate]);
+    window.location.href = '/';
+  }, []);
 
   // Handle navigation after authentication
   const handleNavigation = useCallback(() => {
     if (isAuthenticated && !isNavigating) {
-      console.log('[Login] User authenticated, setting up forced navigation');
-      
-      // Clear any existing timeout
-      if (navigationTimeoutRef.current) {
-        clearTimeout(navigationTimeoutRef.current);
-      }
-
-      // Set up new forced navigation timeout
-      navigationTimeoutRef.current = setTimeout(() => {
-        forceNavigation();
-      }, FORCE_NAVIGATION_TIMEOUT);
-
-      // Attempt immediate navigation
-      navigate("/");
+      console.log('[Login] User authenticated, initiating navigation');
+      forceNavigation();
     }
-  }, [isAuthenticated, isNavigating, navigate, forceNavigation]);
+  }, [isAuthenticated, isNavigating, forceNavigation]);
 
   // Monitor navigation success
   useEffect(() => {
@@ -85,17 +69,11 @@ export default function Login() {
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (!isAuthChecking) {
+    if (!isAuthChecking && isAuthenticated) {
+      console.log('[Login] Already authenticated, initiating navigation');
       handleNavigation();
     }
-    
-    // Cleanup timeout on unmount
-    return () => {
-      if (navigationTimeoutRef.current) {
-        clearTimeout(navigationTimeoutRef.current);
-      }
-    };
-  }, [isAuthenticated, isAuthChecking, handleNavigation]);
+  }, [isAuthChecking, isAuthenticated, handleNavigation]);
 
   async function onSubmit(values: { username: string; password: string }) {
     try {
@@ -111,7 +89,6 @@ export default function Login() {
       } else {
         console.log('[Login] Login failed:', result.message);
         if (result.errors) {
-          // Set form errors if we have field-specific errors
           Object.entries(result.errors).forEach(([field, messages]) => {
             form.setError(field as "username" | "password", {
               type: "manual",
