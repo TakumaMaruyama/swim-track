@@ -197,7 +197,7 @@ export default function AllTimeRecords() {
                 <CardTitle className="flex items-center justify-between">
                   <div>
                     <span className="text-xl">{record.style}</span>
-                    <span className="text-sm text-muted-foreground ml-2">
+                    <span className="text-sm ml-2">
                       {record.distance}m ({record.poolLength}mプール)
                     </span>
                   </div>
@@ -222,12 +222,10 @@ export default function AllTimeRecords() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex justify-between items-start">
-                  <div>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-4">
                     <p className="text-3xl font-bold text-primary">{record.time}</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {record.athleteName} - {new Date(record.date).toLocaleDateString('ja-JP')}
-                    </p>
+                    <p className="text-xl font-semibold">{record.athleteName}</p>
                   </div>
                   {record.isCompetition && (
                     <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
@@ -235,6 +233,9 @@ export default function AllTimeRecords() {
                     </span>
                   )}
                 </div>
+                <p className="text-sm mt-2">
+                  {new Date(record.date).toLocaleDateString('ja-JP')}
+                </p>
               </CardContent>
             </Card>
           ))}

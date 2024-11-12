@@ -213,36 +213,36 @@ export default function Competitions() {
                         key={record.id} 
                         className="flex flex-col p-4 rounded-lg bg-muted/50"
                       >
-                        <div className="flex justify-between items-center mb-2">
-                          <p className="font-medium text-lg">{record.style}</p>
-                          <div className="flex items-center gap-2">
-                            <p className="text-xl font-bold text-primary">{record.time}</p>
-                            {user?.role === 'coach' && (
-                              <div className="flex gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => setEditingRecord(record.id)}
-                                >
-                                  <Edit2 className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleDelete(record.id)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            )}
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="space-y-1">
+                            <p className="font-medium text-lg">{record.style}</p>
+                            <p className="font-medium">
+                              {record.distance}m {record.poolLength ? `(${record.poolLength}mプール)` : ''}
+                            </p>
                           </div>
+                          {user?.role === 'coach' && (
+                            <div className="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setEditingRecord(record.id)}
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDelete(record.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          )}
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          {record.distance}m {record.poolLength ? `(${record.poolLength}mプール)` : ''}
-                        </p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          選手: {record.athleteName}
-                        </p>
+                        <div className="flex items-center gap-4">
+                          <p className="text-2xl font-bold text-primary">{record.time}</p>
+                          <p className="text-xl font-semibold">{record.athleteName}</p>
+                        </div>
                       </div>
                     ))}
                   </div>
