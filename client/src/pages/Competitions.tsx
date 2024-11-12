@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { EditRecordForm } from '../components/EditRecordForm';
 import { useUser } from '../hooks/use-user';
 import { useToast } from '@/hooks/use-toast';
+import { PageHeader } from '../components/PageHeader';
 
 type GroupedCompetitions = {
   [date: string]: {
@@ -17,6 +18,7 @@ type GroupedCompetitions = {
     time: string;
     studentId: number;
     isCompetition: boolean;
+    athleteName?: string;
   }[];
 };
 
@@ -51,6 +53,7 @@ export default function Competitions() {
         time: record.time,
         studentId: record.studentId,
         isCompetition: record.isCompetition,
+        athleteName: record.athleteName,
       });
       
       return acc;
@@ -153,89 +156,100 @@ export default function Competitions() {
 
   if (isLoading) {
     return (
-      <div className="container py-8">
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="animate-pulse text-lg">大会記録を読み込んでいます...</div>
+      <>
+        <PageHeader title="大会記録" />
+        <div className="container">
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="animate-pulse text-lg">大会記録を読み込んでいます...</div>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   if (error) {
     return (
-      <div className="container py-8">
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            大会記録の取得中にエラーが発生しました。再度お試しください。
-          </AlertDescription>
-        </Alert>
-      </div>
+      <>
+        <PageHeader title="大会記録" />
+        <div className="container">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              大会記録の取得中にエラーが発生しました。再度お試しください。
+            </AlertDescription>
+          </Alert>
+        </div>
+      </>
     );
   }
 
   return (
-    <div className="container py-8 px-4 md:px-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl md:text-3xl font-bold">大会記録</h1>
-        {user?.role === 'coach' && (
-          <Button
-            onClick={() => setEditingRecord(-1)}
-            className="mb-4"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            新規記録追加
-          </Button>
-        )}
-      </div>
-      <div className="space-y-6">
-        {Object.entries(groupedRecords)
-          .sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime())
-          .map(([date, records]) => (
-            <Card key={date} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <CardTitle className="text-xl">{date}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {records.map((record) => (
-                    <div 
-                      key={record.id} 
-                      className="flex flex-col p-4 rounded-lg bg-muted/50"
-                    >
-                      <div className="flex justify-between items-center mb-2">
-                        <p className="font-medium text-lg">{record.style}</p>
-                        <div className="flex items-center gap-2">
-                          <p className="text-xl font-bold text-primary">{record.time}</p>
-                          {user?.role === 'coach' && (
-                            <div className="flex gap-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setEditingRecord(record.id)}
-                              >
-                                <Edit2 className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDelete(record.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          )}
+    <>
+      <PageHeader 
+        title="大会記録"
+        children={
+          user?.role === 'coach' && (
+            <Button onClick={() => setEditingRecord(-1)}>
+              <Plus className="mr-2 h-4 w-4" />
+              新規記録追加
+            </Button>
+          )
+        }
+      />
+      
+      <div className="container px-4 md:px-8">
+        <div className="space-y-6">
+          {Object.entries(groupedRecords)
+            .sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime())
+            .map(([date, records]) => (
+              <Card key={date} className="hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <CardTitle className="text-xl">{date}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {records.map((record) => (
+                      <div 
+                        key={record.id} 
+                        className="flex flex-col p-4 rounded-lg bg-muted/50"
+                      >
+                        <div className="flex justify-between items-center mb-2">
+                          <p className="font-medium text-lg">{record.style}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-xl font-bold text-primary">{record.time}</p>
+                            {user?.role === 'coach' && (
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setEditingRecord(record.id)}
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleDelete(record.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
+                          </div>
                         </div>
+                        <p className="text-sm text-muted-foreground">
+                          {record.distance}m {record.poolLength ? `(${record.poolLength}mプール)` : ''}
+                        </p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          選手: {record.athleteName}
+                        </p>
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        {record.distance}m {record.poolLength ? `(${record.poolLength}mプール)` : ''}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+        </div>
       </div>
 
       <EditRecordForm
@@ -250,6 +264,6 @@ export default function Competitions() {
           }
         }}
       />
-    </div>
+    </>
   );
 }

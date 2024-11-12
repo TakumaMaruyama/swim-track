@@ -37,8 +37,8 @@ export default function AllTimeRecords() {
   const { toast } = useToast();
   const { records, isLoading, error, mutate } = useSwimRecords();
   const [editingRecord, setEditingRecord] = React.useState<number | null>(null);
-  const [styleFilter, setStyleFilter] = React.useState<string>("");
-  const [poolLengthFilter, setPoolLengthFilter] = React.useState<string>("");
+  const [styleFilter, setStyleFilter] = React.useState<string>("all");
+  const [poolLengthFilter, setPoolLengthFilter] = React.useState<string>("all_pools");
 
   const swimStyles = [
     "自由形",
@@ -54,8 +54,8 @@ export default function AllTimeRecords() {
     if (!records) return {};
     return records.reduce((acc, record) => {
       // Apply filters
-      if (styleFilter && record.style !== styleFilter) return acc;
-      if (poolLengthFilter && record.poolLength !== parseInt(poolLengthFilter)) return acc;
+      if (styleFilter !== "all" && record.style !== styleFilter) return acc;
+      if (poolLengthFilter !== "all_pools" && record.poolLength !== parseInt(poolLengthFilter)) return acc;
 
       const key = `${record.style}-${record.distance}-${record.poolLength}`;
       if (!acc[key] || record.time < acc[key].time) {
@@ -134,7 +134,7 @@ export default function AllTimeRecords() {
   if (isLoading) {
     return (
       <>
-        <PageHeader title="歴代ベスト" />
+        <PageHeader title="歴代記録" />
         <div className="container">
           <div className="flex items-center justify-center min-h-[60vh]">
             <div className="animate-pulse text-lg">記録を読み込んでいます...</div>
@@ -147,7 +147,7 @@ export default function AllTimeRecords() {
   if (error) {
     return (
       <>
-        <PageHeader title="歴代ベスト" />
+        <PageHeader title="歴代記録" />
         <div className="container">
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
@@ -162,14 +162,14 @@ export default function AllTimeRecords() {
 
   return (
     <>
-      <PageHeader title="歴代ベスト">
+      <PageHeader title="歴代記録">
         <div className="flex gap-4">
           <Select value={styleFilter} onValueChange={setStyleFilter}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="種目で絞り込み" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">すべての種目</SelectItem>
+              <SelectItem value="all">すべての種目</SelectItem>
               {swimStyles.map(style => (
                 <SelectItem key={style} value={style}>{style}</SelectItem>
               ))}
@@ -180,7 +180,7 @@ export default function AllTimeRecords() {
               <SelectValue placeholder="プール長で絞り込み" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">すべてのプール</SelectItem>
+              <SelectItem value="all_pools">すべてのプール</SelectItem>
               {poolLengths.map(length => (
                 <SelectItem key={length} value={length.toString()}>{length}mプール</SelectItem>
               ))}
@@ -241,7 +241,7 @@ export default function AllTimeRecords() {
         </div>
 
         <EditRecordForm
-          record={record}
+          record={editingRecord === -1 ? undefined : record}
           isOpen={!!editingRecord}
           onClose={() => setEditingRecord(null)}
           onSubmit={async (data) => {
