@@ -17,12 +17,18 @@ import { AlertCircle, Loader2, Home } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
 import { insertUserSchema } from "db/schema";
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 
 export default function Login() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { login, isAuthenticated, isLoading: isAuthChecking, error: authError } = useUser();
+  const { 
+    login, 
+    isAuthenticated, 
+    isLoading: isAuthChecking, 
+    isNavigating,
+    error: authError 
+  } = useUser();
   
   const form = useForm({
     resolver: zodResolver(insertUserSchema),
@@ -32,38 +38,59 @@ export default function Login() {
     },
   });
 
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
+  // Handle navigation after authentication
+  const handleNavigation = useCallback(() => {
+    if (isAuthenticated && !isNavigating) {
+      console.log('[Login] User authenticated, navigating to dashboard');
       navigate("/");
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, isNavigating, navigate]);
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    console.log('[Login] Auth state changed:', { isAuthenticated, isAuthChecking, isNavigating });
+    
+    if (!isAuthChecking) {
+      handleNavigation();
+    }
+  }, [isAuthenticated, isAuthChecking, handleNavigation]);
 
   async function onSubmit(values: { username: string; password: string }) {
-    const result = await login(values);
-    
-    if (result.ok) {
-      toast({
-        title: "ログイン成功",
-        description: "ダッシュボードに移動します",
-      });
-      navigate("/");
-    } else {
-      if (result.errors) {
-        // Set form errors if we have field-specific errors
-        Object.entries(result.errors).forEach(([field, messages]) => {
-          form.setError(field as "username" | "password", {
-            type: "manual",
-            message: messages[0],
-          });
-        });
-      } else {
+    try {
+      console.log('[Login] Attempting login');
+      const result = await login(values);
+      
+      if (result.ok) {
         toast({
-          variant: "destructive",
-          title: "エラー",
-          description: result.message,
+          title: "ログイン成功",
+          description: "ダッシュボードに移動します",
         });
+        handleNavigation();
+      } else {
+        console.log('[Login] Login failed:', result.message);
+        if (result.errors) {
+          // Set form errors if we have field-specific errors
+          Object.entries(result.errors).forEach(([field, messages]) => {
+            form.setError(field as "username" | "password", {
+              type: "manual",
+              message: messages[0],
+            });
+          });
+        } else {
+          toast({
+            variant: "destructive",
+            title: "エラー",
+            description: result.message,
+          });
+        }
       }
+    } catch (error) {
+      console.error('[Login] Unexpected error:', error);
+      toast({
+        variant: "destructive",
+        title: "エラー",
+        description: "予期せぬエラーが発生しました",
+      });
     }
   }
 
@@ -116,7 +143,7 @@ export default function Login() {
                       <FormControl>
                         <Input 
                           {...field} 
-                          disabled={form.formState.isSubmitting}
+                          disabled={form.formState.isSubmitting || isNavigating}
                           autoComplete="username"
                           className="bg-white"
                         />
@@ -135,7 +162,7 @@ export default function Login() {
                         <Input 
                           type="password" 
                           {...field} 
-                          disabled={form.formState.isSubmitting}
+                          disabled={form.formState.isSubmitting || isNavigating}
                           autoComplete="current-password"
                           className="bg-white"
                         />
@@ -153,12 +180,12 @@ export default function Login() {
                 <Button 
                   type="submit" 
                   className="w-full" 
-                  disabled={form.formState.isSubmitting}
+                  disabled={form.formState.isSubmitting || isNavigating}
                 >
-                  {form.formState.isSubmitting ? (
+                  {form.formState.isSubmitting || isNavigating ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ログイン中...
+                      {isNavigating ? "移動中..." : "ログイン中..."}
                     </>
                   ) : (
                     "ログイン"
@@ -175,7 +202,7 @@ export default function Login() {
               variant="outline"
               className="w-full"
               onClick={() => navigate("/register")}
-              disabled={form.formState.isSubmitting}
+              disabled={form.formState.isSubmitting || isNavigating}
             >
               新規登録
             </Button>

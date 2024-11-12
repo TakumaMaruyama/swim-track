@@ -1,6 +1,6 @@
 import useSWR from "swr";
 import type { User, InsertUser } from "db/schema";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 
 interface AuthError {
   message: string;
@@ -11,12 +11,20 @@ interface AuthError {
 interface AuthState {
   isLoading: boolean;
   error: AuthError | null;
+  navigationAttempt: {
+    inProgress: boolean;
+    timestamp: number;
+  };
 }
 
 export function useUser() {
   const [authState, setAuthState] = useState<AuthState>({
     isLoading: false,
     error: null,
+    navigationAttempt: {
+      inProgress: false,
+      timestamp: 0,
+    }
   });
 
   const { 
@@ -35,13 +43,42 @@ export function useUser() {
     }
   });
 
+  // Cleanup navigation attempts that are stale
+  useEffect(() => {
+    const NAVIGATION_TIMEOUT = 5000; // 5 seconds
+    if (authState.navigationAttempt.inProgress) {
+      const timeSinceAttempt = Date.now() - authState.navigationAttempt.timestamp;
+      if (timeSinceAttempt > NAVIGATION_TIMEOUT) {
+        console.log('[Auth] Cleaning up stale navigation attempt');
+        setAuthState(prev => ({
+          ...prev,
+          navigationAttempt: {
+            inProgress: false,
+            timestamp: 0
+          }
+        }));
+      }
+    }
+  }, [authState.navigationAttempt]);
+
   const login = useCallback(async (user: InsertUser) => {
     if (authState.isLoading) {
+      console.log('[Auth] Login already in progress');
       return { ok: false, message: "ログイン処理中です" };
     }
 
     try {
-      setAuthState({ isLoading: true, error: null });
+      console.log('[Auth] Starting login attempt');
+      setAuthState(prev => ({ 
+        ...prev,
+        isLoading: true, 
+        error: null,
+        navigationAttempt: {
+          inProgress: true,
+          timestamp: Date.now()
+        }
+      }));
+
       const response = await fetch("/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -52,26 +89,48 @@ export function useUser() {
       const data = await response.json();
 
       if (!response.ok) {
-        setAuthState({
+        console.log('[Auth] Login failed:', data.message);
+        setAuthState(prev => ({
+          ...prev,
           isLoading: false,
           error: {
             message: data.message || "ログインに失敗しました",
             field: data.field,
             errors: data.errors,
           },
-        });
+          navigationAttempt: {
+            inProgress: false,
+            timestamp: 0
+          }
+        }));
         return { ok: false, message: data.message, field: data.field, errors: data.errors };
       }
 
+      console.log('[Auth] Login successful, updating session');
       await mutate();
-      setAuthState({ isLoading: false, error: null });
+      setAuthState({
+        isLoading: false,
+        error: null,
+        navigationAttempt: {
+          inProgress: false,
+          timestamp: 0
+        }
+      });
       return { ok: true, user: data.user };
     } catch (e: any) {
+      console.error('[Auth] Login error:', e);
       const error = {
         message: "サーバーとの通信に失敗しました",
         field: "network",
       };
-      setAuthState({ isLoading: false, error });
+      setAuthState({
+        isLoading: false,
+        error,
+        navigationAttempt: {
+          inProgress: false,
+          timestamp: 0
+        }
+      });
       return { ok: false, ...error };
     }
   }, [authState.isLoading, mutate]);
@@ -82,7 +141,8 @@ export function useUser() {
     }
 
     try {
-      setAuthState({ isLoading: true, error: null });
+      console.log('[Auth] Starting logout');
+      setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
       const response = await fetch("/logout", {
         method: "POST",
         credentials: "include",
@@ -91,61 +151,36 @@ export function useUser() {
       const data = await response.json();
 
       if (!response.ok) {
-        setAuthState({
+        setAuthState(prev => ({
+          ...prev,
           isLoading: false,
           error: { message: data.message || "ログアウトに失敗しました" },
-        });
+        }));
         return { ok: false, message: data.message };
       }
 
       // Clear user data and reset state
       await mutate(undefined, false);
-      setAuthState({ isLoading: false, error: null });
+      setAuthState({
+        isLoading: false,
+        error: null,
+        navigationAttempt: {
+          inProgress: false,
+          timestamp: 0
+        }
+      });
       return { ok: true };
     } catch (e: any) {
+      console.error('[Auth] Logout error:', e);
       const error = { message: "サーバーとの通信に失敗しました" };
-      setAuthState({ isLoading: false, error });
-      return { ok: false, ...error };
-    }
-  }, [authState.isLoading, mutate]);
-
-  const register = useCallback(async (user: InsertUser) => {
-    if (authState.isLoading) {
-      return { ok: false, message: "登録処理中です" };
-    }
-
-    try {
-      setAuthState({ isLoading: true, error: null });
-      const response = await fetch("/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(user),
-        credentials: "include",
+      setAuthState({
+        isLoading: false,
+        error,
+        navigationAttempt: {
+          inProgress: false,
+          timestamp: 0
+        }
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setAuthState({
-          isLoading: false,
-          error: {
-            message: data.message || "登録に失敗しました",
-            field: data.field,
-            errors: data.errors,
-          },
-        });
-        return { ok: false, message: data.message, field: data.field, errors: data.errors };
-      }
-
-      await mutate();
-      setAuthState({ isLoading: false, error: null });
-      return { ok: true, user: data.user };
-    } catch (e: any) {
-      const error = {
-        message: "サーバーとの通信に失敗しました",
-        field: "network",
-      };
-      setAuthState({ isLoading: false, error });
       return { ok: false, ...error };
     }
   }, [authState.isLoading, mutate]);
@@ -155,9 +190,9 @@ export function useUser() {
     isLoading: swrLoading || authState.isLoading,
     isLoginPending: authState.isLoading,
     isAuthenticated: !!data,
+    isNavigating: authState.navigationAttempt.inProgress,
     error: authState.error || (swrError ? { message: "認証に失敗しました" } : null),
     login,
     logout,
-    register,
   };
 }
