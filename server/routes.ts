@@ -138,6 +138,40 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Delete athlete and associated records
+  app.delete("/api/athletes/:id", requireAuth, requireCoach, async (req, res) => {
+    const { id } = req.params;
+    
+    try {
+      // Start a transaction
+      await db.transaction(async (tx) => {
+        // Delete associated records first
+        await tx
+          .delete(swimRecords)
+          .where(eq(swimRecords.studentId, parseInt(id)));
+
+        // Delete the athlete
+        const [deletedAthlete] = await tx
+          .delete(users)
+          .where(and(
+            eq(users.id, parseInt(id)),
+            eq(users.role, "student")
+          ))
+          .returning();
+
+        if (!deletedAthlete) {
+          throw new Error("選手が見つかりません");
+        }
+      });
+
+      res.json({ message: "選手と関連する記録が削除されました" });
+    } catch (error) {
+      console.error('Error deleting athlete:', error);
+      res.status(error.message === "選手が見つかりません" ? 404 : 500)
+        .json({ message: error.message || "選手の削除に失敗しました" });
+    }
+  });
+
   // Update athlete status
   app.patch("/api/athletes/:id/status", requireAuth, requireCoach, async (req, res) => {
     try {
@@ -322,14 +356,21 @@ export function registerRoutes(app: Express) {
     try {
       const { id } = req.params;
       
-      const [deletedRecord] = await db
-        .delete(swimRecords)
+      // Check if record exists before deletion
+      const [record] = await db
+        .select()
+        .from(swimRecords)
         .where(eq(swimRecords.id, parseInt(id)))
-        .returning();
+        .limit(1);
 
-      if (!deletedRecord) {
+      if (!record) {
         return res.status(404).json({ message: "記録が見つかりません" });
       }
+
+      // Delete the record
+      await db
+        .delete(swimRecords)
+        .where(eq(swimRecords.id, parseInt(id)));
 
       res.json({ message: "記録を削除しました" });
     } catch (error) {
@@ -392,6 +433,42 @@ export function registerRoutes(app: Express) {
       res.download(filePath);
     } catch (error) {
       res.status(500).json({ message: "ダウンロードに失敗しました" });
+    }
+  });
+
+  app.delete("/api/documents/:id", requireAuth, requireCoach, async (req, res) => {
+    const { id } = req.params;
+    
+    try {
+      // Get document details first
+      const [document] = await db
+        .select()
+        .from(documents)
+        .where(eq(documents.id, parseInt(id)))
+        .limit(1);
+
+      if (!document) {
+        return res.status(404).json({ message: "ドキュメントが見つかりません" });
+      }
+
+      // Delete the file
+      const filePath = path.join("uploads", document.filename);
+      try {
+        await fs.unlink(filePath);
+      } catch (error) {
+        console.error('Error deleting file:', error);
+        // Continue with database deletion even if file deletion fails
+      }
+
+      // Delete from database
+      await db
+        .delete(documents)
+        .where(eq(documents.id, parseInt(id)));
+
+      res.json({ message: "ドキュメントが削除されました" });
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      res.status(500).json({ message: "ドキュメントの削除に失敗しました" });
     }
   });
 

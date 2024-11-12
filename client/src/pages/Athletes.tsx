@@ -5,7 +5,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Edit2, Plus, Power, History } from "lucide-react";
+import { AlertCircle, Edit2, Plus, Power, History, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { EditAthleteForm } from '../components/EditAthleteForm';
 import { EditRecordForm } from '../components/EditRecordForm';
 import { TimeHistoryModal } from '../components/TimeHistoryModal';
@@ -20,6 +30,7 @@ export default function Athletes() {
   const { athletes, isLoading: athletesLoading, error: athletesError, mutate: mutateAthletes } = useAthletes();
   const { records, isLoading: recordsLoading, error: recordsError, mutate: mutateRecords } = useSwimRecords();
   const [editingAthlete, setEditingAthlete] = React.useState<number | null>(null);
+  const [deletingAthlete, setDeletingAthlete] = React.useState<number | null>(null);
   const [editingRecord, setEditingRecord] = React.useState<{id: number | null, studentId: number | null}>({
     id: null,
     studentId: null
@@ -155,6 +166,36 @@ export default function Athletes() {
     }
   };
 
+  const handleDelete = async (athleteId: number) => {
+    try {
+      const response = await fetch(`/api/athletes/${athleteId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete athlete');
+      }
+
+      await Promise.all([
+        mutateAthletes(),
+        mutateRecords()
+      ]);
+      
+      toast({
+        title: "削除成功",
+        description: "選手と関連する記録が削除されました",
+      });
+    } catch (error) {
+      console.error('Error deleting athlete:', error);
+      toast({
+        variant: "destructive",
+        title: "エラー",
+        description: "選手の削除に失敗しました",
+      });
+    }
+  };
+
   if (athletesLoading || recordsLoading) {
     return (
       <>
@@ -259,6 +300,13 @@ export default function Athletes() {
                           >
                             <Plus className="h-4 w-4" />
                           </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeletingAthlete(athlete.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
                         </>
                       )}
                     </div>
@@ -345,6 +393,34 @@ export default function Athletes() {
             athleteName={viewingHistory.athleteName}
           />
         )}
+
+        <AlertDialog 
+          open={!!deletingAthlete} 
+          onOpenChange={(open) => !open && setDeletingAthlete(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>選手を削除しますか？</AlertDialogTitle>
+              <AlertDialogDescription>
+                この操作は取り消せません。選手に関連するすべての記録も削除されます。
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>キャンセル</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (deletingAthlete) {
+                    handleDelete(deletingAthlete);
+                    setDeletingAthlete(null);
+                  }
+                }}
+                className="bg-red-500 hover:bg-red-600"
+              >
+                削除
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </>
   );
