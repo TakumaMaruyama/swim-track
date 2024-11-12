@@ -12,7 +12,8 @@ import {
   LogOut,
   Plus,
   Edit2,
-  Trash2
+  Trash2,
+  UserX
 } from 'lucide-react'
 import { useUser } from '../hooks/use-user'
 import { useLocation } from 'wouter'
@@ -22,7 +23,7 @@ import { useSwimRecords } from '../hooks/use-swim-records'
 import { useCompetitions } from '../hooks/use-competitions'
 import { PageHeader } from '../components/PageHeader'
 import { EditCompetitionForm } from '../components/EditCompetitionForm'
-import { useToast } from '@/hooks/use-toast'
+import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -60,13 +61,14 @@ const calculateTimeImprovement = (records: any[]) => {
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
-  const { user, isLoading, logout } = useUser();
+  const { user, isLoading, logout, deleteAccount } = useUser();
   const isMobile = useMobile();
   const { toast } = useToast();
   const { records, isLoading: recordsLoading } = useSwimRecords(true);
   const { competitions, isLoading: competitionsLoading, mutate: mutateCompetitions } = useCompetitions();
   const [editingCompetition, setEditingCompetition] = React.useState<number | null>(null);
   const [showLogoutDialog, setShowLogoutDialog] = React.useState(false);
+  const [showDeleteAccountDialog, setShowDeleteAccountDialog] = React.useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -87,6 +89,32 @@ export default function Dashboard() {
         variant: "destructive",
         title: "エラー",
         description: result.message || "ログアウトに失敗しました",
+      });
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    try {
+      const result = await deleteAccount();
+      if (result.ok) {
+        toast({
+          title: "アカウント削除成功",
+          description: "アカウントが削除されました",
+        });
+        navigate('/login');
+      } else {
+        toast({
+          variant: "destructive",
+          title: "エラー",
+          description: result.message || "アカウントの削除に失敗しました",
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting account:', error);
+      toast({
+        variant: "destructive",
+        title: "エラー",
+        description: "予期せぬエラーが発生しました",
       });
     }
   };
@@ -205,14 +233,26 @@ export default function Dashboard() {
               </Avatar>
               <span className="ml-2 text-sm font-medium text-gray-700">{user.username}</span>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowLogoutDialog(true)}
-              className="text-gray-600 hover:text-gray-900"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowLogoutDialog(true)}
+                className="text-gray-600 hover:text-gray-900"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+              {user?.role === 'coach' && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowDeleteAccountDialog(true)}
+                  className="text-red-600 hover:text-red-900"
+                >
+                  <UserX className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -386,6 +426,29 @@ export default function Dashboard() {
             <AlertDialogCancel>キャンセル</AlertDialogCancel>
             <AlertDialogAction onClick={handleLogout}>
               ログアウト
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog 
+        open={showDeleteAccountDialog} 
+        onOpenChange={setShowDeleteAccountDialog}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>アカウントを削除しますか？</AlertDialogTitle>
+            <AlertDialogDescription>
+              この操作は取り消せません。アカウントと関連するすべてのデータが完全に削除されます。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>キャンセル</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteAccount}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              削除
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -474,5 +474,52 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Add coach account deletion endpoint
+  app.delete("/api/user", requireAuth, async (req, res) => {
+    try {
+      // Verify the user is a coach
+      if (req.user?.role !== "coach") {
+        return res.status(403).json({ message: "コーチアカウントのみ削除できます" });
+      }
+
+      const userId = req.user.id;
+
+      // First, delete all documents uploaded by this coach
+      await db
+        .delete(documents)
+        .where(eq(documents.uploaderId, userId));
+
+      // Then delete the coach's account
+      const [deletedUser] = await db
+        .delete(users)
+        .where(and(
+          eq(users.id, userId),
+          eq(users.role, "coach")
+        ))
+        .returning();
+
+      if (!deletedUser) {
+        return res.status(404).json({ message: "アカウントが見つかりません" });
+      }
+
+      // Destroy the session
+      req.logout((err) => {
+        if (err) {
+          console.error('Error during logout:', err);
+        }
+        req.session.destroy((err) => {
+          if (err) {
+            console.error('Error destroying session:', err);
+          }
+          res.clearCookie('connect.sid');
+          res.json({ message: "アカウントが削除されました" });
+        });
+      });
+    } catch (error) {
+      console.error('Error deleting coach account:', error);
+      res.status(500).json({ message: "アカウントの削除に失敗しました" });
+    }
+  });
+
   return app;
 }
