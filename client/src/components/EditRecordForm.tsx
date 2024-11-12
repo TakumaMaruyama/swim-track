@@ -29,9 +29,12 @@ import * as z from "zod";
 // Time format validation regex: MM:SS.ms
 const timeRegex = /^([0-5]?[0-9]):([0-5][0-9])\.([0-9]{1,3})$/;
 
+// Available distances
+const distances = [15, 25, 30, 60, 120, 240];
+
 const editRecordSchema = z.object({
   style: z.string().min(1, "種目を選択してください"),
-  distance: z.number().min(25, "距離は25m以上である必要があります"),
+  distance: z.number().refine(val => distances.includes(val), "有効な距離を選択してください"),
   time: z.string().regex(timeRegex, "タイム形式は MM:SS.ms である必要があります"),
   date: z.string().min(1, "日付を選択してください"),
   isCompetition: z.boolean().default(false),
@@ -53,7 +56,7 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
     resolver: zodResolver(editRecordSchema),
     defaultValues: {
       style: record?.style ?? "",
-      distance: record?.distance ?? 50,
+      distance: record?.distance ?? 25,
       time: record?.time ?? "",
       date: record ? new Date(record.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       isCompetition: record?.isCompetition ?? false,
@@ -128,14 +131,17 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
                 <FormItem>
                   <FormLabel>距離 (m)</FormLabel>
                   <FormControl>
-                    <Input
-                      type="number"
-                      min="25"
-                      step="25"
+                    <select
+                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                       {...field}
                       onChange={e => field.onChange(Number(e.target.value))}
                       disabled={isSubmitting}
-                    />
+                    >
+                      <option value="">距離を選択</option>
+                      {distances.map(d => (
+                        <option key={d} value={d}>{d}m</option>
+                      ))}
+                    </select>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
