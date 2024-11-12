@@ -224,8 +224,8 @@ export default function AllTimeRecords() {
               <CardContent>
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-4">
-                    <p className="text-3xl font-bold text-primary">{record.time}</p>
                     <p className="text-xl font-semibold">{record.athleteName}</p>
+                    <p className="text-3xl font-bold text-primary">{record.time}</p>
                   </div>
                   {record.isCompetition && (
                     <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">

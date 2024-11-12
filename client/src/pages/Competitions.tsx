@@ -22,7 +22,8 @@ type GroupedCompetitions = {
   }[];
 };
 
-const formatDate = (date: Date) => {
+const formatDate = (date: Date | null) => {
+  if (!date) return '';
   return new Intl.DateTimeFormat('ja-JP', {
     year: 'numeric',
     month: 'long',
@@ -40,7 +41,9 @@ export default function Competitions() {
     if (!records) return {};
 
     return records.reduce((acc, record) => {
-      const date = formatDate(new Date(record.date));
+      const date = formatDate(record.date ? new Date(record.date) : null);
+      if (!date) return acc;
+      
       if (!acc[date]) {
         acc[date] = [];
       }
@@ -52,7 +55,7 @@ export default function Competitions() {
         poolLength: record.poolLength,
         time: record.time,
         studentId: record.studentId,
-        isCompetition: record.isCompetition,
+        isCompetition: record.isCompetition ?? false,
         athleteName: record.athleteName,
       });
       
@@ -240,8 +243,8 @@ export default function Competitions() {
                           )}
                         </div>
                         <div className="flex items-center gap-4">
-                          <p className="text-2xl font-bold text-primary">{record.time}</p>
                           <p className="text-xl font-semibold">{record.athleteName}</p>
+                          <p className="text-2xl font-bold text-primary">{record.time}</p>
                         </div>
                       </div>
                     ))}
