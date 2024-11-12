@@ -69,7 +69,8 @@ export function useUser() {
 
       console.log('[Auth] Login successful, forcing immediate navigation');
       await mutate();
-      window.location.href = '/';
+      // Force a page reload to ensure fresh session
+      window.location.replace('/');
       return { ok: true, user: data.user };
     } catch (e: any) {
       console.error('[Auth] Login error:', e);

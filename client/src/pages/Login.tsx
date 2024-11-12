@@ -42,7 +42,7 @@ export default function Login() {
     console.log('[Login] Checking initial auth state:', { isAuthenticated, isAuthChecking });
     if (!isAuthChecking && isAuthenticated) {
       console.log('[Login] User is already authenticated, redirecting');
-      window.location.href = '/';
+      window.location.replace('/');
     }
   }, [isAuthChecking, isAuthenticated]);
 
@@ -57,8 +57,8 @@ export default function Login() {
           title: "ログイン成功",
           description: "ダッシュボードに移動します",
         });
-        // Force immediate navigation
-        window.location.href = '/';
+        // Force reload navigation
+        window.location.replace('/');
         return;
       }
 
