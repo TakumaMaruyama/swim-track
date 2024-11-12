@@ -5,11 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Edit2, Plus, LineChart } from "lucide-react";
+import { AlertCircle, Edit2, Plus } from "lucide-react";
 import { EditAthleteForm } from '../components/EditAthleteForm';
 import { EditRecordForm } from '../components/EditRecordForm';
 import { useUser } from '../hooks/use-user';
 import { useToast } from '@/hooks/use-toast';
+import { PageHeader } from '../components/PageHeader';
 
 export default function Athletes() {
   const { user } = useUser();
@@ -115,24 +116,30 @@ export default function Athletes() {
 
   if (athletesLoading || recordsLoading) {
     return (
-      <div className="container py-8">
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="animate-pulse text-lg">データを読み込んでいます...</div>
+      <>
+        <PageHeader title="選手一覧" />
+        <div className="container">
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="animate-pulse text-lg">データを読み込んでいます...</div>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   if (athletesError || recordsError) {
     return (
-      <div className="container py-8">
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            データの取得中にエラーが発生しました。再度お試しください。
-          </AlertDescription>
-        </Alert>
-      </div>
+      <>
+        <PageHeader title="選手一覧" />
+        <div className="container">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              データの取得中にエラーが発生しました。再度お試しください。
+            </AlertDescription>
+          </Alert>
+        </div>
+      </>
     );
   }
 
@@ -140,116 +147,128 @@ export default function Athletes() {
   const record = records?.find(r => r.id === editingRecord.id);
 
   return (
-    <div className="container py-8 px-4 md:px-8">
-      <h1 className="text-2xl md:text-3xl font-bold mb-8">選手一覧</h1>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {athletes?.map((athlete) => {
-          const latestRecord = getLatestPerformance(athlete.id);
-          return (
-            <Card key={athlete.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-4">
-                  <Avatar className="h-12 w-12">
-                    <AvatarFallback className="bg-primary text-primary-foreground">
-                      {athlete.username.substring(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <span className="text-lg">{athlete.username}</span>
-                    <p className="text-sm text-muted-foreground mt-1">選手</p>
-                  </div>
-                  {user?.role === 'coach' && (
-                    <div className="flex gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setEditingAthlete(athlete.id)}
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setEditingRecord({ id: null, studentId: athlete.id })}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
+    <>
+      <PageHeader 
+        title="選手一覧"
+        children={
+          user?.role === 'coach' && (
+            <Button onClick={() => setEditingRecord({ id: null, studentId: null })}>
+              <Plus className="mr-2 h-4 w-4" />
+              新規記録追加
+            </Button>
+          )
+        }
+      />
+      <div className="container px-4 md:px-8">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {athletes?.map((athlete) => {
+            const latestRecord = getLatestPerformance(athlete.id);
+            return (
+              <Card key={athlete.id} className="hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-4">
+                    <Avatar className="h-12 w-12">
+                      <AvatarFallback className="bg-primary text-primary-foreground">
+                        {athlete.username.substring(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <span className="text-lg">{athlete.username}</span>
+                      <p className="text-sm text-muted-foreground mt-1">選手</p>
                     </div>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {latestRecord ? (
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <h3 className="font-medium text-sm text-muted-foreground">最近の記録:</h3>
-                      {user?.role === 'coach' && (
+                    {user?.role === 'coach' && (
+                      <div className="flex gap-2">
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => setEditingRecord({ 
-                            id: latestRecord.id, 
-                            studentId: athlete.id 
-                          })}
+                          onClick={() => setEditingAthlete(athlete.id)}
                         >
                           <Edit2 className="h-4 w-4" />
                         </Button>
-                      )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setEditingRecord({ id: null, studentId: athlete.id })}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {latestRecord ? (
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <h3 className="font-medium text-sm text-muted-foreground">最近の記録:</h3>
+                        {user?.role === 'coach' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setEditingRecord({ 
+                              id: latestRecord.id, 
+                              studentId: athlete.id 
+                            })}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <p className="text-sm font-medium">種目</p>
+                          <p className="text-base">{latestRecord.style}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">距離</p>
+                          <p className="text-base">{latestRecord.distance}m</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">タイム</p>
+                          <p className="text-base font-bold">{latestRecord.time}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">日付</p>
+                          <p className="text-base">
+                            {new Date(latestRecord.date).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <p className="text-sm font-medium">種目</p>
-                        <p className="text-base">{latestRecord.style}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">距離</p>
-                        <p className="text-base">{latestRecord.distance}m</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">タイム</p>
-                        <p className="text-base font-bold">{latestRecord.time}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">日付</p>
-                        <p className="text-base">
-                          {new Date(latestRecord.date).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">記録なし</p>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">記録なし</p>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
 
-      {athlete && (
-        <EditAthleteForm
-          athlete={athlete}
-          isOpen={!!editingAthlete}
-          onClose={() => setEditingAthlete(null)}
+        {athlete && (
+          <EditAthleteForm
+            athlete={athlete}
+            isOpen={!!editingAthlete}
+            onClose={() => setEditingAthlete(null)}
+            onSubmit={async (data) => {
+              await handleEdit(athlete.id, data);
+            }}
+          />
+        )}
+
+        <EditRecordForm
+          record={record}
+          studentId={editingRecord.studentId ?? undefined}
+          isOpen={!!editingRecord.studentId}
+          onClose={() => setEditingRecord({ id: null, studentId: null })}
           onSubmit={async (data) => {
-            await handleEdit(athlete.id, data);
+            if (editingRecord.id) {
+              await handleEditRecord(editingRecord.id, data);
+            } else {
+              await handleCreateRecord(data);
+            }
           }}
         />
-      )}
-
-      <EditRecordForm
-        record={record}
-        studentId={editingRecord.studentId ?? undefined}
-        isOpen={!!editingRecord.studentId}
-        onClose={() => setEditingRecord({ id: null, studentId: null })}
-        onSubmit={async (data) => {
-          if (editingRecord.id) {
-            await handleEditRecord(editingRecord.id, data);
-          } else {
-            await handleCreateRecord(data);
-          }
-        }}
-      />
-    </div>
+      </div>
+    </>
   );
 }

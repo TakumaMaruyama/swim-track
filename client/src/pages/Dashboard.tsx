@@ -3,46 +3,48 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { 
-  BarChart, 
   Users, 
   Trophy, 
   Calendar, 
-  TrendingUp, 
-  Target, 
-  ClipboardList
+  Timer, 
+  ClipboardList,
+  TrendingDown
 } from 'lucide-react'
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-} from 'chart.js'
-import { Bar, Line } from 'react-chartjs-2'
 import { useUser } from '../hooks/use-user'
 import { useLocation } from 'wouter'
 import { useMobile } from '../hooks/use-mobile'
 import { MobileNav } from '../components/MobileNav'
+import { useSwimRecords } from '../hooks/use-swim-records'
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend
-)
+const calculateTimeUntilCompetition = (competitionDate: Date) => {
+  const now = new Date();
+  const diffTime = competitionDate.getTime() - now.getTime();
+  const days = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diffTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+
+  return { days, hours };
+};
+
+const calculateTimeImprovement = (records: any[]) => {
+  const lastMonth = new Date();
+  lastMonth.setMonth(lastMonth.getMonth() - 1);
+  
+  const improvements = records
+    .filter(record => new Date(record.date) >= lastMonth)
+    .reduce((acc, record) => {
+      const [mins, secs] = record.time.split(':');
+      const totalSeconds = parseInt(mins) * 60 + parseFloat(secs);
+      return acc + totalSeconds;
+    }, 0);
+
+  return improvements.toFixed(2);
+};
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
   const { user, isLoading, logout } = useUser();
   const isMobile = useMobile();
+  const { records, isLoading: recordsLoading } = useSwimRecords(true);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -50,13 +52,27 @@ export default function Dashboard() {
     }
   }, [user, isLoading, navigate]);
 
-  if (isLoading) {
+  if (isLoading || recordsLoading) {
     return <div className="flex items-center justify-center min-h-screen">読み込み中...</div>;
   }
 
   if (!user) {
     return null;
   }
+
+  // Sample upcoming competitions - This would typically come from an API
+  const upcomingCompetitions = [
+    {
+      name: "全国水泳大会2024",
+      date: new Date("2024-12-15"),
+      location: "東京アクアティクスセンター"
+    },
+    {
+      name: "ジュニア水泳選手権",
+      date: new Date("2024-12-28"),
+      location: "大阪プール"
+    }
+  ];
 
   const navItems = [
     { label: '選手一覧', icon: <Users className="h-4 w-4" />, href: '/athletes' },
@@ -65,47 +81,9 @@ export default function Dashboard() {
     { label: '資料', icon: <ClipboardList className="h-4 w-4" />, href: '/documents' },
   ];
 
-  // Performance improvement data
-  const performanceData = {
-    labels: ['1月', '2月', '3月', '4月', '5月', '6月'],
-    datasets: [
-      {
-        label: '平均タイム改善（秒）',
-        data: [0, -0.5, -0.8, -1.2, -1.5, -2],
-        borderColor: 'rgb(75, 192, 192)',
-        tension: 0.1
-      }
-    ]
-  }
-
-  // Swimming style ranking data
-  const rankingData = {
-    labels: ['自由形', '背泳ぎ', '平泳ぎ', 'バタフライ', '個人メドレー'],
-    datasets: [
-      {
-        label: 'チーム平均順位',
-        data: [3, 5, 2, 4, 1],
-        backgroundColor: 'rgba(53, 162, 235, 0.5)',
-      }
-    ]
-  }
-
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: !isMobile,
-    scales: {
-      x: {
-        type: 'category' as const,
-        ticks: {
-          maxRotation: isMobile ? 45 : 0,
-          minRotation: isMobile ? 45 : 0
-        }
-      },
-      y: {
-        beginAtZero: true
-      }
-    }
-  }
+  const nextCompetition = upcomingCompetitions[0];
+  const { days, hours } = calculateTimeUntilCompetition(nextCompetition.date);
+  const timeImprovement = records ? calculateTimeImprovement(records) : 0;
 
   const handleLogout = async () => {
     await logout();
@@ -163,22 +141,72 @@ export default function Dashboard() {
 
       <main className="flex-grow">
         <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid gap-4 md:grid-cols-3">
             <Card>
               <CardHeader>
-                <CardTitle>タイム改善推移</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  次の大会まで
+                </CardTitle>
               </CardHeader>
-              <CardContent className="h-[300px] sm:h-[400px]">
-                <Line data={performanceData} options={chartOptions} />
+              <CardContent>
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-primary mb-2">
+                    {days}日 {hours}時間
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {nextCompetition.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {nextCompetition.date.toLocaleDateString('ja-JP')}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingDown className="h-4 w-4" />
+                  先月の記録更新
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-primary mb-2">
+                    {timeImprovement}秒
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    平均タイム改善
+                  </p>
+                </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>種目別ランキング</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Timer className="h-4 w-4" />
+                  今後の大会
+                </CardTitle>
               </CardHeader>
-              <CardContent className="h-[300px] sm:h-[400px]">
-                <Bar data={rankingData} options={chartOptions} />
+              <CardContent>
+                <div className="space-y-4">
+                  {upcomingCompetitions.map((competition, index) => (
+                    <div 
+                      key={index}
+                      className="flex flex-col space-y-1 pb-3 border-b last:border-0 last:pb-0"
+                    >
+                      <p className="font-medium">{competition.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {competition.date.toLocaleDateString('ja-JP')}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {competition.location}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           </div>
