@@ -29,8 +29,8 @@ import * as z from "zod";
 // Time format validation regex: MM:SS.ms
 const timeRegex = /^([0-5]?[0-9]):([0-5][0-9])\.([0-9]{1,3})$/;
 
-// Available distances
-const distances = [15, 25, 30, 60, 120, 240];
+// Available distances - ordered from shortest to longest
+const distances = [15, 25, 30, 50, 60, 100, 120, 200, 240, 400, 800, 1500];
 
 const editRecordSchema = z.object({
   style: z.string().min(1, "種目を選択してください"),
@@ -56,7 +56,7 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
     resolver: zodResolver(editRecordSchema),
     defaultValues: {
       style: record?.style ?? "",
-      distance: record?.distance ?? 25,
+      distance: record?.distance ?? 50,
       time: record?.time ?? "",
       date: record ? new Date(record.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       isCompetition: record?.isCompetition ?? false,
