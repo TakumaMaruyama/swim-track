@@ -46,19 +46,15 @@ export function setupAuth(app: Express) {
   const MemoryStore = createMemoryStore(session);
   const sessionSettings: session.SessionOptions = {
     secret: process.env.REPL_ID || "porygon-supremacy",
-    resave: false,
+    resave: true, // Changed to true to ensure session persistence
     saveUninitialized: false,
     rolling: true,
     cookie: {
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      maxAge: 24 * 60 * 60 * 1000,
       httpOnly: true,
       sameSite: "lax",
       secure: app.get("env") === "production"
-    },
-    store: new MemoryStore({
-      checkPeriod: 86400000, // prune expired entries every 24h
-      stale: false, // Don't serve stale sessions
-    }),
+    }
   };
 
   app.use(session(sessionSettings));
@@ -234,6 +230,7 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/login", (req, res, next) => {
+    console.log('[Auth] Processing login request');
     const result = insertUserSchema.safeParse(req.body);
     if (!result.success) {
       return res
@@ -246,26 +243,30 @@ export function setupAuth(app: Express) {
 
     const cb = (err: any, user: Express.User, info: IVerifyOptions) => {
       if (err) {
-        console.error("Login error:", err);
+        console.error("[Auth] Login error:", err);
         return next(err);
       }
       if (!user) {
+        console.log('[Auth] Login failed:', info.message);
         return res.status(401).json({
           message: info.message ?? "ログインに失敗しました",
           field: "credentials"
         });
       }
+
       req.logIn(user, (err) => {
         if (err) {
-          console.error("Session error:", err);
+          console.error("[Auth] Session error:", err);
           return next(err);
         }
+        console.log('[Auth] Login successful, session established');
         return res.json({
           message: "ログインしました",
           user: { id: user.id, username: user.username, role: user.role },
         });
       });
     };
+    
     passport.authenticate("local", cb)(req, res, next);
   });
 
@@ -290,8 +291,10 @@ export function setupAuth(app: Express) {
 
   app.get("/api/user", (req, res) => {
     if (req.isAuthenticated()) {
+      console.log('[Auth] User session validated');
       return res.json(req.user);
     }
+    console.log('[Auth] No valid session found');
     res.status(401).json({ message: "認証が必要です" });
   });
 }

@@ -17,7 +17,7 @@ import { AlertCircle, Loader2, Home } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
 import { insertUserSchema } from "db/schema";
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useCallback } from "react";
 
 export default function Login() {
   const [, navigate] = useLocation();
@@ -25,9 +25,7 @@ export default function Login() {
   const { 
     login, 
     isAuthenticated, 
-    isLoading: isAuthChecking, 
-    isNavigating,
-    navigationSuccess,
+    isLoading: isAuthChecking,
     error: authError 
   } = useUser();
   
@@ -39,41 +37,14 @@ export default function Login() {
     },
   });
 
-  // Force navigation using direct URL change
-  const forceNavigation = useCallback(() => {
-    console.log('[Login] Forcing navigation to dashboard');
-    window.location.href = '/';
-  }, []);
-
-  // Handle navigation after authentication
-  const handleNavigation = useCallback(() => {
-    if (isAuthenticated && !isNavigating) {
-      console.log('[Login] User authenticated, initiating navigation');
-      forceNavigation();
-    }
-  }, [isAuthenticated, isNavigating, forceNavigation]);
-
-  // Monitor navigation success
+  // Check initial authentication state
   useEffect(() => {
-    console.log('[Login] Navigation state updated:', { 
-      isAuthenticated, 
-      isNavigating, 
-      navigationSuccess 
-    });
-
-    if (navigationSuccess) {
-      console.log('[Login] Navigation successful, forcing redirect');
-      forceNavigation();
-    }
-  }, [navigationSuccess, forceNavigation]);
-
-  // Redirect if already authenticated
-  useEffect(() => {
+    console.log('[Login] Checking initial auth state:', { isAuthenticated, isAuthChecking });
     if (!isAuthChecking && isAuthenticated) {
-      console.log('[Login] Already authenticated, initiating navigation');
-      handleNavigation();
+      console.log('[Login] User is already authenticated, redirecting');
+      window.location.href = '/';
     }
-  }, [isAuthChecking, isAuthenticated, handleNavigation]);
+  }, [isAuthChecking, isAuthenticated]);
 
   async function onSubmit(values: { username: string; password: string }) {
     try {
@@ -81,27 +52,30 @@ export default function Login() {
       const result = await login(values);
       
       if (result.ok) {
+        console.log('[Login] Login successful, initiating navigation');
         toast({
           title: "ログイン成功",
           description: "ダッシュボードに移動します",
         });
-        handleNavigation();
+        // Force immediate navigation
+        window.location.href = '/';
+        return;
+      }
+
+      console.log('[Login] Login failed:', result.message);
+      if (result.errors) {
+        Object.entries(result.errors).forEach(([field, messages]) => {
+          form.setError(field as "username" | "password", {
+            type: "manual",
+            message: messages[0],
+          });
+        });
       } else {
-        console.log('[Login] Login failed:', result.message);
-        if (result.errors) {
-          Object.entries(result.errors).forEach(([field, messages]) => {
-            form.setError(field as "username" | "password", {
-              type: "manual",
-              message: messages[0],
-            });
-          });
-        } else {
-          toast({
-            variant: "destructive",
-            title: "エラー",
-            description: result.message,
-          });
-        }
+        toast({
+          variant: "destructive",
+          title: "エラー",
+          description: result.message,
+        });
       }
     } catch (error) {
       console.error('[Login] Unexpected error:', error);
@@ -132,7 +106,6 @@ export default function Login() {
           size="sm"
           onClick={() => navigate("/")}
           className="mb-8"
-          disabled={isNavigating}
         >
           <Home className="h-4 w-4 mr-2" />
           ホームに戻る
@@ -163,7 +136,7 @@ export default function Login() {
                       <FormControl>
                         <Input 
                           {...field} 
-                          disabled={form.formState.isSubmitting || isNavigating}
+                          disabled={form.formState.isSubmitting}
                           autoComplete="username"
                           className="bg-white"
                         />
@@ -182,7 +155,7 @@ export default function Login() {
                         <Input 
                           type="password" 
                           {...field} 
-                          disabled={form.formState.isSubmitting || isNavigating}
+                          disabled={form.formState.isSubmitting}
                           autoComplete="current-password"
                           className="bg-white"
                         />
@@ -200,12 +173,12 @@ export default function Login() {
                 <Button 
                   type="submit" 
                   className="w-full" 
-                  disabled={form.formState.isSubmitting || isNavigating}
+                  disabled={form.formState.isSubmitting}
                 >
-                  {form.formState.isSubmitting || isNavigating ? (
+                  {form.formState.isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {isNavigating ? "移動中..." : "ログイン中..."}
+                      ログイン中...
                     </>
                   ) : (
                     "ログイン"
@@ -222,7 +195,7 @@ export default function Login() {
               variant="outline"
               className="w-full"
               onClick={() => navigate("/register")}
-              disabled={form.formState.isSubmitting || isNavigating}
+              disabled={form.formState.isSubmitting}
             >
               新規登録
             </Button>
