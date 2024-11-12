@@ -23,6 +23,16 @@ import { useCompetitions } from '../hooks/use-competitions'
 import { PageHeader } from '../components/PageHeader'
 import { EditCompetitionForm } from '../components/EditCompetitionForm'
 import { useToast } from '@/hooks/use-toast'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const calculateTimeUntilCompetition = (competitionDate: Date) => {
   const now = new Date();
@@ -56,12 +66,30 @@ export default function Dashboard() {
   const { records, isLoading: recordsLoading } = useSwimRecords(true);
   const { competitions, isLoading: competitionsLoading, mutate: mutateCompetitions } = useCompetitions();
   const [editingCompetition, setEditingCompetition] = React.useState<number | null>(null);
+  const [showLogoutDialog, setShowLogoutDialog] = React.useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) {
       navigate('/login');
     }
   }, [user, isLoading, navigate]);
+
+  const handleLogout = async () => {
+    const result = await logout();
+    if (result.ok) {
+      toast({
+        title: "ログアウト成功",
+        description: "セッションが終了しました",
+      });
+      navigate('/login');
+    } else {
+      toast({
+        variant: "destructive",
+        title: "エラー",
+        description: result.message || "ログアウトに失敗しました",
+      });
+    }
+  };
 
   const handleCreateCompetition = async (data: any) => {
     try {
@@ -157,11 +185,6 @@ export default function Dashboard() {
 
   const competition = competitions?.find(c => c.id === editingCompetition);
 
-  const handleLogout = async () => {
-    await logout();
-    navigate('/login');
-  };
-
   const navItems = [
     { label: '選手一覧', icon: <Users className="h-4 w-4" />, href: '/athletes' },
     { label: '歴代記録', icon: <Trophy className="h-4 w-4" />, href: '/all-time-records' },
@@ -174,12 +197,22 @@ export default function Dashboard() {
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
           <h1 className="text-3xl font-bold text-gray-900">SwimTrack</h1>
-          <div className="flex items-center">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src="/placeholder.svg?height=32&width=32" alt="コーチ" />
-              <AvatarFallback>CN</AvatarFallback>
-            </Avatar>
-            <span className="ml-2 text-sm font-medium text-gray-700">コーチ名</span>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src="/placeholder.svg?height=32&width=32" alt={user.username} />
+                <AvatarFallback>{user.username.substring(0, 2).toUpperCase()}</AvatarFallback>
+              </Avatar>
+              <span className="ml-2 text-sm font-medium text-gray-700">{user.username}</span>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowLogoutDialog(true)}
+              className="text-gray-600 hover:text-gray-900"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       </header>
@@ -340,6 +373,23 @@ export default function Dashboard() {
           }
         }}
       />
+
+      <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ログアウトしますか？</AlertDialogTitle>
+            <AlertDialogDescription>
+              ログアウトすると、再度ログインが必要になります。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>キャンセル</AlertDialogCancel>
+            <AlertDialogAction onClick={handleLogout}>
+              ログアウト
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
