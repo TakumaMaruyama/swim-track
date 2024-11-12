@@ -29,15 +29,26 @@ import * as z from "zod";
 // Time format validation regex: MM:SS.ms
 const timeRegex = /^([0-5]?[0-9]):([0-5][0-9])\.([0-9]{1,3})$/;
 
-// Available distances - ordered from shortest to longest
-const distances = [15, 25, 30, 50, 60, 100, 120, 200, 240, 400, 800, 1500];
-
 // Available pool lengths
-const poolLengths = [25, 50];
+const poolLengths = [15, 25, 50];
+
+// Get available distances based on pool length
+const getAvailableDistances = (poolLength: number) => {
+  switch (poolLength) {
+    case 15:
+      return [15, 30, 60, 90, 120, 240];
+    case 25:
+      return [25, 50, 100, 200, 400, 800, 1500];
+    case 50:
+      return [50, 100, 200, 400, 800, 1500];
+    default:
+      return [];
+  }
+};
 
 const editRecordSchema = z.object({
   style: z.string().min(1, "種目を選択してください"),
-  distance: z.number().refine(val => distances.includes(val), "有効な距離を選択してください"),
+  distance: z.number().min(1, "距離を選択してください"),
   time: z.string().regex(timeRegex, "タイム形式は MM:SS.ms である必要があります"),
   date: z.string().min(1, "日付を選択してください"),
   isCompetition: z.boolean().default(false),
@@ -96,9 +107,11 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
     "個人メドレー"
   ];
 
+  const watchedPoolLength = form.watch('poolLength');
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{record ? "記録の編集" : "新規記録追加"}</DialogTitle>
           <DialogDescription>
@@ -139,7 +152,15 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
                     <select
                       className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                       {...field}
-                      onChange={e => field.onChange(Number(e.target.value))}
+                      onChange={e => {
+                        const value = Number(e.target.value);
+                        field.onChange(value);
+                        // Reset distance when pool length changes
+                        const availableDistances = getAvailableDistances(value);
+                        if (!availableDistances.includes(form.getValues('distance'))) {
+                          form.setValue('distance', availableDistances[0]);
+                        }
+                      }}
                       disabled={isSubmitting}
                     >
                       {poolLengths.map(length => (
@@ -165,7 +186,7 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
                       disabled={isSubmitting}
                     >
                       <option value="">距離を選択</option>
-                      {distances.map(d => (
+                      {getAvailableDistances(watchedPoolLength).map(d => (
                         <option key={d} value={d}>{d}m</option>
                       ))}
                     </select>
