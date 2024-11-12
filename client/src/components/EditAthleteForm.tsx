@@ -16,6 +16,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
@@ -70,6 +71,9 @@ export function EditAthleteForm({ athlete, isOpen, onClose, onSubmit }: EditAthl
       <DialogContent>
         <DialogHeader>
           <DialogTitle>選手情報の編集</DialogTitle>
+          <DialogDescription>
+            選手の基本情報を編集します。この変更は即座に反映されます。
+          </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">

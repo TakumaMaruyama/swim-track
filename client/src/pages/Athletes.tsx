@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Edit2 } from "lucide-react";
+import { AlertCircle, Edit2, Plus, LineChart } from "lucide-react";
 import { EditAthleteForm } from '../components/EditAthleteForm';
+import { EditRecordForm } from '../components/EditRecordForm';
 import { useUser } from '../hooks/use-user';
 import { useToast } from '@/hooks/use-toast';
 
@@ -14,8 +15,12 @@ export default function Athletes() {
   const { user } = useUser();
   const { toast } = useToast();
   const { athletes, isLoading: athletesLoading, error: athletesError, mutate: mutateAthletes } = useAthletes();
-  const { records, isLoading: recordsLoading, error: recordsError } = useSwimRecords();
+  const { records, isLoading: recordsLoading, error: recordsError, mutate: mutateRecords } = useSwimRecords();
   const [editingAthlete, setEditingAthlete] = React.useState<number | null>(null);
+  const [editingRecord, setEditingRecord] = React.useState<{id: number | null, studentId: number | null}>({
+    id: null,
+    studentId: null
+  });
 
   const getLatestPerformance = (studentId: number) => {
     if (!records) return null;
@@ -46,6 +51,68 @@ export default function Athletes() {
     }
   };
 
+  const handleCreateRecord = async (data: any) => {
+    try {
+      const response = await fetch('/api/records', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create record');
+      }
+
+      await mutateRecords();
+      toast({
+        title: "追加成功",
+        description: "新しい記録が追加されました",
+      });
+    } catch (error) {
+      console.error('Error creating record:', error);
+      toast({
+        variant: "destructive",
+        title: "エラー",
+        description: "記録の追加に失敗しました",
+      });
+      throw error;
+    }
+  };
+
+  const handleEditRecord = async (recordId: number, data: any) => {
+    try {
+      const response = await fetch(`/api/records/${recordId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update record');
+      }
+
+      await mutateRecords();
+      toast({
+        title: "更新成功",
+        description: "記録が更新されました",
+      });
+    } catch (error) {
+      console.error('Error updating record:', error);
+      toast({
+        variant: "destructive",
+        title: "エラー",
+        description: "記録の更新に失敗しました",
+      });
+      throw error;
+    }
+  };
+
   if (athletesLoading || recordsLoading) {
     return (
       <div className="container py-8">
@@ -70,6 +137,7 @@ export default function Athletes() {
   }
 
   const athlete = athletes?.find(a => a.id === editingAthlete);
+  const record = records?.find(r => r.id === editingRecord.id);
 
   return (
     <div className="container py-8 px-4 md:px-8">
@@ -91,20 +159,43 @@ export default function Athletes() {
                     <p className="text-sm text-muted-foreground mt-1">選手</p>
                   </div>
                   {user?.role === 'coach' && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setEditingAthlete(athlete.id)}
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setEditingAthlete(athlete.id)}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setEditingRecord({ id: null, studentId: athlete.id })}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
                   )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {latestRecord ? (
                   <div className="space-y-3">
-                    <h3 className="font-medium text-sm text-muted-foreground">最近の記録:</h3>
+                    <div className="flex justify-between items-center">
+                      <h3 className="font-medium text-sm text-muted-foreground">最近の記録:</h3>
+                      {user?.role === 'coach' && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setEditingRecord({ 
+                            id: latestRecord.id, 
+                            studentId: athlete.id 
+                          })}
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <p className="text-sm font-medium">種目</p>
@@ -145,6 +236,20 @@ export default function Athletes() {
           }}
         />
       )}
+
+      <EditRecordForm
+        record={record}
+        studentId={editingRecord.studentId ?? undefined}
+        isOpen={!!editingRecord.studentId}
+        onClose={() => setEditingRecord({ id: null, studentId: null })}
+        onSubmit={async (data) => {
+          if (editingRecord.id) {
+            await handleEditRecord(editingRecord.id, data);
+          } else {
+            await handleCreateRecord(data);
+          }
+        }}
+      />
     </div>
   );
 }

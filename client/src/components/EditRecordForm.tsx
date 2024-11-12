@@ -63,7 +63,7 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
   const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
     try {
       setIsSubmitting(true);
-      await onSubmit(values);
+      await onSubmit({ ...values, studentId });
       toast({
         title: record ? "更新成功" : "記録追加成功",
         description: record ? "記録が更新されました" : "新しい記録が追加されました",

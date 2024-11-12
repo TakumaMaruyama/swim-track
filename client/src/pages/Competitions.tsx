@@ -2,7 +2,7 @@ import React from 'react';
 import { useSwimRecords } from '../hooks/use-swim-records';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Edit2, Trash2 } from "lucide-react";
+import { AlertCircle, Edit2, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EditRecordForm } from '../components/EditRecordForm';
 import { useUser } from '../hooks/use-user';
@@ -86,6 +86,37 @@ export default function Competitions() {
     }
   };
 
+  const handleCreate = async (data: any) => {
+    try {
+      const response = await fetch('/api/records', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ...data, isCompetition: true }),
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create record');
+      }
+
+      await mutate();
+      toast({
+        title: "追加成功",
+        description: "新しい大会記録が追加されました",
+      });
+    } catch (error) {
+      console.error('Error creating record:', error);
+      toast({
+        variant: "destructive",
+        title: "エラー",
+        description: "記録の追加に失敗しました",
+      });
+      throw error;
+    }
+  };
+
   const handleDelete = async (recordId: number) => {
     if (!confirm('この記録を削除してもよろしいですか？')) {
       return;
@@ -143,7 +174,18 @@ export default function Competitions() {
 
   return (
     <div className="container py-8 px-4 md:px-8">
-      <h1 className="text-2xl md:text-3xl font-bold mb-8">大会記録</h1>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-2xl md:text-3xl font-bold">大会記録</h1>
+        {user?.role === 'coach' && (
+          <Button
+            onClick={() => setEditingRecord(-1)}
+            className="mb-4"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            新規記録追加
+          </Button>
+        )}
+      </div>
       <div className="space-y-6">
         {Object.entries(groupedRecords)
           .sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime())
@@ -194,16 +236,18 @@ export default function Competitions() {
           ))}
       </div>
 
-      {record && (
-        <EditRecordForm
-          record={record}
-          isOpen={!!editingRecord}
-          onClose={() => setEditingRecord(null)}
-          onSubmit={async (data) => {
+      <EditRecordForm
+        record={editingRecord === -1 ? undefined : record}
+        isOpen={!!editingRecord}
+        onClose={() => setEditingRecord(null)}
+        onSubmit={async (data) => {
+          if (editingRecord === -1) {
+            await handleCreate(data);
+          } else if (record) {
             await handleEdit(record.id, data);
-          }}
-        />
-      )}
+          }
+        }}
+      />
     </div>
   );
 }
