@@ -1,6 +1,6 @@
 import useSWR from "swr";
 import type { User, InsertUser } from "db/schema";
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
 
 interface AuthError {
   message: string;
@@ -8,14 +8,22 @@ interface AuthError {
   errors?: Record<string, string[]>;
 }
 
+interface NavigationAttempt {
+  inProgress: boolean;
+  timestamp: number;
+  retryCount: number;
+  success?: boolean;
+}
+
 interface AuthState {
   isLoading: boolean;
   error: AuthError | null;
-  navigationAttempt: {
-    inProgress: boolean;
-    timestamp: number;
-  };
+  navigationAttempt: NavigationAttempt;
 }
+
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000;
+const NAVIGATION_TIMEOUT = 5000;
 
 export function useUser() {
   const [authState, setAuthState] = useState<AuthState>({
@@ -24,8 +32,13 @@ export function useUser() {
     navigationAttempt: {
       inProgress: false,
       timestamp: 0,
+      retryCount: 0,
+      success: undefined
     }
   });
+
+  const retryTimeoutRef = useRef<NodeJS.Timeout>();
+  const navigationTimeoutRef = useRef<NodeJS.Timeout>();
 
   const { 
     data, 
@@ -36,30 +49,64 @@ export function useUser() {
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
     shouldRetryOnError: false,
-    refreshInterval: 300000, // Refresh session every 5 minutes
+    refreshInterval: 300000,
     onError: () => {
-      // Clear user data on error
+      console.log('[Auth] Session validation failed, clearing user data');
       mutate(undefined, false);
     }
   });
 
-  // Cleanup navigation attempts that are stale
-  useEffect(() => {
-    const NAVIGATION_TIMEOUT = 5000; // 5 seconds
-    if (authState.navigationAttempt.inProgress) {
-      const timeSinceAttempt = Date.now() - authState.navigationAttempt.timestamp;
-      if (timeSinceAttempt > NAVIGATION_TIMEOUT) {
-        console.log('[Auth] Cleaning up stale navigation attempt');
-        setAuthState(prev => ({
-          ...prev,
-          navigationAttempt: {
-            inProgress: false,
-            timestamp: 0
-          }
-        }));
-      }
+  const clearTimeouts = useCallback(() => {
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
     }
-  }, [authState.navigationAttempt]);
+    if (navigationTimeoutRef.current) {
+      clearTimeout(navigationTimeoutRef.current);
+    }
+  }, []);
+
+  const resetNavigationState = useCallback(() => {
+    console.log('[Auth] Resetting navigation state');
+    clearTimeouts();
+    setAuthState(prev => ({
+      ...prev,
+      navigationAttempt: {
+        inProgress: false,
+        timestamp: 0,
+        retryCount: 0,
+        success: undefined
+      }
+    }));
+  }, [clearTimeouts]);
+
+  // Handle navigation timeouts and cleanup
+  useEffect(() => {
+    if (authState.navigationAttempt.inProgress) {
+      console.log('[Auth] Setting up navigation timeout');
+      navigationTimeoutRef.current = setTimeout(() => {
+        console.log('[Auth] Navigation timeout reached');
+        resetNavigationState();
+      }, NAVIGATION_TIMEOUT);
+
+      return () => {
+        clearTimeouts();
+      };
+    }
+  }, [authState.navigationAttempt.inProgress, resetNavigationState, clearTimeouts]);
+
+  // Monitor authentication state changes
+  useEffect(() => {
+    if (data) {
+      console.log('[Auth] User data received, updating navigation state');
+      setAuthState(prev => ({
+        ...prev,
+        navigationAttempt: {
+          ...prev.navigationAttempt,
+          success: true
+        }
+      }));
+    }
+  }, [data]);
 
   const login = useCallback(async (user: InsertUser) => {
     if (authState.isLoading) {
@@ -75,7 +122,9 @@ export function useUser() {
         error: null,
         navigationAttempt: {
           inProgress: true,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          retryCount: 0,
+          success: undefined
         }
       }));
 
@@ -90,6 +139,7 @@ export function useUser() {
 
       if (!response.ok) {
         console.log('[Auth] Login failed:', data.message);
+        resetNavigationState();
         setAuthState(prev => ({
           ...prev,
           isLoading: false,
@@ -97,10 +147,6 @@ export function useUser() {
             message: data.message || "ログインに失敗しました",
             field: data.field,
             errors: data.errors,
-          },
-          navigationAttempt: {
-            inProgress: false,
-            timestamp: 0
           }
         }));
         return { ok: false, message: data.message, field: data.field, errors: data.errors };
@@ -108,14 +154,36 @@ export function useUser() {
 
       console.log('[Auth] Login successful, updating session');
       await mutate();
-      setAuthState({
-        isLoading: false,
-        error: null,
-        navigationAttempt: {
-          inProgress: false,
-          timestamp: 0
+      
+      // Implement retry mechanism for session validation
+      const validateSession = async (retryCount: number = 0) => {
+        const sessionResponse = await fetch("/api/user", { credentials: "include" });
+        if (!sessionResponse.ok && retryCount < MAX_RETRIES) {
+          console.log(`[Auth] Session validation retry ${retryCount + 1}/${MAX_RETRIES}`);
+          retryTimeoutRef.current = setTimeout(() => {
+            validateSession(retryCount + 1);
+          }, RETRY_DELAY);
+          return;
         }
-      });
+
+        if (sessionResponse.ok) {
+          console.log('[Auth] Session validated successfully');
+          setAuthState(prev => ({
+            ...prev,
+            isLoading: false,
+            error: null,
+            navigationAttempt: {
+              ...prev.navigationAttempt,
+              success: true
+            }
+          }));
+        } else {
+          console.log('[Auth] Session validation failed after retries');
+          resetNavigationState();
+        }
+      };
+
+      await validateSession();
       return { ok: true, user: data.user };
     } catch (e: any) {
       console.error('[Auth] Login error:', e);
@@ -123,17 +191,15 @@ export function useUser() {
         message: "サーバーとの通信に失敗しました",
         field: "network",
       };
-      setAuthState({
+      resetNavigationState();
+      setAuthState(prev => ({
+        ...prev,
         isLoading: false,
-        error,
-        navigationAttempt: {
-          inProgress: false,
-          timestamp: 0
-        }
-      });
+        error
+      }));
       return { ok: false, ...error };
     }
-  }, [authState.isLoading, mutate]);
+  }, [authState.isLoading, mutate, resetNavigationState]);
 
   const logout = useCallback(async () => {
     if (authState.isLoading) {
@@ -159,31 +225,28 @@ export function useUser() {
         return { ok: false, message: data.message };
       }
 
-      // Clear user data and reset state
       await mutate(undefined, false);
-      setAuthState({
-        isLoading: false,
-        error: null,
-        navigationAttempt: {
-          inProgress: false,
-          timestamp: 0
-        }
-      });
+      resetNavigationState();
       return { ok: true };
     } catch (e: any) {
       console.error('[Auth] Logout error:', e);
       const error = { message: "サーバーとの通信に失敗しました" };
-      setAuthState({
+      resetNavigationState();
+      setAuthState(prev => ({
+        ...prev,
         isLoading: false,
-        error,
-        navigationAttempt: {
-          inProgress: false,
-          timestamp: 0
-        }
-      });
+        error
+      }));
       return { ok: false, ...error };
     }
-  }, [authState.isLoading, mutate]);
+  }, [authState.isLoading, mutate, resetNavigationState]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      clearTimeouts();
+    };
+  }, [clearTimeouts]);
 
   return {
     user: data,
@@ -191,6 +254,7 @@ export function useUser() {
     isLoginPending: authState.isLoading,
     isAuthenticated: !!data,
     isNavigating: authState.navigationAttempt.inProgress,
+    navigationSuccess: authState.navigationAttempt.success,
     error: authState.error || (swrError ? { message: "認証に失敗しました" } : null),
     login,
     logout,
