@@ -5,9 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Edit2, Plus, Power } from "lucide-react";
+import { AlertCircle, Edit2, Plus, Power, History } from "lucide-react";
 import { EditAthleteForm } from '../components/EditAthleteForm';
 import { EditRecordForm } from '../components/EditRecordForm';
+import { TimeHistoryModal } from '../components/TimeHistoryModal';
 import { useUser } from '../hooks/use-user';
 import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '../components/PageHeader';
@@ -23,12 +24,21 @@ export default function Athletes() {
     id: null,
     studentId: null
   });
+  const [viewingHistory, setViewingHistory] = React.useState<{
+    athleteId: number | null;
+    athleteName: string;
+  }>({ athleteId: null, athleteName: '' });
 
   const getLatestPerformance = (studentId: number) => {
     if (!records) return null;
     return records
       .filter(record => record.studentId === studentId)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+  };
+
+  const getAthleteRecords = (studentId: number) => {
+    if (!records) return [];
+    return records.filter(record => record.studentId === studentId);
   };
 
   const handleToggleStatus = async (athleteId: number, currentStatus: boolean) => {
@@ -215,31 +225,43 @@ export default function Athletes() {
                       </div>
                       <p className="text-sm text-muted-foreground mt-1">選手</p>
                     </div>
-                    {user?.role === 'coach' && (
-                      <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleToggleStatus(athlete.id, athlete.isActive)}
-                        >
-                          <Power className={`h-4 w-4 ${athlete.isActive ? 'text-green-500' : 'text-red-500'}`} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setEditingAthlete(athlete.id)}
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setEditingRecord({ id: null, studentId: athlete.id })}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )}
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setViewingHistory({ 
+                          athleteId: athlete.id,
+                          athleteName: athlete.username
+                        })}
+                      >
+                        <History className="h-4 w-4" />
+                      </Button>
+                      {user?.role === 'coach' && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleToggleStatus(athlete.id, athlete.isActive)}
+                          >
+                            <Power className={`h-4 w-4 ${athlete.isActive ? 'text-green-500' : 'text-red-500'}`} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setEditingAthlete(athlete.id)}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setEditingRecord({ id: null, studentId: athlete.id })}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -314,6 +336,15 @@ export default function Athletes() {
             }
           }}
         />
+
+        {viewingHistory.athleteId && (
+          <TimeHistoryModal
+            isOpen={!!viewingHistory.athleteId}
+            onClose={() => setViewingHistory({ athleteId: null, athleteName: '' })}
+            records={getAthleteRecords(viewingHistory.athleteId)}
+            athleteName={viewingHistory.athleteName}
+          />
+        )}
       </div>
     </>
   );
