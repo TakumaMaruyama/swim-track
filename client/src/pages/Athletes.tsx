@@ -391,6 +391,7 @@ export default function Athletes() {
             onClose={() => setViewingHistory({ athleteId: null, athleteName: '' })}
             records={getAthleteRecords(viewingHistory.athleteId)}
             athleteName={viewingHistory.athleteName}
+            onRecordDeleted={() => mutateRecords()}
           />
         )}
 

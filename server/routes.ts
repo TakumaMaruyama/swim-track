@@ -143,32 +143,34 @@ export function registerRoutes(app: Express) {
     const { id } = req.params;
     
     try {
-      // Start a transaction
-      await db.transaction(async (tx) => {
-        // Delete associated records first
-        await tx
-          .delete(swimRecords)
-          .where(eq(swimRecords.studentId, parseInt(id)));
+      // First verify the athlete exists and is a student
+      const [athlete] = await db
+        .select()
+        .from(users)
+        .where(and(
+          eq(users.id, parseInt(id)),
+          eq(users.role, "student")
+        ))
+        .limit(1);
 
-        // Delete the athlete
-        const [deletedAthlete] = await tx
-          .delete(users)
-          .where(and(
-            eq(users.id, parseInt(id)),
-            eq(users.role, "student")
-          ))
-          .returning();
+      if (!athlete) {
+        return res.status(404).json({ message: "選手が見つかりません" });
+      }
 
-        if (!deletedAthlete) {
-          throw new Error("選手が見つかりません");
-        }
-      });
+      // Delete associated records first
+      await db
+        .delete(swimRecords)
+        .where(eq(swimRecords.studentId, parseInt(id)));
+
+      // Then delete the athlete
+      await db
+        .delete(users)
+        .where(eq(users.id, parseInt(id)));
 
       res.json({ message: "選手と関連する記録が削除されました" });
     } catch (error) {
       console.error('Error deleting athlete:', error);
-      res.status(error.message === "選手が見つかりません" ? 404 : 500)
-        .json({ message: error.message || "選手の削除に失敗しました" });
+      res.status(500).json({ message: "選手の削除に失敗しました" });
     }
   });
 

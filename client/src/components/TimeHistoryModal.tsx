@@ -6,7 +6,18 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -15,7 +26,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, TrendingUp } from "lucide-react";
+import { Trophy, TrendingUp, Trash2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useUser } from "../hooks/use-user";
 import type { ExtendedSwimRecord } from "../hooks/use-swim-records";
 
 type TimeHistoryModalProps = {
@@ -23,6 +36,7 @@ type TimeHistoryModalProps = {
   onClose: () => void;
   records: ExtendedSwimRecord[];
   athleteName: string;
+  onRecordDeleted?: () => void;
 };
 
 type GroupedRecords = {
@@ -37,9 +51,18 @@ const swimStyles = [
   "個人メドレー"
 ];
 
-export function TimeHistoryModal({ isOpen, onClose, records, athleteName }: TimeHistoryModalProps) {
+export function TimeHistoryModal({ 
+  isOpen, 
+  onClose, 
+  records, 
+  athleteName,
+  onRecordDeleted 
+}: TimeHistoryModalProps) {
+  const { toast } = useToast();
+  const { user } = useUser();
   const [styleFilter, setStyleFilter] = React.useState<string>("all");
   const [sortBy, setSortBy] = React.useState<string>("date_desc");
+  const [deletingRecord, setDeletingRecord] = React.useState<number | null>(null);
 
   const groupedAndFilteredRecords: GroupedRecords = React.useMemo(() => {
     const filtered = records.filter(record => 
@@ -84,95 +107,166 @@ export function TimeHistoryModal({ isOpen, onClose, records, athleteName }: Time
     return bests;
   }, [groupedAndFilteredRecords]);
 
+  const handleDelete = async (recordId: number) => {
+    try {
+      const response = await fetch(`/api/records/${recordId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete record');
+      }
+
+      toast({
+        title: "削除成功",
+        description: "記録が削除されました",
+      });
+      
+      if (onRecordDeleted) {
+        onRecordDeleted();
+      }
+    } catch (error) {
+      console.error('Error deleting record:', error);
+      toast({
+        variant: "destructive",
+        title: "エラー",
+        description: "記録の削除に失敗しました",
+      });
+    } finally {
+      setDeletingRecord(null);
+    }
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{athleteName}の記録履歴</DialogTitle>
-          <DialogDescription>
-            選手の記録の推移と詳細を表示します
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{athleteName}の記録履歴</DialogTitle>
+            <DialogDescription>
+              選手の記録の推移と詳細を表示します
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="flex gap-4 mb-4">
-          <Select value={styleFilter} onValueChange={setStyleFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="種目で絞り込み" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">すべての種目</SelectItem>
-              {swimStyles.map(style => (
-                <SelectItem key={style} value={style}>{style}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex gap-4 mb-4">
+            <Select value={styleFilter} onValueChange={setStyleFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="種目で絞り込み" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">すべての種目</SelectItem>
+                {swimStyles.map(style => (
+                  <SelectItem key={style} value={style}>{style}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="並び替え" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="date_desc">日付 (新しい順)</SelectItem>
-              <SelectItem value="date_asc">日付 (古い順)</SelectItem>
-              <SelectItem value="time_asc">タイム (速い順)</SelectItem>
-              <SelectItem value="time_desc">タイム (遅い順)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="並び替え" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="date_desc">日付 (新しい順)</SelectItem>
+                <SelectItem value="date_asc">日付 (古い順)</SelectItem>
+                <SelectItem value="time_asc">タイム (速い順)</SelectItem>
+                <SelectItem value="time_desc">タイム (遅い順)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-        <div className="space-y-6">
-          {Object.entries(groupedAndFilteredRecords).map(([key, records]) => {
-            const [style, distance] = key.split('-');
-            return (
-              <Card key={key}>
-                <CardContent className="pt-6">
-                  <div className="mb-4">
-                    <h3 className="text-lg font-semibold">
-                      {style} {distance}m
-                    </h3>
-                  </div>
-                  <div className="space-y-3">
-                    {records.map((record) => (
-                      <div
-                        key={record.id}
-                        className={`p-3 rounded-lg ${
-                          record.time === personalBests[key]
-                            ? 'bg-primary/10'
-                            : 'bg-muted/50'
-                        }`}
-                      >
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xl font-bold">
-                              {record.time}
-                            </span>
-                            {record.time === personalBests[key] && (
-                              <Badge variant="secondary" className="flex items-center gap-1">
-                                <Trophy className="h-3 w-3" />
-                                自己ベスト
-                              </Badge>
-                            )}
-                            {record.isCompetition && (
-                              <Badge className="flex items-center gap-1">
-                                <TrendingUp className="h-3 w-3" />
-                                大会記録
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            <div>{new Date(record.date).toLocaleDateString('ja-JP')}</div>
-                            <div>{record.poolLength}mプール</div>
+          <div className="space-y-6">
+            {Object.entries(groupedAndFilteredRecords).map(([key, records]) => {
+              const [style, distance] = key.split('-');
+              return (
+                <Card key={key}>
+                  <CardContent className="pt-6">
+                    <div className="mb-4">
+                      <h3 className="text-lg font-semibold">
+                        {style} {distance}m
+                      </h3>
+                    </div>
+                    <div className="space-y-3">
+                      {records.map((record) => (
+                        <div
+                          key={record.id}
+                          className={`p-3 rounded-lg ${
+                            record.time === personalBests[key]
+                              ? 'bg-primary/10'
+                              : 'bg-muted/50'
+                          }`}
+                        >
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xl font-bold">
+                                {record.time}
+                              </span>
+                              {record.time === personalBests[key] && (
+                                <Badge variant="secondary" className="flex items-center gap-1">
+                                  <Trophy className="h-3 w-3" />
+                                  自己ベスト
+                                </Badge>
+                              )}
+                              {record.isCompetition && (
+                                <Badge className="flex items-center gap-1">
+                                  <TrendingUp className="h-3 w-3" />
+                                  大会記録
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <div className="text-sm text-muted-foreground">
+                                <div>{new Date(record.date).toLocaleDateString('ja-JP')}</div>
+                                <div>{record.poolLength}mプール</div>
+                              </div>
+                              {user?.role === 'coach' && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setDeletingRecord(record.id)}
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      </DialogContent>
-    </Dialog>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog 
+        open={!!deletingRecord} 
+        onOpenChange={(open) => !open && setDeletingRecord(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>記録を削除しますか？</AlertDialogTitle>
+            <AlertDialogDescription>
+              この操作は取り消せません。本当にこの記録を削除してもよろしいですか？
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>キャンセル</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deletingRecord) {
+                  handleDelete(deletingRecord);
+                }
+              }}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              削除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
