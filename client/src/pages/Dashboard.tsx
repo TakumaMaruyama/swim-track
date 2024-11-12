@@ -9,14 +9,20 @@ import {
   Timer, 
   ClipboardList,
   TrendingDown,
-  LogOut
+  LogOut,
+  Plus,
+  Edit2,
+  Trash2
 } from 'lucide-react'
 import { useUser } from '../hooks/use-user'
 import { useLocation } from 'wouter'
 import { useMobile } from '../hooks/use-mobile'
 import { MobileNav } from '../components/MobileNav'
 import { useSwimRecords } from '../hooks/use-swim-records'
+import { useCompetitions } from '../hooks/use-competitions'
 import { PageHeader } from '../components/PageHeader'
+import { EditCompetitionForm } from '../components/EditCompetitionForm'
+import { useToast } from '@/hooks/use-toast'
 
 const calculateTimeUntilCompetition = (competitionDate: Date) => {
   const now = new Date();
@@ -46,7 +52,10 @@ export default function Dashboard() {
   const [, navigate] = useLocation();
   const { user, isLoading, logout } = useUser();
   const isMobile = useMobile();
+  const { toast } = useToast();
   const { records, isLoading: recordsLoading } = useSwimRecords(true);
+  const { competitions, isLoading: competitionsLoading, mutate: mutateCompetitions } = useCompetitions();
+  const [editingCompetition, setEditingCompetition] = React.useState<number | null>(null);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -54,7 +63,81 @@ export default function Dashboard() {
     }
   }, [user, isLoading, navigate]);
 
-  if (isLoading || recordsLoading) {
+  const handleCreateCompetition = async (data: any) => {
+    try {
+      const response = await fetch('/api/competitions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create competition');
+      }
+
+      await mutateCompetitions();
+    } catch (error) {
+      console.error('Error creating competition:', error);
+      throw error;
+    }
+  };
+
+  const handleEditCompetition = async (competitionId: number, data: any) => {
+    try {
+      const response = await fetch(`/api/competitions/${competitionId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update competition');
+      }
+
+      await mutateCompetitions();
+    } catch (error) {
+      console.error('Error updating competition:', error);
+      throw error;
+    }
+  };
+
+  const handleDeleteCompetition = async (competitionId: number) => {
+    if (!confirm('この大会を削除してもよろしいですか？')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/competitions/${competitionId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete competition');
+      }
+
+      await mutateCompetitions();
+      toast({
+        title: "削除成功",
+        description: "大会が削除されました",
+      });
+    } catch (error) {
+      console.error('Error deleting competition:', error);
+      toast({
+        variant: "destructive",
+        title: "エラー",
+        description: "大会の削除に失敗しました",
+      });
+    }
+  };
+
+  if (isLoading || recordsLoading || competitionsLoading) {
     return <div className="flex items-center justify-center min-h-screen">読み込み中...</div>;
   }
 
@@ -62,19 +145,22 @@ export default function Dashboard() {
     return null;
   }
 
-  // Sample upcoming competitions - This would typically come from an API
-  const upcomingCompetitions = [
-    {
-      name: "全国水泳大会2024",
-      date: new Date("2024-12-15"),
-      location: "東京アクアティクスセンター"
-    },
-    {
-      name: "ジュニア水泳選手権",
-      date: new Date("2024-12-28"),
-      location: "大阪プール"
-    }
-  ];
+  const upcomingCompetitions = competitions
+    ?.filter(comp => new Date(comp.date) > new Date())
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) ?? [];
+
+  const nextCompetition = upcomingCompetitions[0];
+  const { days, hours } = nextCompetition 
+    ? calculateTimeUntilCompetition(new Date(nextCompetition.date))
+    : { days: 0, hours: 0 };
+  const timeImprovement = records ? calculateTimeImprovement(records) : 0;
+
+  const competition = competitions?.find(c => c.id === editingCompetition);
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
 
   const navItems = [
     { label: '選手一覧', icon: <Users className="h-4 w-4" />, href: '/athletes' },
@@ -82,15 +168,6 @@ export default function Dashboard() {
     { label: '大会記録', icon: <Calendar className="h-4 w-4" />, href: '/competitions' },
     { label: '資料', icon: <ClipboardList className="h-4 w-4" />, href: '/documents' },
   ];
-
-  const nextCompetition = upcomingCompetitions[0];
-  const { days, hours } = calculateTimeUntilCompetition(nextCompetition.date);
-  const timeImprovement = records ? calculateTimeImprovement(records) : 0;
-
-  const handleLogout = async () => {
-    await logout();
-    navigate('/login');
-  };
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-100">
@@ -148,15 +225,23 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-center">
-                  <p className="text-3xl font-bold text-primary mb-2">
-                    {days}日 {hours}時間
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {nextCompetition.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {nextCompetition.date.toLocaleDateString('ja-JP')}
-                  </p>
+                  {nextCompetition ? (
+                    <>
+                      <p className="text-3xl font-bold text-primary mb-2">
+                        {days}日 {hours}時間
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {nextCompetition.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(nextCompetition.date).toLocaleDateString('ja-JP')}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      予定されている大会はありません
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -182,33 +267,84 @@ export default function Dashboard() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Timer className="h-4 w-4" />
-                  今後の大会
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Timer className="h-4 w-4" />
+                    今後の大会
+                  </div>
+                  {user.role === 'coach' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditingCompetition(-1)}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      追加
+                    </Button>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {upcomingCompetitions.map((competition, index) => (
-                    <div 
-                      key={index}
-                      className="flex flex-col space-y-1 pb-3 border-b last:border-0 last:pb-0"
-                    >
-                      <p className="font-medium">{competition.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {competition.date.toLocaleDateString('ja-JP')}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {competition.location}
-                      </p>
-                    </div>
-                  ))}
+                  {upcomingCompetitions.length > 0 ? (
+                    upcomingCompetitions.map((competition) => (
+                      <div 
+                        key={competition.id}
+                        className="flex justify-between items-start pb-3 border-b last:border-0 last:pb-0"
+                      >
+                        <div className="space-y-1">
+                          <p className="font-medium">{competition.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(competition.date).toLocaleDateString('ja-JP')}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {competition.location}
+                          </p>
+                        </div>
+                        {user.role === 'coach' && (
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setEditingCompetition(competition.id)}
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteCompetition(competition.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center">
+                      予定されている大会はありません
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>
           </div>
         </div>
       </main>
+
+      <EditCompetitionForm
+        competition={editingCompetition === -1 ? undefined : competition}
+        isOpen={!!editingCompetition}
+        onClose={() => setEditingCompetition(null)}
+        onSubmit={async (data) => {
+          if (editingCompetition === -1) {
+            await handleCreateCompetition(data);
+          } else if (competition) {
+            await handleEditCompetition(competition.id, data);
+          }
+        }}
+      />
     </div>
   );
 }
