@@ -171,23 +171,18 @@ export default function Dashboard() {
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-100">
-      <PageHeader title="スイムコーチ">
-        <div className="flex items-center gap-4">
-          <Avatar className="h-8 w-8">
-            <AvatarImage src="/placeholder.svg?height=32&width=32" alt={user.username} />
-            <AvatarFallback>{user.username.substring(0, 2).toUpperCase()}</AvatarFallback>
-          </Avatar>
-          <span className="text-sm font-medium text-gray-700 hidden sm:inline">{user.username}</span>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={handleLogout}
-          >
-            <LogOut className="h-4 w-4 mr-2" />
-            ログアウト
-          </Button>
+      <header className="bg-white shadow">
+        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
+          <h1 className="text-3xl font-bold text-gray-900">SwimTrack</h1>
+          <div className="flex items-center">
+            <Avatar className="h-8 w-8">
+              <AvatarImage src="/placeholder.svg?height=32&width=32" alt="コーチ" />
+              <AvatarFallback>CN</AvatarFallback>
+            </Avatar>
+            <span className="ml-2 text-sm font-medium text-gray-700">コーチ名</span>
+          </div>
         </div>
-      </PageHeader>
+      </header>
 
       {!isMobile && (
         <nav className="bg-gray-800">
