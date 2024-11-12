@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
 import { insertUserSchema } from "db/schema";
+import { Loader2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -22,11 +23,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 export default function Register() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { register: registerUser } = useUser();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const form = useForm({
     resolver: zodResolver(insertUserSchema),
     defaultValues: {
@@ -34,22 +40,46 @@ export default function Register() {
       password: "",
       role: "student",
     },
+    mode: "onChange", // Enable real-time validation
   });
 
   async function onSubmit(values: { username: string; password: string; role: string }) {
-    const result = await registerUser(values);
-    if (result.ok) {
-      toast({
-        title: "登録成功",
-        description: "ログインページに移動します",
-      });
-      navigate("/login");
-    } else {
+    if (isSubmitting) return;
+
+    try {
+      setIsSubmitting(true);
+      const result = await registerUser(values);
+      
+      if (result.ok) {
+        toast({
+          title: "登録成功",
+          description: "ログインページに移動します",
+        });
+        navigate("/login");
+      } else {
+        if (result.errors) {
+          Object.entries(result.errors).forEach(([field, messages]) => {
+            form.setError(field as "username" | "password" | "role", {
+              type: "manual",
+              message: messages[0],
+            });
+          });
+        } else {
+          toast({
+            variant: "destructive",
+            title: "エラー",
+            description: result.message,
+          });
+        }
+      }
+    } catch (error) {
       toast({
         variant: "destructive",
         title: "エラー",
-        description: result.message,
+        description: "予期せぬエラーが発生しました",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -71,7 +101,7 @@ export default function Register() {
                   <FormItem>
                     <FormLabel>ユーザー名</FormLabel>
                     <FormControl>
-                      <Input {...field} />
+                      <Input {...field} disabled={isSubmitting} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -84,7 +114,11 @@ export default function Register() {
                   <FormItem>
                     <FormLabel>パスワード</FormLabel>
                     <FormControl>
-                      <Input type="password" {...field} />
+                      <Input 
+                        type="password" 
+                        {...field} 
+                        disabled={isSubmitting}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -99,6 +133,7 @@ export default function Register() {
                     <Select
                       onValueChange={field.onChange}
                       defaultValue={field.value}
+                      disabled={isSubmitting}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -114,8 +149,29 @@ export default function Register() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full">
-                登録
+
+              {form.formState.errors.root && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    {form.formState.errors.root.message}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <Button 
+                type="submit" 
+                className="w-full"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    登録中...
+                  </>
+                ) : (
+                  "登録"
+                )}
               </Button>
             </form>
           </Form>
@@ -128,6 +184,7 @@ export default function Register() {
             variant="outline"
             className="w-full"
             onClick={() => navigate("/login")}
+            disabled={isSubmitting}
           >
             ログインへ戻る
           </Button>
