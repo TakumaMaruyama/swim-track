@@ -16,6 +16,7 @@ type GroupedRecords = {
       date: Date;
       studentId: number;
       isCompetition: boolean;
+      poolLength: number;
     };
   };
 };
@@ -50,6 +51,7 @@ export default function BestTimes() {
           date: new Date(record.date),
           studentId: record.studentId,
           isCompetition: record.isCompetition,
+          poolLength: record.poolLength,
         };
       }
       
@@ -202,7 +204,9 @@ export default function BestTimes() {
                     className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-3 rounded-lg bg-muted/50"
                   >
                     <div className="mb-2 sm:mb-0">
-                      <p className="font-medium text-lg">{distance}m</p>
+                      <p className="font-medium text-lg">
+                        {distance}m ({record.poolLength}mプール)
+                      </p>
                       <p className="text-sm text-muted-foreground">
                         {formatDate(record.date)}
                       </p>

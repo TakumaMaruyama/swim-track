@@ -32,12 +32,16 @@ const timeRegex = /^([0-5]?[0-9]):([0-5][0-9])\.([0-9]{1,3})$/;
 // Available distances - ordered from shortest to longest
 const distances = [15, 25, 30, 50, 60, 100, 120, 200, 240, 400, 800, 1500];
 
+// Available pool lengths
+const poolLengths = [25, 50];
+
 const editRecordSchema = z.object({
   style: z.string().min(1, "種目を選択してください"),
   distance: z.number().refine(val => distances.includes(val), "有効な距離を選択してください"),
   time: z.string().regex(timeRegex, "タイム形式は MM:SS.ms である必要があります"),
   date: z.string().min(1, "日付を選択してください"),
   isCompetition: z.boolean().default(false),
+  poolLength: z.number().refine(val => poolLengths.includes(val), "有効なプール長を選択してください")
 });
 
 type EditRecordFormProps = {
@@ -60,6 +64,7 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
       time: record?.time ?? "",
       date: record ? new Date(record.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       isCompetition: record?.isCompetition ?? false,
+      poolLength: record?.poolLength ?? 25
     },
   });
 
@@ -117,6 +122,28 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
                       <option value="">種目を選択</option>
                       {swimStyles.map(style => (
                         <option key={style} value={style}>{style}</option>
+                      ))}
+                    </select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="poolLength"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>プール長 (m)</FormLabel>
+                  <FormControl>
+                    <select
+                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                      {...field}
+                      onChange={e => field.onChange(Number(e.target.value))}
+                      disabled={isSubmitting}
+                    >
+                      {poolLengths.map(length => (
+                        <option key={length} value={length}>{length}mプール</option>
                       ))}
                     </select>
                   </FormControl>

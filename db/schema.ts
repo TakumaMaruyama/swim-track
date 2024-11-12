@@ -27,7 +27,8 @@ export const swimRecords = pgTable("swim_records", {
   distance: integer("distance").notNull(),
   time: text("time").notNull(),
   date: timestamp("date").defaultNow(),
-  isCompetition: boolean("is_competition").default(false)
+  isCompetition: boolean("is_competition").default(false),
+  poolLength: integer("pool_length").notNull().default(25) // Added pool length field
 });
 
 export const insertUserSchema = createInsertSchema(users);

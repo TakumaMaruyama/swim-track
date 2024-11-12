@@ -13,6 +13,7 @@ type GroupedCompetitions = {
     id: number;
     style: string;
     distance: number;
+    poolLength?: number;
     time: string;
     studentId: number;
     isCompetition: boolean;
@@ -46,6 +47,7 @@ export default function Competitions() {
         id: record.id,
         style: record.style,
         distance: record.distance,
+        poolLength: record.poolLength,
         time: record.time,
         studentId: record.studentId,
         isCompetition: record.isCompetition,
@@ -226,7 +228,7 @@ export default function Competitions() {
                         </div>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {record.distance}m
+                        {record.distance}m {record.poolLength ? `(${record.poolLength}mプール)` : ''}
                       </p>
                     </div>
                   ))}
