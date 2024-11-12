@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { EditRecordForm } from '../components/EditRecordForm';
 import { useUser } from '../hooks/use-user';
 import { useToast } from '@/hooks/use-toast';
+import { PageHeader } from '../components/PageHeader';
 
 type GroupedRecords = {
   [style: string]: {
@@ -17,6 +18,7 @@ type GroupedRecords = {
       studentId: number;
       isCompetition: boolean;
       poolLength: number;
+      athleteName?: string;
     };
   };
 };
@@ -52,6 +54,7 @@ export default function BestTimes() {
           studentId: record.studentId,
           isCompetition: record.isCompetition,
           poolLength: record.poolLength,
+          athleteName: record.athleteName,
         };
       }
       
@@ -155,89 +158,96 @@ export default function BestTimes() {
 
   if (isLoading) {
     return (
-      <div className="container py-8">
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="animate-pulse text-lg">記録を読み込んでいます...</div>
+      <>
+        <PageHeader title="ベストタイム" />
+        <div className="container">
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="animate-pulse text-lg">記録を読み込んでいます...</div>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   if (error) {
     return (
-      <div className="container py-8">
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            記録の取得中にエラーが発生しました。再度お試しください。
-          </AlertDescription>
-        </Alert>
-      </div>
+      <>
+        <PageHeader title="ベストタイム" />
+        <div className="container">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              記録の取得中にエラーが発生しました。再度お試しください。
+            </AlertDescription>
+          </Alert>
+        </div>
+      </>
     );
   }
 
   return (
-    <div className="container py-8 px-4 md:px-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl md:text-3xl font-bold">ベストタイム</h1>
-        {user?.role === 'coach' && (
-          <Button
-            onClick={() => setEditingRecord(-1)}
-            className="mb-4"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            新規記録追加
-          </Button>
-        )}
-      </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        {Object.entries(groupedRecords).map(([style, distances]) => (
-          <Card key={style} className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <CardTitle className="text-xl">{style}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {Object.entries(distances).map(([distance, record]) => (
-                  <div 
-                    key={distance} 
-                    className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-3 rounded-lg bg-muted/50"
-                  >
-                    <div className="mb-2 sm:mb-0">
-                      <p className="font-medium text-lg">
-                        {distance}m ({record.poolLength}mプール)
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {formatDate(record.date)}
-                      </p>
+    <>
+      <PageHeader 
+        title="ベストタイム"
+        children={
+          user?.role === 'coach' && (
+            <Button onClick={() => setEditingRecord(-1)}>
+              <Plus className="mr-2 h-4 w-4" />
+              新規記録追加
+            </Button>
+          )
+        }
+      />
+      <div className="container px-4 md:px-8">
+        <div className="grid gap-4 md:grid-cols-2">
+          {Object.entries(groupedRecords).map(([style, distances]) => (
+            <Card key={style} className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <CardTitle className="text-xl">{style}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {Object.entries(distances).map(([distance, record]) => (
+                    <div 
+                      key={distance} 
+                      className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-3 rounded-lg bg-muted/50"
+                    >
+                      <div className="mb-2 sm:mb-0">
+                        <p className="font-medium text-lg">
+                          {distance}m ({record.poolLength}mプール)
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {formatDate(record.date)} - {record.athleteName}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xl font-bold text-primary">{record.time}</p>
+                        {user?.role === 'coach' && (
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setEditingRecord(record.id)}
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDelete(record.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-xl font-bold text-primary">{record.time}</p>
-                      {user?.role === 'coach' && (
-                        <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setEditingRecord(record.id)}
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(record.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
 
       <EditRecordForm
@@ -252,6 +262,6 @@ export default function BestTimes() {
           }
         }}
       />
-    </div>
+    </>
   );
 }

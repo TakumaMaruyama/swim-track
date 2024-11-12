@@ -97,8 +97,19 @@ export function registerRoutes(app: Express) {
   app.get("/api/records", requireAuth, async (req, res) => {
     try {
       const records = await db
-        .select()
+        .select({
+          id: swimRecords.id,
+          studentId: swimRecords.studentId,
+          style: swimRecords.style,
+          distance: swimRecords.distance,
+          time: swimRecords.time,
+          date: swimRecords.date,
+          isCompetition: swimRecords.isCompetition,
+          poolLength: swimRecords.poolLength,
+          athleteName: users.username
+        })
         .from(swimRecords)
+        .leftJoin(users, eq(swimRecords.studentId, users.id))
         .orderBy(desc(swimRecords.date));
       res.json(records);
     } catch (error) {
@@ -109,8 +120,19 @@ export function registerRoutes(app: Express) {
   app.get("/api/records/competitions", requireAuth, async (req, res) => {
     try {
       const records = await db
-        .select()
+        .select({
+          id: swimRecords.id,
+          studentId: swimRecords.studentId,
+          style: swimRecords.style,
+          distance: swimRecords.distance,
+          time: swimRecords.time,
+          date: swimRecords.date,
+          isCompetition: swimRecords.isCompetition,
+          poolLength: swimRecords.poolLength,
+          athleteName: users.username
+        })
         .from(swimRecords)
+        .leftJoin(users, eq(swimRecords.studentId, users.id))
         .where(eq(swimRecords.isCompetition, true))
         .orderBy(desc(swimRecords.date));
       res.json(records);
@@ -260,4 +282,6 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ message: "ダウンロードに失敗しました" });
     }
   });
+
+  return app;
 }
