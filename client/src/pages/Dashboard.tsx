@@ -47,18 +47,56 @@ const calculateTimeUntilCompetition = (competitionDate: Date) => {
 };
 
 const calculateTimeImprovement = (records: any[]) => {
+  if (!records || records.length === 0) return { totalImprovement: 0, improvementCount: 0 };
+
   const lastMonth = new Date();
   lastMonth.setMonth(lastMonth.getMonth() - 1);
   
-  const improvements = records
-    .filter(record => new Date(record.date) >= lastMonth)
-    .reduce((acc, record) => {
-      const [mins, secs] = record.time.split(':');
-      const totalSeconds = parseInt(mins) * 60 + parseFloat(secs);
-      return acc + totalSeconds;
-    }, 0);
+  // Filter records from last month
+  const recentRecords = records.filter(record => new Date(record.date) >= lastMonth);
+  
+  // Group records by style, distance, and pool length
+  const groupedRecords: { [key: string]: any[] } = {};
+  recentRecords.forEach(record => {
+    const key = `${record.style}-${record.distance}-${record.poolLength}`;
+    if (!groupedRecords[key]) {
+      groupedRecords[key] = [];
+    }
+    groupedRecords[key].push(record);
+  });
 
-  return improvements.toFixed(2);
+  let totalImprovement = 0;
+  let improvementCount = 0;
+
+  // Process each group
+  Object.values(groupedRecords).forEach(group => {
+    // Sort records by date
+    const sortedRecords = group.sort((a, b) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+
+    // Compare consecutive records
+    for (let i = 1; i < sortedRecords.length; i++) {
+      const prevRecord = sortedRecords[i - 1];
+      const currentRecord = sortedRecords[i];
+
+      // Convert times to seconds for comparison
+      const [prevMins, prevSecs] = prevRecord.time.split(':').map(Number);
+      const [currentMins, currentSecs] = currentRecord.time.split(':').map(Number);
+      
+      const prevTimeInSeconds = prevMins * 60 + prevSecs;
+      const currentTimeInSeconds = currentMins * 60 + currentSecs;
+
+      // Check if there was an improvement (time decreased)
+      if (currentTimeInSeconds < prevTimeInSeconds) {
+        const improvement = prevTimeInSeconds - currentTimeInSeconds;
+        totalImprovement += improvement;
+        improvementCount++;
+      }
+    }
+  });
+
+  return { totalImprovement: totalImprovement.toFixed(2), improvementCount };
 };
 
 export default function Dashboard() {
@@ -212,7 +250,7 @@ export default function Dashboard() {
   const { days, hours } = nextCompetition 
     ? calculateTimeUntilCompetition(new Date(nextCompetition.date))
     : { days: 0, hours: 0 };
-  const timeImprovement = records ? calculateTimeImprovement(records) : 0;
+  const { totalImprovement, improvementCount } = records ? calculateTimeImprovement(records) : { totalImprovement: 0, improvementCount: 0 };
 
   const competition = competitions?.find(c => c.id === editingCompetition);
 
@@ -220,7 +258,7 @@ export default function Dashboard() {
     { label: '選手一覧', icon: <Users className="h-4 w-4" />, href: '/athletes' },
     { label: '歴代記録', icon: <Trophy className="h-4 w-4" />, href: '/all-time-records' },
     { label: '大会記録', icon: <Calendar className="h-4 w-4" />, href: '/competitions' },
-    { label: '資料', icon: <ClipboardList className="h-4 w-4" />, href: '/documents' }, // Updated label
+    { label: '資料', icon: <ClipboardList className="h-4 w-4" />, href: '/documents' },
   ];
 
   return (
@@ -338,10 +376,10 @@ export default function Dashboard() {
               <CardContent>
                 <div className="text-center">
                   <p className="text-3xl font-bold text-primary mb-2">
-                    {timeImprovement}秒
+                    {totalImprovement}秒
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    平均タイム改善
+                    合計タイム短縮 ({improvementCount}回の更新)
                   </p>
                 </div>
               </CardContent>
