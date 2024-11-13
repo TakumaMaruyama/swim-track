@@ -297,43 +297,44 @@ export function registerRoutes(app: Express) {
   // Create new record
   app.post("/api/records", requireAuth, requireCoach, async (req, res) => {
     try {
-      const { studentId, style, distance, time, date, isCompetition } = req.body;
+      const { studentId, style, distance, time, date, isCompetition, poolLength } = req.body;
+    
+    // Verify student exists
+    const [student] = await db
+      .select()
+      .from(users)
+      .where(and(eq(users.id, studentId), eq(users.role, "student")))
+      .limit(1);
 
-      // Verify student exists
-      const [student] = await db
-        .select()
-        .from(users)
-        .where(and(eq(users.id, studentId), eq(users.role, "student")))
-        .limit(1);
-
-      if (!student) {
-        return res.status(404).json({ message: "選手が見つかりません" });
-      }
-
-      const [record] = await db
-        .insert(swimRecords)
-        .values({
-          studentId,
-          style,
-          distance,
-          time,
-          date: new Date(date),
-          isCompetition,
-        })
-        .returning();
-
-      res.json(record);
-    } catch (error) {
-      console.error('Error creating record:', error);
-      res.status(500).json({ message: "記録の作成に失敗しました" });
+    if (!student) {
+      return res.status(404).json({ message: "選手が見つかりません" });
     }
-  });
+
+    const [record] = await db
+      .insert(swimRecords)
+      .values({
+        studentId,
+        style,
+        distance,
+        time,
+        date: new Date(date),
+        isCompetition,
+        poolLength,
+      })
+      .returning();
+
+    res.json(record);
+  } catch (error) {
+    console.error('Error creating record:', error);
+    res.status(500).json({ message: "記録の作成に失敗しました" });
+  }
+});
 
   // Update record
   app.put("/api/records/:id", requireAuth, requireCoach, async (req, res) => {
     try {
       const { id } = req.params;
-      const { style, distance, time, date, isCompetition } = req.body;
+      const { style, distance, time, date, isCompetition, poolLength } = req.body;
 
       const [record] = await db
         .update(swimRecords)
@@ -343,6 +344,7 @@ export function registerRoutes(app: Express) {
           time,
           date: new Date(date),
           isCompetition,
+          poolLength,
         })
         .where(eq(swimRecords.id, parseInt(id)))
         .returning();

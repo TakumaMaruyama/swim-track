@@ -31,7 +31,17 @@ interface TimeProgressChartProps {
 
 export function TimeProgressChart({ records, style, distance, poolLength }: TimeProgressChartProps) {
   const filteredRecords = records
-    .filter(r => r.style === style && r.distance === distance && r.poolLength === poolLength)
+    .filter(r => {
+      console.log('Filtering record:', {
+        recordStyle: r.style,
+        recordDistance: r.distance,
+        recordPoolLength: r.poolLength,
+        expectedPoolLength: poolLength
+      });
+      return r.style === style && 
+             r.distance === distance && 
+             r.poolLength === poolLength;
+    })
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   const timeToSeconds = (time: string) => {
