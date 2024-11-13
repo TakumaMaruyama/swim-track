@@ -29,7 +29,7 @@ export default function Login() {
       username: "",
       password: "",
     },
-    mode: "onChange",
+    mode: "onSubmit",
   });
 
   useEffect(() => {
