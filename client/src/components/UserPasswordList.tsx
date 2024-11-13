@@ -36,8 +36,8 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
   const [editingUser, setEditingUser] = React.useState<number | null>(null);
   const [newPassword, setNewPassword] = React.useState("");
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = React.useState(false);
+  const [passwordError, setPasswordError] = React.useState<string | null>(null);
 
-  // Move error handling to useEffect
   React.useEffect(() => {
     if (error) {
       toast({
@@ -48,8 +48,21 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
     }
   }, [error, toast]);
 
+  const validatePassword = (password: string): boolean => {
+    if (password.length < 8) {
+      setPasswordError("パスワードは8文字以上である必要があります");
+      return false;
+    }
+    setPasswordError(null);
+    return true;
+  };
+
   const handlePasswordUpdate = async (userId: number) => {
     try {
+      if (!validatePassword(newPassword)) {
+        return;
+      }
+
       const response = await fetch(`/api/users/${userId}/password`, {
         method: 'PUT',
         headers: {
@@ -60,7 +73,8 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update password');
+        const data = await response.json();
+        throw new Error(data.message || 'パスワードの更新に失敗しました');
       }
 
       await mutate();
@@ -77,21 +91,15 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
       toast({
         variant: "destructive",
         title: "エラー",
-        description: "パスワードの更新に失敗しました",
+        description: error instanceof Error ? error.message : "パスワードの更新に失敗しました",
       });
     }
   };
 
   const handleConfirmUpdate = (userId: number) => {
-    if (newPassword.length < 8) {
-      toast({
-        variant: "destructive",
-        title: "エラー",
-        description: "パスワードは8文字以上である必要があります",
-      });
-      return;
+    if (validatePassword(newPassword)) {
+      setIsConfirmDialogOpen(true);
     }
-    setIsConfirmDialogOpen(true);
   };
 
   return (
@@ -99,9 +107,9 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-md max-h-[80vh]">
           <DialogHeader>
-            <DialogTitle>ユーザー一覧とパスワード管理</DialogTitle>
+            <DialogTitle>ユーザーパスワード管理</DialogTitle>
             <DialogDescription>
-              ユーザーアカウントとパスワードの管理を行います
+              ユーザーアカウントのパスワード管理を行います
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-4 overflow-y-auto max-h-[60vh] pr-2">
@@ -116,13 +124,20 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
                   </div>
                   {editingUser === user.id ? (
                     <div className="flex items-center gap-2">
-                      <Input
-                        type="password"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="新しいパスワード"
-                        className="w-40"
-                      />
+                      <div className="flex flex-col">
+                        <Input
+                          type="password"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="新しいパスワード"
+                          className="w-40"
+                        />
+                        {passwordError && (
+                          <span className="text-xs text-red-500 mt-1">
+                            {passwordError}
+                          </span>
+                        )}
+                      </div>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -138,6 +153,7 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
                       onClick={() => {
                         setEditingUser(user.id);
                         setNewPassword("");
+                        setPasswordError(null);
                       }}
                     >
                       <Edit2 className="h-4 w-4" />
@@ -166,6 +182,7 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
               setIsConfirmDialogOpen(false);
               setEditingUser(null);
               setNewPassword("");
+              setPasswordError(null);
             }}>
               キャンセル
             </AlertDialogCancel>

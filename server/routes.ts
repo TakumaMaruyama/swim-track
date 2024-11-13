@@ -540,6 +540,7 @@ export function registerRoutes(app: Express) {
   });
 
   // Password management endpoints
+  // Update the /api/users/passwords endpoint
   app.get("/api/users/passwords", requireAuth, requireCoach, async (req, res) => {
     try {
       const usersList = await db
@@ -548,11 +549,11 @@ export function registerRoutes(app: Express) {
           username: users.username,
           role: users.role,
         })
-        .from(users);
-
+        .from(users)
+        .orderBy(users.username);
       res.json(usersList);
     } catch (error) {
-      console.error('Error fetching user information:', error);
+      console.error('Error fetching users:', error);
       res.status(500).json({ message: "ユーザー情報の取得に失敗しました" });
     }
   });
@@ -567,26 +568,21 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ message: "パスワードは8文字以上である必要があります" });
       }
 
-      // Hash the new password using the existing crypto utility from auth.ts
-      const salt = crypto.randomBytes(32);
-      const hash = (await scryptAsync(password, salt, 64)) as Buffer;
-      const hashedPassword = Buffer.concat([hash, salt]).toString('hex');
+      // Hash the new password
+      const hashedPassword = await crypto.hash(password);
 
+      // Update the user's password
       const [updatedUser] = await db
         .update(users)
         .set({ password: hashedPassword })
         .where(eq(users.id, parseInt(id)))
-        .returning({
-          id: users.id,
-          username: users.username,
-          role: users.role,
-        });
+        .returning();
 
       if (!updatedUser) {
         return res.status(404).json({ message: "ユーザーが見つかりません" });
       }
 
-      res.json(updatedUser);
+      res.json({ message: "パスワードが更新されました" });
     } catch (error) {
       console.error('Error updating password:', error);
       res.status(500).json({ message: "パスワードの更新に失敗しました" });

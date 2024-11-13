@@ -26,24 +26,30 @@ interface TimeProgressChartProps {
   records: ExtendedSwimRecord[];
   style: string;
   distance: number;
+  poolLength: number;
 }
 
-export function TimeProgressChart({ records, style, distance }: TimeProgressChartProps) {
+export function TimeProgressChart({ records, style, distance, poolLength }: TimeProgressChartProps) {
   const filteredRecords = records
-    .filter(r => r.style === style && r.distance === distance)
+    .filter(r => r.style === style && r.distance === distance && r.poolLength === poolLength)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  const timeToSeconds = (time: string) => {
+    const [minutes, seconds] = time.split(':').map(Number);
+    return minutes * 60 + seconds;
+  };
 
   const data = {
     labels: filteredRecords.map(r => new Date(r.date).toLocaleDateString('ja-JP')),
     datasets: [
       {
-        label: `${style} ${distance}m`,
-        data: filteredRecords.map(r => {
-          const [minutes, seconds] = r.time.split(':');
-          return parseFloat(minutes) * 60 + parseFloat(seconds);
-        }),
+        label: `${style} ${distance}m (${poolLength}mプール)`,
+        data: filteredRecords.map(r => timeToSeconds(r.time)),
         borderColor: 'rgb(75, 192, 192)',
-        tension: 0.1,
+        backgroundColor: 'rgba(75, 192, 192, 0.5)',
+        tension: 0.3,
+        pointStyle: filteredRecords.map(r => r.isCompetition ? 'star' : 'circle'),
+        pointRadius: filteredRecords.map(r => r.isCompetition ? 8 : 4),
       },
     ],
   };
@@ -58,6 +64,16 @@ export function TimeProgressChart({ records, style, distance }: TimeProgressChar
         display: true,
         text: `${style} ${distance}m の記録推移`,
       },
+      tooltip: {
+        callbacks: {
+          label: (context: any) => {
+            const seconds = context.raw;
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = (seconds % 60).toFixed(2);
+            return `${minutes}:${remainingSeconds.padStart(5, '0')}`;
+          },
+        },
+      },
     },
     scales: {
       y: {
@@ -65,6 +81,13 @@ export function TimeProgressChart({ records, style, distance }: TimeProgressChar
         title: {
           display: true,
           text: 'タイム (秒)',
+        },
+        ticks: {
+          callback: (value: number) => {
+            const minutes = Math.floor(value / 60);
+            const seconds = (value % 60).toFixed(2);
+            return `${minutes}:${seconds.padStart(5, '0')}`;
+          },
         },
       },
     },
