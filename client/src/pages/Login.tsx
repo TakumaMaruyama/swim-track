@@ -29,7 +29,7 @@ export default function Login() {
       username: "",
       password: "",
     },
-    mode: "onChange",
+    mode: "onSubmit",
   });
 
   useEffect(() => {
@@ -39,8 +39,6 @@ export default function Login() {
   }, [isAuthChecking, isAuthenticated, navigate]);
 
   const onSubmit = async (values: { username: string; password: string }) => {
-    if (form.formState.isSubmitting) return;
-
     try {
       const result = await login(values);
       if (result.ok) {

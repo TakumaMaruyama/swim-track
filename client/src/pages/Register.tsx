@@ -54,8 +54,6 @@ export default function Register() {
   const { formState } = form;
 
   async function onSubmit(values: { username: string; password: string; role: string }) {
-    if (isSubmitting) return;
-
     try {
       console.log('[Register] Starting registration');
       setIsSubmitting(true);
@@ -217,7 +215,7 @@ export default function Register() {
                 <Button 
                   type="submit" 
                   className="w-full"
-                  disabled={isSubmitting || !formState.isValid}
+                  disabled={isSubmitting}
                 >
                   {isSubmitting ? (
                     <>
