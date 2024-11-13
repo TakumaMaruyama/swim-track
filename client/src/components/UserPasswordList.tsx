@@ -10,6 +10,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import useSWR from "swr";
 import type { User } from "db/schema";
@@ -21,20 +28,28 @@ interface UserPasswordListProps {
 
 export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
   const { toast } = useToast();
-  const { data: students, error, mutate } = useSWR<User[]>("/api/users/passwords");
+  const { data: users, error, mutate } = useSWR<User[]>("/api/users/passwords");
   const [editingUser, setEditingUser] = React.useState<number | null>(null);
   const [newPassword, setNewPassword] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [roleFilter, setRoleFilter] = React.useState<string>("all");
 
   React.useEffect(() => {
     if (error) {
       toast({
         variant: "destructive",
         title: "エラー",
-        description: "学生情報の取得に失敗しました",
+        description: "ユーザー情報の取得に失敗しました",
       });
     }
   }, [error, toast]);
+
+  const filteredUsers = React.useMemo(() => {
+    if (!users) return [];
+    return users.filter(user => 
+      roleFilter === "all" || user.role === roleFilter
+    );
+  }, [users, roleFilter]);
 
   const handlePasswordUpdate = async (userId: number) => {
     if (isSubmitting) return;
@@ -68,26 +83,51 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
     }
   };
 
+  const getRoleBadgeVariant = (role: string) => {
+    return role === 'coach' ? 'default' : 'secondary';
+  };
+
+  const getRoleDisplayName = (role: string) => {
+    return role === 'coach' ? 'コーチ' : '選手';
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md max-h-[80vh]">
         <DialogHeader>
-          <DialogTitle>学生パスワード管理</DialogTitle>
+          <DialogTitle>パスワード管理</DialogTitle>
           <DialogDescription>
-            学生のパスワードを管理します
+            ユーザーのパスワードを管理します
           </DialogDescription>
         </DialogHeader>
+        <div className="mb-4">
+          <Select value={roleFilter} onValueChange={setRoleFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="ロールで絞り込み" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">すべて</SelectItem>
+              <SelectItem value="coach">コーチ</SelectItem>
+              <SelectItem value="student">選手</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <div className="space-y-4 mt-4 overflow-y-auto max-h-[60vh] pr-2">
-          {students?.map((student) => (
-            <Card key={student.id}>
+          {filteredUsers.map((user) => (
+            <Card key={user.id}>
               <CardContent className="flex justify-between items-center p-4">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium">{student.username}</span>
-                  <Badge variant={student.isActive ? 'default' : 'secondary'}>
-                    {student.isActive ? '有効' : '無効'}
+                  <span className="font-medium">{user.username}</span>
+                  <Badge variant={getRoleBadgeVariant(user.role)}>
+                    {getRoleDisplayName(user.role)}
                   </Badge>
+                  {user.isActive !== undefined && (
+                    <Badge variant={user.isActive ? 'default' : 'secondary'}>
+                      {user.isActive ? '有効' : '無効'}
+                    </Badge>
+                  )}
                 </div>
-                {editingUser === student.id ? (
+                {editingUser === user.id ? (
                   <div className="flex items-center gap-2">
                     <Input
                       type="password"
@@ -99,7 +139,7 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
                     />
                     <Button 
                       size="sm"
-                      onClick={() => handlePasswordUpdate(student.id)}
+                      onClick={() => handlePasswordUpdate(user.id)}
                       disabled={isSubmitting}
                     >
                       更新
@@ -120,7 +160,7 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setEditingUser(student.id)}
+                    onClick={() => setEditingUser(user.id)}
                   >
                     パスワード変更
                   </Button>

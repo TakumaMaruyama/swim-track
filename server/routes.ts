@@ -2,7 +2,7 @@ import { Express } from "express";
 import { setupAuth } from "./auth";
 import multer from "multer";
 import { db } from "db";
-import { documents, users, swimRecords, competitions } from "db/schema";
+import { documents, users, swimRecords, competitions, categories } from "db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import path from "path";
 import fs from "fs/promises";
@@ -77,10 +77,10 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Update the /api/users/passwords endpoint to get only students
+  // Update the /api/users/passwords endpoint to get both students and coaches
   app.get("/api/users/passwords", requireAuth, requireCoach, async (req, res) => {
     try {
-      const students = await db
+      const users = await db
         .select({
           id: users.id,
           username: users.username,
@@ -88,13 +88,12 @@ export function registerRoutes(app: Express) {
           isActive: users.isActive,
         })
         .from(users)
-        .where(eq(users.role, "student"))
-        .orderBy(users.username);
+        .orderBy([users.role, users.username]);
 
-      res.json(students);
+      res.json(users);
     } catch (error) {
-      console.error('Error fetching student list:', error);
-      res.status(500).json({ message: "学生情報の取得に失敗しました" });
+      console.error('Error fetching user list:', error);
+      res.status(500).json({ message: "ユーザー情報の取得に失敗しました" });
     }
   });
 
@@ -464,6 +463,7 @@ export function registerRoutes(app: Express) {
             filename: req.file.filename,
             mimeType: req.file.mimetype,
             uploaderId: req.user!.id,
+            categoryId: req.body.categoryId ? parseInt(req.body.categoryId) : null
           })
           .returning();
 
@@ -595,6 +595,98 @@ export function registerRoutes(app: Express) {
     } catch (error) {
       console.error('Error deleting coach account:', error);
       res.status(500).json({ message: "アカウントの削除に失敗しました" });
+    }
+  });
+
+  // Categories API
+  app.post("/api/categories", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { name, description } = req.body;
+      const [category] = await db
+        .insert(categories)
+        .values({
+          name,
+          description,
+          createdBy: req.user!.id
+        })
+        .returning();
+
+      res.json(category);
+    } catch (error) {
+      console.error('Error creating category:', error);
+      res.status(500).json({ message: "カテゴリーの作成に失敗しました" });
+    }
+  });
+
+  app.get("/api/categories", requireAuth, async (req, res) => {
+    try {
+      const categoryList = await db
+        .select({
+          id: categories.id,
+          name: categories.name,
+          description: categories.description,
+          createdAt: categories.createdAt,
+          createdBy: categories.createdBy,
+          documentCount: sql<number>`count(${documents.id})`
+        })
+        .from(categories)
+        .leftJoin(documents, eq(documents.categoryId, categories.id))
+        .groupBy(categories.id)
+        .orderBy(categories.name);
+
+      res.json(categoryList);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      res.status(500).json({ message: "カテゴリーの取得に失敗しました" });
+    }
+  });
+
+  app.put("/api/categories/:id", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, description } = req.body;
+
+      const [category] = await db
+        .update(categories)
+        .set({ name, description })
+        .where(eq(categories.id, parseInt(id)))
+        .returning();
+
+      if (!category) {
+        return res.status(404).json({ message: "カテゴリーが見つかりません" });
+      }
+
+      res.json(category);
+    } catch (error) {
+      console.error('Error updating category:', error);
+      res.status(500).json({ message: "カテゴリーの更新に失敗しました" });
+    }
+  });
+
+  app.delete("/api/categories/:id", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // First update all documents in this category to have no category
+      await db
+        .update(documents)
+        .set({ categoryId: null })
+        .where(eq(documents.categoryId, parseInt(id)));
+
+      // Then delete the category
+      const [deletedCategory] = await db
+        .delete(categories)
+        .where(eq(categories.id, parseInt(id)))
+        .returning();
+
+      if (!deletedCategory) {
+        return res.status(404).json({ message: "カテゴリーが見つかりません" });
+      }
+
+      res.json({ message: "カテゴリーが削除されました" });
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      res.status(500).json({ message: "カテゴリーの削除に失敗しました" });
     }
   });
 
