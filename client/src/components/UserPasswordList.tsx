@@ -37,13 +37,16 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
   const [newPassword, setNewPassword] = React.useState("");
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = React.useState(false);
 
-  if (error) {
-    toast({
-      variant: "destructive",
-      title: "エラー",
-      description: "ユーザー情報の取得に失敗しました",
-    });
-  }
+  // Move error handling to useEffect
+  React.useEffect(() => {
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "エラー",
+        description: "ユーザー情報の取得に失敗しました",
+      });
+    }
+  }, [error, toast]);
 
   const handlePasswordUpdate = async (userId: number) => {
     try {
@@ -63,6 +66,7 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
       await mutate();
       setEditingUser(null);
       setNewPassword("");
+      setIsConfirmDialogOpen(false);
       
       toast({
         title: "更新成功",
@@ -76,6 +80,18 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
         description: "パスワードの更新に失敗しました",
       });
     }
+  };
+
+  const handleConfirmUpdate = (userId: number) => {
+    if (newPassword.length < 8) {
+      toast({
+        variant: "destructive",
+        title: "エラー",
+        description: "パスワードは8文字以上である必要があります",
+      });
+      return;
+    }
+    setIsConfirmDialogOpen(true);
   };
 
   return (
@@ -110,9 +126,7 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => {
-                          setIsConfirmDialogOpen(true);
-                        }}
+                        onClick={() => handleConfirmUpdate(user.id)}
                       >
                         <Save className="h-4 w-4" />
                       </Button>
@@ -121,7 +135,10 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => setEditingUser(user.id)}
+                      onClick={() => {
+                        setEditingUser(user.id);
+                        setNewPassword("");
+                      }}
                     >
                       <Edit2 className="h-4 w-4" />
                     </Button>
@@ -156,7 +173,6 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
               onClick={() => {
                 if (editingUser) {
                   handlePasswordUpdate(editingUser);
-                  setIsConfirmDialogOpen(false);
                 }
               }}
             >

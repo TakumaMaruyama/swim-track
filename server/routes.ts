@@ -529,7 +529,7 @@ export function registerRoutes(app: Express) {
   // Password management endpoints
   app.get("/api/users/passwords", requireAuth, requireCoach, async (req, res) => {
     try {
-      const users = await db
+      const usersList = await db
         .select({
           id: users.id,
           username: users.username,
@@ -537,7 +537,7 @@ export function registerRoutes(app: Express) {
         })
         .from(users);
 
-      res.json(users);
+      res.json(usersList);
     } catch (error) {
       console.error('Error fetching user information:', error);
       res.status(500).json({ message: "ユーザー情報の取得に失敗しました" });
@@ -550,12 +550,14 @@ export function registerRoutes(app: Express) {
       const { id } = req.params;
       const { password } = req.body;
 
-      if (!password) {
-        return res.status(400).json({ message: "パスワードは必須です" });
+      if (!password || password.length < 8) {
+        return res.status(400).json({ message: "パスワードは8文字以上である必要があります" });
       }
 
-      // Hash the new password
-      const hashedPassword = await crypto.hash(password);
+      // Hash the new password using the existing crypto utility from auth.ts
+      const salt = crypto.randomBytes(32);
+      const hash = (await scryptAsync(password, salt, 64)) as Buffer;
+      const hashedPassword = Buffer.concat([hash, salt]).toString('hex');
 
       const [updatedUser] = await db
         .update(users)

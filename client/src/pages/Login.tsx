@@ -37,13 +37,20 @@ export default function Login() {
     },
   });
 
-  // Check initial authentication state
+  // Check initial authentication state with cleanup
   useEffect(() => {
+    let mounted = true;
+    
     console.log('[Login] Checking initial auth state:', { isAuthenticated, isAuthChecking });
-    if (!isAuthChecking && isAuthenticated) {
+    
+    if (!isAuthChecking && isAuthenticated && mounted) {
       console.log('[Login] User is already authenticated, redirecting');
       window.location.replace('/');
     }
+
+    return () => {
+      mounted = false;
+    };
   }, [isAuthChecking, isAuthenticated]);
 
   async function onSubmit(values: { username: string; password: string }) {
