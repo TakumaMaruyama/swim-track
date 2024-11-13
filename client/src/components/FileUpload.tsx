@@ -21,7 +21,7 @@ export function FileUpload({ onSuccess }: FileUploadProps) {
   const [uploading, setUploading] = useState(false);
   const { toast } = useToast();
   const { user } = useUser();
-  const { data: categories } = useSWR<Category[]>("/api/categories");
+  const { data: categories, error: categoriesError } = useSWR<Category[]>("/api/categories");
   
   const handleUpload = async (e: React.ChangeEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -49,12 +49,20 @@ export function FileUpload({ onSuccess }: FileUploadProps) {
       toast({
         variant: "destructive",
         title: "エラー",
-        description: error.message,
+        description: error.message || "ファイルのアップロードに失敗しました",
       });
     } finally {
       setUploading(false);
     }
   };
+
+  if (categoriesError) {
+    toast({
+      variant: "destructive",
+      title: "エラー",
+      description: "カテゴリー情報の取得に失敗しました",
+    });
+  }
 
   if (!user || user.role !== "coach") return null;
 
@@ -72,7 +80,7 @@ export function FileUpload({ onSuccess }: FileUploadProps) {
             <SelectValue placeholder="カテゴリーを選択" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">カテゴリーなし</SelectItem>
+            <SelectItem value="none">カテゴリーなし</SelectItem>
             {categories?.map((category) => (
               <SelectItem key={category.id} value={category.id.toString()}>
                 {category.name}
