@@ -35,7 +35,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { StudentPasswordList } from '../components/StudentPasswordList';
+import { UserPasswordList } from '../components/UserPasswordList';
 
 const calculateTimeUntilCompetition = (competitionDate: Date) => {
   const now = new Date();
@@ -243,6 +243,7 @@ export default function Dashboard() {
                   size="icon"
                   onClick={() => setShowPasswordList(true)}
                   className="text-gray-600 hover:text-gray-900"
+                  title="パスワード管理"
                 >
                   <Key className="h-4 w-4" />
                 </Button>
@@ -467,7 +468,7 @@ export default function Dashboard() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <StudentPasswordList
+      <UserPasswordList
         isOpen={showPasswordList}
         onClose={() => setShowPasswordList(false)}
       />

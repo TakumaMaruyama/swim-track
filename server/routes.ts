@@ -8,6 +8,7 @@ import path from "path";
 import fs from "fs/promises";
 import { scrypt } from "crypto";
 import { promisify } from "util";
+import crypto from 'crypto';
 
 const scryptAsync = promisify(scrypt);
 
@@ -525,25 +526,55 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Add the new password viewing endpoint
+  // Password management endpoints
   app.get("/api/users/passwords", requireAuth, requireCoach, async (req, res) => {
     try {
-      const students = await db
-        .select()
-        .from(users)
-        .where(eq(users.role, "student"));
+      const users = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          role: users.role,
+        })
+        .from(users);
 
-      // Return only username and original password
-      const studentInfo = students.map(student => ({
-        id: student.id,
-        username: student.username,
-        role: student.role,
-      }));
-
-      res.json(studentInfo);
+      res.json(users);
     } catch (error) {
-      console.error('Error fetching student passwords:', error);
-      res.status(500).json({ message: "学生情報の取得に失敗しました" });
+      console.error('Error fetching user information:', error);
+      res.status(500).json({ message: "ユーザー情報の取得に失敗しました" });
+    }
+  });
+
+  // Add password update endpoint
+  app.put("/api/users/:id/password", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { password } = req.body;
+
+      if (!password) {
+        return res.status(400).json({ message: "パスワードは必須です" });
+      }
+
+      // Hash the new password
+      const hashedPassword = await crypto.hash(password);
+
+      const [updatedUser] = await db
+        .update(users)
+        .set({ password: hashedPassword })
+        .where(eq(users.id, parseInt(id)))
+        .returning({
+          id: users.id,
+          username: users.username,
+          role: users.role,
+        });
+
+      if (!updatedUser) {
+        return res.status(404).json({ message: "ユーザーが見つかりません" });
+      }
+
+      res.json(updatedUser);
+    } catch (error) {
+      console.error('Error updating password:', error);
+      res.status(500).json({ message: "パスワードの更新に失敗しました" });
     }
   });
 
