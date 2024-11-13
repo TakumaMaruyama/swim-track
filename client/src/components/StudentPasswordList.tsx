@@ -7,6 +7,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import useSWR from "swr";
 import type { User } from "db/schema";
@@ -18,13 +19,13 @@ interface StudentPasswordListProps {
 
 export function StudentPasswordList({ isOpen, onClose }: StudentPasswordListProps) {
   const { toast } = useToast();
-  const { data: students, error } = useSWR<User[]>("/api/users/passwords");
+  const { data: users, error } = useSWR<User[]>("/api/users/passwords");
 
   if (error) {
     toast({
       variant: "destructive",
       title: "エラー",
-      description: "学生情報の取得に失敗しました",
+      description: "ユーザー情報の取得に失敗しました",
     });
   }
 
@@ -32,16 +33,24 @@ export function StudentPasswordList({ isOpen, onClose }: StudentPasswordListProp
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md max-h-[80vh]">
         <DialogHeader>
-          <DialogTitle>学生一覧とパスワード</DialogTitle>
+          <DialogTitle>ユーザー一覧とパスワード</DialogTitle>
           <DialogDescription>
-            学生のアカウント情報一覧です
+            ユーザーアカウント情報一覧です
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 mt-4 overflow-y-auto max-h-[60vh] pr-2">
-          {students?.map((student) => (
-            <Card key={student.id}>
+          {users?.map((user) => (
+            <Card key={user.id}>
               <CardContent className="flex justify-between items-center p-4">
-                <span className="font-medium">{student.username}</span>
+                <div>
+                  <span className="font-medium">{user.username}</span>
+                  <Badge variant={user.role === 'coach' ? "default" : "secondary"} className="ml-2">
+                    {user.role === 'coach' ? 'コーチ' : '選手'}
+                  </Badge>
+                </div>
+                <span className="text-sm font-mono bg-muted px-2 py-1 rounded">
+                  {user.password}
+                </span>
               </CardContent>
             </Card>
           ))}
