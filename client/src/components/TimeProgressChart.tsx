@@ -32,25 +32,28 @@ interface TimeProgressChartProps {
 export function TimeProgressChart({ records, style, distance, poolLength }: TimeProgressChartProps) {
   const filteredRecords = records
     .filter(r => {
-      console.log('Filtering record:', {
-        recordStyle: r.style,
-        recordDistance: r.distance,
-        recordPoolLength: r.poolLength,
-        expectedPoolLength: poolLength
-      });
       return r.style === style && 
              r.distance === distance && 
              r.poolLength === poolLength;
     })
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    .sort((a, b) => {
+      const dateA = new Date(a.date || '');
+      const dateB = new Date(b.date || '');
+      return dateA.getTime() - dateB.getTime();
+    });
 
   const timeToSeconds = (time: string) => {
     const [minutes, seconds] = time.split(':').map(Number);
     return minutes * 60 + seconds;
   };
 
+  const formatDate = (date: Date | string | null) => {
+    if (!date) return '';
+    return new Date(date).toLocaleDateString('ja-JP');
+  };
+
   const data = {
-    labels: filteredRecords.map(r => new Date(r.date).toLocaleDateString('ja-JP')),
+    labels: filteredRecords.map(r => formatDate(r.date)),
     datasets: [
       {
         label: `${style} ${distance}m (${poolLength}mプール)`,
@@ -72,7 +75,7 @@ export function TimeProgressChart({ records, style, distance, poolLength }: Time
       },
       title: {
         display: true,
-        text: `${style} ${distance}m の記録推移`,
+        text: `${style} ${distance}m (${poolLength}mプール) の記録推移`,
       },
       tooltip: {
         callbacks: {

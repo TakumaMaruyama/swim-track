@@ -179,19 +179,22 @@ export function TimeHistoryModal({
           <div className="space-y-6">
             {Object.entries(groupedAndFilteredRecords).map(([key, records]) => {
               const [style, distance] = key.split('-');
+              const poolLength = records[0]?.poolLength || 25;
+              
               return (
                 <Card key={key}>
                   <CardContent className="pt-6">
                     <div className="mb-4">
                       <h3 className="text-lg font-semibold">
-                        {style} {distance}m
+                        {style} {distance}m ({poolLength}mプール)
                       </h3>
                     </div>
                     
                     <TimeProgressChart 
                       records={records} 
                       style={style} 
-                      distance={parseInt(distance)} 
+                      distance={parseInt(distance)}
+                      poolLength={poolLength}
                     />
 
                     <div className="space-y-3 mt-4">
