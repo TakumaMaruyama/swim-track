@@ -49,45 +49,57 @@ const calculateTimeUntilCompetition = (competitionDate: Date) => {
 const calculateTimeImprovement = (records: any[]) => {
   if (!records || records.length === 0) return { totalImprovement: 0, improvementCount: 0 };
 
-  // Group records by style, distance, and pool length
-  const groupedRecords: { [key: string]: any[] } = {};
+  // First group by athlete
+  const athleteRecords: { [key: string]: any[] } = {};
   records.forEach(record => {
-    const key = `${record.style}-${record.distance}-${record.poolLength}`;
-    if (!groupedRecords[key]) {
-      groupedRecords[key] = [];
+    if (!athleteRecords[record.studentId]) {
+      athleteRecords[record.studentId] = [];
     }
-    groupedRecords[key].push(record);
+    athleteRecords[record.studentId].push(record);
   });
 
   let totalImprovement = 0;
   let improvementCount = 0;
 
-  // Process each group
-  Object.values(groupedRecords).forEach(group => {
-    // Sort records by date within each group
-    const sortedRecords = group.sort((a: any, b: any) => 
-      new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
-
-    // Compare each record with its previous record
-    for (let i = 1; i < sortedRecords.length; i++) {
-      const prevRecord = sortedRecords[i - 1];
-      const currentRecord = sortedRecords[i];
-
-      // Convert times to seconds for comparison
-      const [prevMins, prevSecs] = prevRecord.time.split(':').map(Number);
-      const [currentMins, currentSecs] = currentRecord.time.split(':').map(Number);
-      
-      const prevTimeInSeconds = prevMins * 60 + prevSecs;
-      const currentTimeInSeconds = currentMins * 60 + currentSecs;
-
-      // If current time is better (smaller) than previous
-      if (currentTimeInSeconds < prevTimeInSeconds) {
-        const improvement = prevTimeInSeconds - currentTimeInSeconds;
-        totalImprovement += improvement;
-        improvementCount++;
+  // Process each athlete's records separately
+  Object.values(athleteRecords).forEach(athleteRecords => {
+    // Group athlete's records by style, distance, and pool length
+    const groupedRecords: { [key: string]: any[] } = {};
+    athleteRecords.forEach(record => {
+      const key = `${record.style}-${record.distance}-${record.poolLength}`;
+      if (!groupedRecords[key]) {
+        groupedRecords[key] = [];
       }
-    }
+      groupedRecords[key].push(record);
+    });
+
+    // Calculate improvements within each group for this athlete
+    Object.values(groupedRecords).forEach(group => {
+      // Sort by date
+      const sortedRecords = group.sort((a, b) => 
+        new Date(a.date).getTime() - new Date(b.date).getTime()
+      );
+
+      // Compare each record with its previous record
+      for (let i = 1; i < sortedRecords.length; i++) {
+        const prevRecord = sortedRecords[i - 1];
+        const currentRecord = sortedRecords[i];
+
+        // Convert times to seconds
+        const [prevMins, prevSecs] = prevRecord.time.split(':').map(Number);
+        const [currentMins, currentSecs] = currentRecord.time.split(':').map(Number);
+        
+        const prevTimeInSeconds = prevMins * 60 + prevSecs;
+        const currentTimeInSeconds = currentMins * 60 + currentSecs;
+
+        // If current time is better (smaller) than previous
+        if (currentTimeInSeconds < prevTimeInSeconds) {
+          const improvement = prevTimeInSeconds - currentTimeInSeconds;
+          totalImprovement += improvement;
+          improvementCount++;
+        }
+      }
+    });
   });
 
   return { 
