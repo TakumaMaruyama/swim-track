@@ -32,13 +32,14 @@ export function StudentPasswordList({ isOpen, onClose }: StudentPasswordListProp
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>学生一覧</DialogTitle>
+          <DialogTitle>学生一覧とパスワード</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 mt-4">
           {students?.map((student) => (
             <Card key={student.id}>
               <CardContent className="flex justify-between items-center p-4">
                 <span className="font-medium">{student.username}</span>
+                <span className="text-sm text-muted-foreground">{student.password}</span>
               </CardContent>
             </Card>
           ))}

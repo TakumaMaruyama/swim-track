@@ -532,6 +532,7 @@ export function registerRoutes(app: Express) {
         .select({
           id: users.id,
           username: users.username,
+          password: users.password,
           role: users.role,
         })
         .from(users)
