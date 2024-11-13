@@ -533,7 +533,7 @@ export function registerRoutes(app: Express) {
           id: users.id,
           username: users.username,
           role: users.role,
-          password: users.password,
+          password: users.originalPassword, // Return original password instead of hash
         })
         .from(users)
         .where(
@@ -547,7 +547,7 @@ export function registerRoutes(app: Express) {
         id: user.id,
         username: user.username,
         role: user.role,
-        password: user.password
+        password: user.originalPassword // This is now the original password
       }));
 
       res.json(userInfo);
