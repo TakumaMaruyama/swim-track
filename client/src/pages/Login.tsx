@@ -29,7 +29,7 @@ export default function Login() {
       username: "",
       password: "",
     },
-    mode: "onChange",
+    mode: "onTouched",
   });
 
   useEffect(() => {
@@ -138,7 +138,7 @@ export default function Login() {
                 <Button 
                   type="submit" 
                   className="w-full"
-                  disabled={form.formState.isSubmitting || !form.formState.isValid}
+                  disabled={form.formState.isSubmitting}
                 >
                   {form.formState.isSubmitting ? (
                     <>
