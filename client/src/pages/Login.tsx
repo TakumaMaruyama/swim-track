@@ -22,14 +22,13 @@ import { useEffect } from "react";
 export default function Login() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { login, isAuthenticated, isLoading: isAuthChecking } = useUser();
+  const { login, isAuthenticated, isLoginPending, isLoading: isAuthChecking } = useUser();
   const form = useForm({
     resolver: zodResolver(insertUserSchema),
     defaultValues: {
       username: "",
       password: "",
     },
-    mode: "onSubmit",
   });
 
   useEffect(() => {
@@ -107,7 +106,7 @@ export default function Login() {
                       <FormControl>
                         <Input 
                           {...field} 
-                          disabled={form.formState.isSubmitting}
+                          disabled={isLoginPending}
                           autoComplete="username"
                           className="bg-white"
                         />
@@ -126,7 +125,7 @@ export default function Login() {
                         <Input 
                           type="password" 
                           {...field} 
-                          disabled={form.formState.isSubmitting}
+                          disabled={isLoginPending}
                           autoComplete="current-password"
                           className="bg-white"
                         />
@@ -138,9 +137,9 @@ export default function Login() {
                 <Button 
                   type="submit" 
                   className="w-full"
-                  disabled={form.formState.isSubmitting}
+                  disabled={isLoginPending}
                 >
-                  {form.formState.isSubmitting ? (
+                  {isLoginPending ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ログイン中...
@@ -160,7 +159,7 @@ export default function Login() {
               variant="outline"
               className="w-full"
               onClick={() => navigate("/register")}
-              disabled={form.formState.isSubmitting}
+              disabled={isLoginPending}
             >
               新規登録
             </Button>
