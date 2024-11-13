@@ -529,16 +529,18 @@ export function registerRoutes(app: Express) {
   app.get("/api/users/passwords", requireAuth, requireCoach, async (req, res) => {
     try {
       const students = await db
-        .select({
-          id: users.id,
-          username: users.username,
-          password: users.password,
-          role: users.role,
-        })
+        .select()
         .from(users)
         .where(eq(users.role, "student"));
 
-      res.json(students);
+      // Return only username and original password
+      const studentInfo = students.map(student => ({
+        id: student.id,
+        username: student.username,
+        role: student.role,
+      }));
+
+      res.json(studentInfo);
     } catch (error) {
       console.error('Error fetching student passwords:', error);
       res.status(500).json({ message: "学生情報の取得に失敗しました" });
