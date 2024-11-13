@@ -69,7 +69,7 @@ const calculateTimeImprovement = (records: any[]) => {
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
-    // Compare consecutive records within the same group
+    // Compare each record with its previous record
     for (let i = 1; i < sortedRecords.length; i++) {
       const prevRecord = sortedRecords[i - 1];
       const currentRecord = sortedRecords[i];
@@ -81,7 +81,7 @@ const calculateTimeImprovement = (records: any[]) => {
       const prevTimeInSeconds = prevMins * 60 + prevSecs;
       const currentTimeInSeconds = currentMins * 60 + currentSecs;
 
-      // Check if there was an improvement (time decreased)
+      // If current time is better (smaller) than previous
       if (currentTimeInSeconds < prevTimeInSeconds) {
         const improvement = prevTimeInSeconds - currentTimeInSeconds;
         totalImprovement += improvement;
@@ -173,6 +173,7 @@ export default function Dashboard() {
       }
 
       await mutateCompetitions();
+      setEditingCompetition(null);
     } catch (error) {
       console.error('Error creating competition:', error);
       throw error;
@@ -195,6 +196,7 @@ export default function Dashboard() {
       }
 
       await mutateCompetitions();
+      setEditingCompetition(null);
     } catch (error) {
       console.error('Error updating competition:', error);
       throw error;
@@ -460,12 +462,11 @@ export default function Dashboard() {
           } else {
             await handleEditCompetition(editingCompetition, data);
           }
-          setEditingCompetition(null);
         }}
       />
 
-      <AlertDialog
-        open={showLogoutDialog}
+      <AlertDialog 
+        open={showLogoutDialog} 
         onOpenChange={setShowLogoutDialog}
       >
         <AlertDialogContent>
