@@ -30,6 +30,7 @@ import { Trophy, TrendingUp, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
 import type { ExtendedSwimRecord } from "../hooks/use-swim-records";
+import { TimeProgressChart } from './TimeProgressChart';
 
 type TimeHistoryModalProps = {
   isOpen: boolean;
@@ -186,7 +187,14 @@ export function TimeHistoryModal({
                         {style} {distance}m
                       </h3>
                     </div>
-                    <div className="space-y-3">
+                    
+                    <TimeProgressChart 
+                      records={records} 
+                      style={style} 
+                      distance={parseInt(distance)} 
+                    />
+
+                    <div className="space-y-3 mt-4">
                       {records.map((record) => (
                         <div
                           key={record.id}

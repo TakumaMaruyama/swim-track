@@ -6,6 +6,10 @@ import { documents, users, swimRecords, competitions } from "db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import path from "path";
 import fs from "fs/promises";
+import { scrypt } from "crypto";
+import { promisify } from "util";
+
+const scryptAsync = promisify(scrypt);
 
 const storage = multer.diskStorage({
   destination: "uploads/",
@@ -518,6 +522,25 @@ export function registerRoutes(app: Express) {
     } catch (error) {
       console.error('Error deleting coach account:', error);
       res.status(500).json({ message: "アカウントの削除に失敗しました" });
+    }
+  });
+
+  // Add the new password viewing endpoint
+  app.get("/api/users/passwords", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const students = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          role: users.role,
+        })
+        .from(users)
+        .where(eq(users.role, "student"));
+
+      res.json(students);
+    } catch (error) {
+      console.error('Error fetching student passwords:', error);
+      res.status(500).json({ message: "学生情報の取得に失敗しました" });
     }
   });
 

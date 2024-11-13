@@ -13,7 +13,8 @@ import {
   Plus,
   Edit2,
   Trash2,
-  UserX
+  UserX,
+  Key 
 } from 'lucide-react'
 import { useUser } from '../hooks/use-user'
 import { useLocation } from 'wouter'
@@ -34,6 +35,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { StudentPasswordList } from '../components/StudentPasswordList';
 
 const calculateTimeUntilCompetition = (competitionDate: Date) => {
   const now = new Date();
@@ -69,6 +71,7 @@ export default function Dashboard() {
   const [editingCompetition, setEditingCompetition] = React.useState<number | null>(null);
   const [showLogoutDialog, setShowLogoutDialog] = React.useState(false);
   const [showDeleteAccountDialog, setShowDeleteAccountDialog] = React.useState(false);
+  const [showPasswordList, setShowPasswordList] = React.useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -234,6 +237,16 @@ export default function Dashboard() {
               <span className="ml-2 text-sm font-medium text-gray-700">{user.username}</span>
             </div>
             <div className="flex gap-2">
+              {user?.role === 'coach' && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowPasswordList(true)}
+                  className="text-gray-600 hover:text-gray-900"
+                >
+                  <Key className="h-4 w-4" />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
@@ -453,6 +466,11 @@ export default function Dashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <StudentPasswordList
+        isOpen={showPasswordList}
+        onClose={() => setShowPasswordList(false)}
+      />
     </div>
   );
 }
