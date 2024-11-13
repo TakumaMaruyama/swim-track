@@ -10,27 +10,31 @@ import { db } from "db";
 import { eq } from "drizzle-orm";
 
 const scryptAsync = promisify(scrypt);
+
+const SALT_LENGTH = 32;
+const HASH_LENGTH = 64;
+
 const crypto = {
   hash: async (password: string) => {
-    const salt = randomBytes(16).toString("hex");
-    const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-    return `${buf.toString("hex")}.${salt}`;
+    try {
+      const salt = randomBytes(SALT_LENGTH);
+      const hash = (await scryptAsync(password, salt, HASH_LENGTH)) as Buffer;
+      const hashedPassword = Buffer.concat([hash, salt]);
+      return hashedPassword.toString('hex');
+    } catch (error) {
+      console.error('Password hashing error:', error);
+      throw new Error('パスワードのハッシュ化に失敗しました');
+    }
   },
   compare: async (suppliedPassword: string, storedPassword: string) => {
     try {
-      const [hashedPassword, salt] = storedPassword.split(".");
-      if (!hashedPassword || !salt) return false;
-      
-      const hashedPasswordBuf = Buffer.from(hashedPassword, "hex");
-      const suppliedPasswordBuf = (await scryptAsync(
-        suppliedPassword,
-        salt,
-        64
-      )) as Buffer;
-      
-      return timingSafeEqual(hashedPasswordBuf, suppliedPasswordBuf);
+      const buffer = Buffer.from(storedPassword, 'hex');
+      const hash = buffer.subarray(0, HASH_LENGTH);
+      const salt = buffer.subarray(HASH_LENGTH);
+      const suppliedHash = (await scryptAsync(suppliedPassword, salt, HASH_LENGTH)) as Buffer;
+      return timingSafeEqual(hash, suppliedHash);
     } catch (error) {
-      console.error("Password comparison error:", error);
+      console.error('Password comparison error:', error);
       return false;
     }
   },
@@ -149,6 +153,7 @@ export function setupAuth(app: Express) {
 
         return done(null, user);
       } catch (err) {
+        console.error('Authentication error:', err);
         return done(err);
       }
     })
@@ -172,14 +177,17 @@ export function setupAuth(app: Express) {
 
       done(null, user);
     } catch (err) {
+      console.error('Deserialization error:', err);
       done(err);
     }
   });
 
   app.post("/register", async (req, res, next) => {
     try {
+      console.log('[Auth] Processing registration request');
       const result = insertUserSchema.safeParse(req.body);
       if (!result.success) {
+        console.log('[Auth] Registration validation failed:', result.error);
         return res
           .status(400)
           .json({ 
@@ -198,6 +206,7 @@ export function setupAuth(app: Express) {
         .limit(1);
 
       if (existingUser) {
+        console.log('[Auth] Registration failed: username already exists');
         return res.status(400).json({ 
           message: "このユーザー名は既に使用されています",
           field: "username"
@@ -215,8 +224,10 @@ export function setupAuth(app: Express) {
         })
         .returning();
 
+      console.log('[Auth] Registration successful');
       req.login(newUser, (err) => {
         if (err) {
+          console.error('[Auth] Login after registration failed:', err);
           return next(err);
         }
         return res.json({
@@ -225,6 +236,7 @@ export function setupAuth(app: Express) {
         });
       });
     } catch (error) {
+      console.error('Registration error:', error);
       next(error);
     }
   });
@@ -274,6 +286,7 @@ export function setupAuth(app: Express) {
     const username = req.user?.username;
     req.logout((err) => {
       if (err) {
+        console.error('[Auth] Logout error:', err);
         return res.status(500).json({ message: "ログアウトに失敗しました" });
       }
       if (username) {
@@ -281,9 +294,11 @@ export function setupAuth(app: Express) {
       }
       req.session.destroy((err) => {
         if (err) {
+          console.error('[Auth] Session destruction error:', err);
           return res.status(500).json({ message: "セッションの削除に失敗しました" });
         }
         res.clearCookie('connect.sid');
+        console.log('[Auth] Logout successful');
         res.json({ message: "ログアウトしました" });
       });
     });
