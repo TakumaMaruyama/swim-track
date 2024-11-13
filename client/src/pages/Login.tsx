@@ -22,13 +22,7 @@ import { useEffect } from "react";
 export default function Login() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { 
-    login, 
-    isAuthenticated, 
-    isLoading: isAuthChecking,
-    error: authError 
-  } = useUser();
-  
+  const { login, isAuthenticated, isLoading: isAuthChecking } = useUser();
   const form = useForm({
     resolver: zodResolver(insertUserSchema),
     defaultValues: {
@@ -38,37 +32,21 @@ export default function Login() {
     mode: "onChange",
   });
 
-  // Check initial authentication state
   useEffect(() => {
     if (!isAuthChecking && isAuthenticated) {
-      console.log('[Login] User is already authenticated, redirecting to dashboard');
-      window.location.replace('/');
+      navigate('/');
     }
-  }, [isAuthChecking, isAuthenticated]);
+  }, [isAuthChecking, isAuthenticated, navigate]);
 
-  async function onSubmit(values: { username: string; password: string }) {
+  const onSubmit = async (values: { username: string; password: string }) => {
     try {
-      console.log('[Login] Attempting login');
       const result = await login(values);
-      
       if (result.ok) {
-        console.log('[Login] Login successful, initiating redirect');
         toast({
           title: "ログイン成功",
           description: "ダッシュボードに移動します",
         });
-        window.location.replace('/');
-        return;
-      }
-
-      console.log('[Login] Login failed:', result.message);
-      if (result.errors) {
-        Object.entries(result.errors).forEach(([field, messages]) => {
-          form.setError(field as "username" | "password", {
-            type: "manual",
-            message: messages[0],
-          });
-        });
+        navigate('/');
       } else {
         toast({
           variant: "destructive",
@@ -77,19 +55,14 @@ export default function Login() {
         });
       }
     } catch (error) {
-      console.error('[Login] Unexpected error:', error);
+      console.error('Login error:', error);
       toast({
         variant: "destructive",
         title: "エラー",
         description: "予期せぬエラーが発生しました",
       });
-    } finally {
-      form.reset(form.getValues(), {
-        keepValues: true,
-        keepErrors: true,
-      });
     }
-  }
+  };
 
   if (isAuthChecking) {
     return (
@@ -122,13 +95,7 @@ export default function Login() {
               SwimTrack ログイン
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {authError?.field === "network" && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{authError.message}</AlertDescription>
-              </Alert>
-            )}
+          <CardContent>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
@@ -168,16 +135,10 @@ export default function Login() {
                     </FormItem>
                   )}
                 />
-                {authError?.field === "credentials" && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{authError.message}</AlertDescription>
-                  </Alert>
-                )}
                 <Button 
                   type="submit" 
-                  className="w-full" 
-                  disabled={form.formState.isSubmitting}
+                  className="w-full"
+                  disabled={form.formState.isSubmitting || !form.formState.isValid}
                 >
                   {form.formState.isSubmitting ? (
                     <>
