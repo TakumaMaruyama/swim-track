@@ -6,9 +6,8 @@ import { documents, users, swimRecords, competitions } from "db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import path from "path";
 import fs from "fs/promises";
-import { scrypt, timingSafeEqual } from "crypto";
+import { scrypt, timingSafeEqual, randomBytes } from "crypto";
 import { promisify } from "util";
-import crypto from 'crypto';
 
 const scryptAsync = promisify(scrypt);
 
@@ -24,6 +23,14 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage });
+
+// Password hashing utility functions
+const hashPassword = async (password: string): Promise<string> => {
+  const salt = randomBytes(SALT_LENGTH);
+  const hash = (await scryptAsync(password, salt, HASH_LENGTH)) as Buffer;
+  const hashedPassword = Buffer.concat([hash, salt]);
+  return hashedPassword.toString('hex');
+};
 
 export function registerRoutes(app: Express) {
   setupAuth(app);
@@ -43,6 +50,53 @@ export function registerRoutes(app: Express) {
     }
     next();
   };
+
+  // Add password update endpoint
+  app.put("/api/users/:id/password", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { password } = req.body;
+      
+      // Hash the new password
+      const hashedPassword = await hashPassword(password);
+      
+      const [user] = await db
+        .update(users)
+        .set({ password: hashedPassword })
+        .where(eq(users.id, parseInt(id)))
+        .returning();
+
+      if (!user) {
+        return res.status(404).json({ message: "ユーザーが見つかりません" });
+      }
+
+      res.json({ message: "パスワードが更新されました" });
+    } catch (error) {
+      console.error('Error updating password:', error);
+      res.status(500).json({ message: "パスワードの更新に失敗しました" });
+    }
+  });
+
+  // Update the /api/users/passwords endpoint to get only students
+  app.get("/api/users/passwords", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const students = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          role: users.role,
+          isActive: users.isActive,
+        })
+        .from(users)
+        .where(eq(users.role, "student"))
+        .orderBy(users.username);
+
+      res.json(students);
+    } catch (error) {
+      console.error('Error fetching student list:', error);
+      res.status(500).json({ message: "学生情報の取得に失敗しました" });
+    }
+  });
 
   // Competition Management API endpoints
   app.get("/api/competitions", requireAuth, async (req, res) => {
@@ -546,56 +600,56 @@ export function registerRoutes(app: Express) {
 
   // Password management endpoints
   // Update the /api/users/passwords endpoint
-  app.get("/api/users/passwords", requireAuth, requireCoach, async (req, res) => {
-    try {
-      const students = await db
-        .select({
-          id: users.id,
-          username: users.username,
-          role: users.role,
-          isActive: users.isActive,
-        })
-        .from(users)
-        .where(eq(users.role, "student"))
-        .orderBy(users.username);
-
-      res.json(students);
-    } catch (error) {
-      console.error('Error fetching student list:', error);
-      res.status(500).json({ message: "学生情報の取得に失敗しました" });
-    }
-  });
-
-  // Add password update endpoint
-  app.put("/api/users/:id/password", requireAuth, requireCoach, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { password } = req.body;
-
-      if (!password || password.length < 8) {
-        return res.status(400).json({ message: "パスワードは8文字以上である必要があります" });
-      }
-
-      // Hash the new password
-      const hashedPassword = await crypto.hash(password);
-
-      // Update the user's password
-      const [updatedUser] = await db
-        .update(users)
-        .set({ password: hashedPassword })
-        .where(eq(users.id, parseInt(id)))
-        .returning();
-
-      if (!updatedUser) {
-        return res.status(404).json({ message: "ユーザーが見つかりません" });
-      }
-
-      res.json({ message: "パスワードが更新されました" });
-    } catch (error) {
-      console.error('Error updating password:', error);
-      res.status(500).json({ message: "パスワードの更新に失敗しました" });
-    }
-  });
+  // app.get("/api/users/passwords", requireAuth, requireCoach, async (req, res) => {
+  //   try {
+  //     const students = await db
+  //       .select({
+  //         id: users.id,
+  //         username: users.username,
+  //         role: users.role,
+  //         isActive: users.isActive,
+  //       })
+  //       .from(users)
+  //       .where(eq(users.role, "student"))
+  //       .orderBy(users.username);
+  //
+  //     res.json(students);
+  //   } catch (error) {
+  //     console.error('Error fetching student list:', error);
+  //     res.status(500).json({ message: "学生情報の取得に失敗しました" });
+  //   }
+  // });
+  //
+  // // Add password update endpoint
+  // app.put("/api/users/:id/password", requireAuth, requireCoach, async (req, res) => {
+  //   try {
+  //     const { id } = req.params;
+  //     const { password } = req.body;
+  //
+  //     if (!password || password.length < 8) {
+  //       return res.status(400).json({ message: "パスワードは8文字以上である必要があります" });
+  //     }
+  //
+  //     // Hash the new password
+  //     const hashedPassword = await crypto.hash(password);
+  //
+  //     // Update the user's password
+  //     const [updatedUser] = await db
+  //       .update(users)
+  //       .set({ password: hashedPassword })
+  //       .where(eq(users.id, parseInt(id)))
+  //       .returning();
+  //
+  //     if (!updatedUser) {
+  //       return res.status(404).json({ message: "ユーザーが見つかりません" });
+  //     }
+  //
+  //     res.json({ message: "パスワードが更新されました" });
+  //   } catch (error) {
+  //     console.error('Error updating password:', error);
+  //     res.status(500).json({ message: "パスワードの更新に失敗しました" });
+  //   }
+  // });
 
   return app;
 }
