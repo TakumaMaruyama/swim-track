@@ -49,15 +49,9 @@ const calculateTimeUntilCompetition = (competitionDate: Date) => {
 const calculateTimeImprovement = (records: any[]) => {
   if (!records || records.length === 0) return { totalImprovement: 0, improvementCount: 0 };
 
-  const lastMonth = new Date();
-  lastMonth.setMonth(lastMonth.getMonth() - 1);
-  
-  // Filter records from last month
-  const recentRecords = records.filter(record => new Date(record.date) >= lastMonth);
-  
   // Group records by style, distance, and pool length
   const groupedRecords: { [key: string]: any[] } = {};
-  recentRecords.forEach(record => {
+  records.forEach(record => {
     const key = `${record.style}-${record.distance}-${record.poolLength}`;
     if (!groupedRecords[key]) {
       groupedRecords[key] = [];
@@ -70,12 +64,12 @@ const calculateTimeImprovement = (records: any[]) => {
 
   // Process each group
   Object.values(groupedRecords).forEach(group => {
-    // Sort records by date
-    const sortedRecords = group.sort((a, b) => 
+    // Sort records by date within each group
+    const sortedRecords = group.sort((a: any, b: any) => 
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
-    // Compare consecutive records
+    // Compare consecutive records within the same group
     for (let i = 1; i < sortedRecords.length; i++) {
       const prevRecord = sortedRecords[i - 1];
       const currentRecord = sortedRecords[i];
@@ -96,7 +90,10 @@ const calculateTimeImprovement = (records: any[]) => {
     }
   });
 
-  return { totalImprovement: totalImprovement.toFixed(2), improvementCount };
+  return { 
+    totalImprovement: parseFloat(totalImprovement.toFixed(2)), 
+    improvementCount 
+  };
 };
 
 export default function Dashboard() {
@@ -370,7 +367,7 @@ export default function Dashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <TrendingDown className="h-4 w-4" />
-                  先月の記録更新
+                  記録更新
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -460,18 +457,22 @@ export default function Dashboard() {
         onSubmit={async (data) => {
           if (editingCompetition === -1) {
             await handleCreateCompetition(data);
-          } else if (competition) {
-            await handleEditCompetition(competition.id, data);
+          } else {
+            await handleEditCompetition(editingCompetition, data);
           }
+          setEditingCompetition(null);
         }}
       />
 
-      <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+      <AlertDialog
+        open={showLogoutDialog}
+        onOpenChange={setShowLogoutDialog}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>ログアウトしますか？</AlertDialogTitle>
             <AlertDialogDescription>
-              ログアウトすると、再度ログインが必要になります。
+              ログアウトすると、再度ログインするまでサービスを利用できません。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -483,15 +484,15 @@ export default function Dashboard() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog 
-        open={showDeleteAccountDialog} 
+      <AlertDialog
+        open={showDeleteAccountDialog}
         onOpenChange={setShowDeleteAccountDialog}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>アカウントを削除しますか？</AlertDialogTitle>
             <AlertDialogDescription>
-              この操作は取り消せません。アカウントと関連するすべてのデータが完全に削除されます。
+              この操作は取り消せません。アカウントに関連するすべてのデータが削除されます。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -506,10 +507,12 @@ export default function Dashboard() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <UserPasswordList
-        isOpen={showPasswordList}
-        onClose={() => setShowPasswordList(false)}
-      />
+      {showPasswordList && (
+        <UserPasswordList
+          isOpen={showPasswordList}
+          onClose={() => setShowPasswordList(false)}
+        />
+      )}
     </div>
   );
 }
