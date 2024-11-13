@@ -21,13 +21,16 @@ export function StudentPasswordList({ isOpen, onClose }: StudentPasswordListProp
   const { toast } = useToast();
   const { data: users, error } = useSWR<User[]>("/api/users/passwords");
 
-  if (error) {
-    toast({
-      variant: "destructive",
-      title: "エラー",
-      description: "ユーザー情報の取得に失敗しました",
-    });
-  }
+  // Use useEffect for error handling
+  React.useEffect(() => {
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "エラー",
+        description: "ユーザー情報の取得に失敗しました",
+      });
+    }
+  }, [error, toast]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

@@ -528,8 +528,7 @@ export function registerRoutes(app: Express) {
   // Add the new password viewing endpoint
   app.get("/api/users/passwords", requireAuth, requireCoach, async (req, res) => {
     try {
-      // Get both students and coaches
-      const users = await db
+      const allUsers = await db
         .select({
           id: users.id,
           username: users.username,
@@ -544,12 +543,11 @@ export function registerRoutes(app: Express) {
           )
         );
 
-      // Return user information including role
-      const userInfo = users.map(user => ({
+      const userInfo = allUsers.map(user => ({
         id: user.id,
         username: user.username,
         role: user.role,
-        password: user.password // Include hashed password
+        password: user.password
       }));
 
       res.json(userInfo);
