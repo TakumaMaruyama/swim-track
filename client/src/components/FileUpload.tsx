@@ -1,8 +1,17 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
+import useSWR from "swr";
+import type { Category } from "db/schema";
 
 interface FileUploadProps {
   onSuccess: () => void;
@@ -12,6 +21,7 @@ export function FileUpload({ onSuccess }: FileUploadProps) {
   const [uploading, setUploading] = useState(false);
   const { toast } = useToast();
   const { user } = useUser();
+  const { data: categories } = useSWR<Category[]>("/api/categories");
   
   const handleUpload = async (e: React.ChangeEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -50,13 +60,26 @@ export function FileUpload({ onSuccess }: FileUploadProps) {
 
   return (
     <form onSubmit={handleUpload} className="space-y-4">
-      <div className="flex items-center gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Input
           type="text"
           name="title"
           placeholder="ドキュメントタイトル"
           required
         />
+        <Select name="categoryId">
+          <SelectTrigger>
+            <SelectValue placeholder="カテゴリーを選択" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">カテゴリーなし</SelectItem>
+            {categories?.map((category) => (
+              <SelectItem key={category.id} value={category.id.toString()}>
+                {category.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Input
           type="file"
           name="file"

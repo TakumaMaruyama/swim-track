@@ -80,7 +80,8 @@ export function registerRoutes(app: Express) {
   // Update the /api/users/passwords endpoint to get both students and coaches
   app.get("/api/users/passwords", requireAuth, requireCoach, async (req, res) => {
     try {
-      const users = await db
+      console.log('[Auth] Fetching user passwords list');
+      const usersList = await db
         .select({
           id: users.id,
           username: users.username,
@@ -88,12 +89,91 @@ export function registerRoutes(app: Express) {
           isActive: users.isActive,
         })
         .from(users)
-        .orderBy([users.role, users.username]);
+        .orderBy(users.role, users.username);
 
-      res.json(users);
+      res.json(usersList);
     } catch (error) {
       console.error('Error fetching user list:', error);
       res.status(500).json({ message: "ユーザー情報の取得に失敗しました" });
+    }
+  });
+
+  // Categories API endpoints
+  app.get("/api/categories", requireAuth, async (req, res) => {
+    try {
+      const allCategories = await db
+        .select()
+        .from(categories)
+        .orderBy(categories.name);
+      res.json(allCategories);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      res.status(500).json({ message: "カテゴリーの取得に失敗しました" });
+    }
+  });
+
+  app.post("/api/categories", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { name, description } = req.body;
+      const [category] = await db
+        .insert(categories)
+        .values({
+          name,
+          description,
+          createdBy: req.user!.id
+        })
+        .returning();
+      res.json(category);
+    } catch (error) {
+      console.error('Error creating category:', error);
+      res.status(500).json({ message: "カテゴリーの作成に失敗しました" });
+    }
+  });
+
+  app.delete("/api/categories/:id", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Update documents to remove category reference first
+      await db
+        .update(documents)
+        .set({ categoryId: null })
+        .where(eq(documents.categoryId, parseInt(id)));
+      
+      // Delete the category
+      const [deletedCategory] = await db
+        .delete(categories)
+        .where(eq(categories.id, parseInt(id)))
+        .returning();
+
+      if (!deletedCategory) {
+        return res.status(404).json({ message: "カテゴリーが見つかりません" });
+      }
+
+      res.json({ message: "カテゴリーが削除されました" });
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      res.status(500).json({ message: "カテゴリーの削除に失敗しました" });
+    }
+  });
+
+  // Update documents API to include categories and sorting
+  app.get("/api/documents", requireAuth, async (req, res) => {
+    try {
+      const docs = await db
+        .select({
+          ...documents,
+          categoryName: categories.name,
+          uploaderName: users.username
+        })
+        .from(documents)
+        .leftJoin(categories, eq(documents.categoryId, categories.id))
+        .leftJoin(users, eq(documents.uploaderId, users.id))
+        .orderBy(desc(documents.createdAt));
+      res.json(docs);
+    } catch (error) {
+      console.error('Error fetching documents:', error);
+      res.status(500).json({ message: "ドキュメントの取得に失敗しました" });
     }
   });
 
@@ -463,25 +543,21 @@ export function registerRoutes(app: Express) {
             filename: req.file.filename,
             mimeType: req.file.mimetype,
             uploaderId: req.user!.id,
-            categoryId: req.body.categoryId ? parseInt(req.body.categoryId) : null
+            categoryId: req.body.categoryId ? parseInt(req.body.categoryId) : null,
           })
           .returning();
 
         res.json(document);
       } catch (error) {
-        res.status(500).json({ message: "アップロードに失敗しました" });
+        console.error('Error uploading document:', error);
+        // Delete uploaded file if database operation fails
+        if (req.file) {
+          await fs.unlink(path.join("uploads", req.file.filename)).catch(console.error);
+        }
+        res.status(500).json({ message: "ドキュメントのアップロードに失敗しました" });
       }
     }
   );
-
-  app.get("/api/documents", requireAuth, async (req, res) => {
-    try {
-      const docs = await db.select().from(documents);
-      res.json(docs);
-    } catch (error) {
-      res.status(500).json({ message: "ドキュメントの取得に失敗しました" });
-    }
-  });
 
   app.get("/api/documents/:id/download", requireAuth, async (req, res) => {
     try {
@@ -492,21 +568,20 @@ export function registerRoutes(app: Express) {
         .limit(1);
 
       if (!document) {
-        return res.status(404).json({ message: "ファイルが見つかりません" });
+        return res.status(404).json({ message: "ドキュメントが見つかりません" });
       }
 
-      const filePath = path.join("uploads", document.filename);
-      res.download(filePath);
+      res.download(path.join("uploads", document.filename));
     } catch (error) {
+      console.error('Error downloading document:', error);
       res.status(500).json({ message: "ダウンロードに失敗しました" });
     }
   });
 
   app.delete("/api/documents/:id", requireAuth, requireCoach, async (req, res) => {
-    const { id } = req.params;
-    
     try {
-      // Get document details first
+      const { id } = req.params;
+
       const [document] = await db
         .select()
         .from(documents)
@@ -517,16 +592,8 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ message: "ドキュメントが見つかりません" });
       }
 
-      // Delete the file
-      const filePath = path.join("uploads", document.filename);
-      try {
-        await fs.unlink(filePath);
-      } catch (error) {
-        console.error('Error deleting file:', error);
-        // Continue with database deletion even if file deletion fails
-      }
+      await fs.unlink(path.join("uploads", document.filename)).catch(console.error);
 
-      // Delete from database
       await db
         .delete(documents)
         .where(eq(documents.id, parseInt(id)));
@@ -537,67 +604,6 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ message: "ドキュメントの削除に失敗しました" });
     }
   });
-
-  // Add coach account deletion endpoint
-  app.delete("/api/user", requireAuth, async (req, res) => {
-    try {
-      if (req.user?.role !== "coach") {
-        return res.status(403).json({ message: "コーチアカウントのみ削除できます" });
-      }
-
-      const userId = req.user.id;
-
-      // Count remaining coaches
-      const [coachCount] = await db
-        .select({
-          count: sql<number>`count(*)`.mapWith(Number)
-        })
-        .from(users)
-        .where(eq(users.role, "coach"));
-
-      if (coachCount.count <= 1) {
-        return res.status(400).json({ message: "最後のコーチアカウントは削除できません" });
-      }
-
-      // Delete documents first
-      await db
-        .delete(documents)
-        .where(eq(documents.uploaderId, userId));
-
-      // Delete the coach account
-      const [deletedUser] = await db
-        .delete(users)
-        .where(and(
-          eq(users.id, userId),
-          eq(users.role, "coach")
-        ))
-        .returning();
-
-      if (!deletedUser) {
-        return res.status(404).json({ message: "アカウントが見つかりません" });
-      }
-
-      // Destroy session
-      req.logout((err) => {
-        if (err) {
-          console.error('Error during logout:', err);
-          return res.status(500).json({ message: "セッションの終了に失敗しました" });
-        }
-        req.session.destroy((err) => {
-          if (err) {
-            console.error('Error destroying session:', err);
-            return res.status(500).json({ message: "セッションの削除に失敗しました" });
-          }
-          res.clearCookie('connect.sid');
-          res.json({ message: "アカウントが削除されました" });
-        });
-      });
-    } catch (error) {
-      console.error('Error deleting coach account:', error);
-      res.status(500).json({ message: "アカウントの削除に失敗しました" });
-    }
-  });
-
   // Categories API
   app.post("/api/categories", requireAuth, requireCoach, async (req, res) => {
     try {

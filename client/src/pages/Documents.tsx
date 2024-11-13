@@ -16,7 +16,22 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
+
+type GroupedDocuments = {
+  [categoryId: string]: {
+    categoryName: string;
+    documents: Array<{
+      id: number;
+      title: string;
+      filename: string;
+      createdAt: string;
+      categoryName?: string;
+      uploaderName?: string;
+    }>;
+  };
+};
 
 export default function Documents() {
   const { documents, isLoading, mutate } = useDocuments();
@@ -57,8 +72,29 @@ export default function Documents() {
         title: "エラー",
         description: "ドキュメントの削除に失敗しました",
       });
+    } finally {
+      setDeletingDocument(null);
     }
   };
+
+  const groupedDocuments: GroupedDocuments = documents?.reduce((acc, doc) => {
+    const categoryId = doc.categoryId?.toString() || 'uncategorized';
+    if (!acc[categoryId]) {
+      acc[categoryId] = {
+        categoryName: doc.categoryName || 'カテゴリーなし',
+        documents: [],
+      };
+    }
+    acc[categoryId].documents.push(doc);
+    return acc;
+  }, {} as GroupedDocuments) || {};
+
+  // Sort documents within each category by createdAt DESC
+  Object.values(groupedDocuments).forEach(category => {
+    category.documents.sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  });
 
   return (
     <>
@@ -66,43 +102,57 @@ export default function Documents() {
       <div className="container px-4 md:px-8">
         <FileUpload onSuccess={() => mutate()} />
 
-        <div className="grid gap-4 mt-8">
+        <div className="space-y-8 mt-8">
           {isLoading ? (
             <div>読み込み中...</div>
-          ) : documents?.map((doc) => (
-            <Card key={doc.id}>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>{doc.title}</span>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDownload(doc.id, doc.filename)}
-                    >
-                      <FileDown className="mr-2 h-4 w-4" />
-                      ダウンロード
-                    </Button>
-                    {user?.role === 'coach' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setDeletingDocument(doc.id)}
-                        className="text-red-500 hover:text-red-600"
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        削除
-                      </Button>
-                    )}
-                  </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-gray-500">
-                  アップロード日: {new Date(doc.createdAt).toLocaleDateString()}
-                </p>
-              </CardContent>
-            </Card>
+          ) : Object.entries(groupedDocuments).map(([categoryId, { categoryName, documents }]) => (
+            <div key={categoryId} className="space-y-4">
+              <h2 className="text-2xl font-bold">{categoryName}</h2>
+              <div className="grid gap-4">
+                {documents.map((doc) => (
+                  <Card key={doc.id}>
+                    <CardHeader>
+                      <CardTitle className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span>{doc.title}</span>
+                          {doc.uploaderName && (
+                            <Badge variant="secondary" className="text-xs">
+                              アップロード: {doc.uploaderName}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDownload(doc.id, doc.filename)}
+                          >
+                            <FileDown className="mr-2 h-4 w-4" />
+                            ダウンロード
+                          </Button>
+                          {user?.role === 'coach' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setDeletingDocument(doc.id)}
+                              className="text-red-500 hover:text-red-600"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              削除
+                            </Button>
+                          )}
+                        </div>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-gray-500">
+                        アップロード日: {new Date(doc.createdAt).toLocaleDateString()}
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
 
@@ -123,7 +173,6 @@ export default function Documents() {
                 onClick={() => {
                   if (deletingDocument) {
                     handleDelete(deletingDocument);
-                    setDeletingDocument(null);
                   }
                 }}
                 className="bg-red-500 hover:bg-red-600"
