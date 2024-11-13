@@ -186,6 +186,44 @@ export function useUser() {
     }
   }, [authState.isLoading, mutate]);
 
+  const deleteAccount = useCallback(async (): Promise<AuthResult> => {
+    if (authState.isLoading) {
+      return { ok: false, message: "削除処理中です" };
+    }
+
+    try {
+      setAuthState({ isLoading: true, error: null });
+      const response = await fetch("/api/user", {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        const error = { message: data.message || "アカウントの削除に失敗しました" };
+        setAuthState({
+          isLoading: false,
+          error
+        });
+        return { ok: false, ...error };
+      }
+
+      await mutate(undefined, false);
+      return { ok: true, message: data.message };
+    } catch (error) {
+      console.error('Error deleting account:', error);
+      const errorMessage = { message: "サーバーとの通信に失敗しました" };
+      setAuthState({
+        isLoading: false,
+        error: errorMessage
+      });
+      return { ok: false, ...errorMessage };
+    } finally {
+      setAuthState(prev => ({ ...prev, isLoading: false }));
+    }
+  }, [authState.isLoading, mutate]);
+
   return {
     user: data,
     isLoading: swrLoading || authState.isLoading,
@@ -195,5 +233,6 @@ export function useUser() {
     register,
     login,
     logout,
+    deleteAccount,
   };
 }

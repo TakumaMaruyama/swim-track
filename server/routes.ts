@@ -482,19 +482,28 @@ export function registerRoutes(app: Express) {
   // Add coach account deletion endpoint
   app.delete("/api/user", requireAuth, async (req, res) => {
     try {
-      // Verify the user is a coach
       if (req.user?.role !== "coach") {
         return res.status(403).json({ message: "コーチアカウントのみ削除できます" });
       }
 
       const userId = req.user.id;
 
-      // First, delete all documents uploaded by this coach
+      // Count remaining coaches
+      const coachCount = await db
+        .select({ count: sql`count(*)` })
+        .from(users)
+        .where(eq(users.role, "coach"));
+
+      if (coachCount[0].count <= 1) {
+        return res.status(400).json({ message: "最後のコーチアカウントは削除できません" });
+      }
+
+      // Delete documents first
       await db
         .delete(documents)
         .where(eq(documents.uploaderId, userId));
 
-      // Then delete the coach's account
+      // Delete the coach account
       const [deletedUser] = await db
         .delete(users)
         .where(and(
@@ -507,14 +516,16 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ message: "アカウントが見つかりません" });
       }
 
-      // Destroy the session
+      // Destroy session
       req.logout((err) => {
         if (err) {
           console.error('Error during logout:', err);
+          return res.status(500).json({ message: "セッションの終了に失敗しました" });
         }
         req.session.destroy((err) => {
           if (err) {
             console.error('Error destroying session:', err);
+            return res.status(500).json({ message: "セッションの削除に失敗しました" });
           }
           res.clearCookie('connect.sid');
           res.json({ message: "アカウントが削除されました" });
