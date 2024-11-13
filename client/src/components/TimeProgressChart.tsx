@@ -26,15 +26,20 @@ interface TimeProgressChartProps {
   records: ExtendedSwimRecord[];
   style: string;
   distance: number;
-  poolLength: number;
+  poolLength?: number; // Made optional since we'll force 15m
 }
 
-export function TimeProgressChart({ records, style, distance, poolLength }: TimeProgressChartProps) {
+export function TimeProgressChart({ records, style, distance }: TimeProgressChartProps) {
   const filteredRecords = records
     .filter(r => {
+      console.log('Record:', {
+        style: r.style,
+        distance: r.distance,
+        poolLength: r.poolLength
+      });
       return r.style === style && 
              r.distance === distance && 
-             r.poolLength === poolLength;
+             r.poolLength === 15; // Force 15m pool length
     })
     .sort((a, b) => {
       const dateA = new Date(a.date || '');
@@ -56,7 +61,7 @@ export function TimeProgressChart({ records, style, distance, poolLength }: Time
     labels: filteredRecords.map(r => formatDate(r.date)),
     datasets: [
       {
-        label: `${style} ${distance}m (${poolLength}mプール)`,
+        label: `${style} ${distance}m (15mプール)`,
         data: filteredRecords.map(r => timeToSeconds(r.time)),
         borderColor: 'rgb(75, 192, 192)',
         backgroundColor: 'rgba(75, 192, 192, 0.5)',
@@ -75,7 +80,7 @@ export function TimeProgressChart({ records, style, distance, poolLength }: Time
       },
       title: {
         display: true,
-        text: `${style} ${distance}m (${poolLength}mプール) の記録推移`,
+        text: `${style} ${distance}m (15mプール) の記録推移`,
       },
       tooltip: {
         callbacks: {

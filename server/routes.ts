@@ -297,38 +297,38 @@ export function registerRoutes(app: Express) {
   // Create new record
   app.post("/api/records", requireAuth, requireCoach, async (req, res) => {
     try {
-      const { studentId, style, distance, time, date, isCompetition, poolLength } = req.body;
-    
-    // Verify student exists
-    const [student] = await db
-      .select()
-      .from(users)
-      .where(and(eq(users.id, studentId), eq(users.role, "student")))
-      .limit(1);
+      const { studentId, style, distance, time, date, isCompetition } = req.body;
+      
+      // Verify student exists
+      const [student] = await db
+        .select()
+        .from(users)
+        .where(and(eq(users.id, studentId), eq(users.role, "student")))
+        .limit(1);
 
-    if (!student) {
-      return res.status(404).json({ message: "選手が見つかりません" });
+      if (!student) {
+        return res.status(404).json({ message: "選手が見つかりません" });
+      }
+
+      const [record] = await db
+        .insert(swimRecords)
+        .values({
+          studentId,
+          style,
+          distance,
+          time,
+          date: new Date(date),
+          isCompetition,
+          poolLength: 15, // Force 15m pool length
+        })
+        .returning();
+
+      res.json(record);
+    } catch (error) {
+      console.error('Error creating record:', error);
+      res.status(500).json({ message: "記録の作成に失敗しました" });
     }
-
-    const [record] = await db
-      .insert(swimRecords)
-      .values({
-        studentId,
-        style,
-        distance,
-        time,
-        date: new Date(date),
-        isCompetition,
-        poolLength,
-      })
-      .returning();
-
-    res.json(record);
-  } catch (error) {
-    console.error('Error creating record:', error);
-    res.status(500).json({ message: "記録の作成に失敗しました" });
-  }
-});
+  });
 
   // Update record
   app.put("/api/records/:id", requireAuth, requireCoach, async (req, res) => {
