@@ -2,7 +2,7 @@ import { FileUpload } from "@/components/FileUpload";
 import { useDocuments } from "../hooks/use-documents";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileDown, Trash2, Loader2 } from "lucide-react";
+import { FileDown, Trash2, Loader2, ChevronRight } from "lucide-react";
 import { PageHeader } from '../components/PageHeader';
 import { useUser } from '../hooks/use-user';
 import { useToast } from '@/hooks/use-toast';
@@ -18,6 +18,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 
@@ -29,6 +41,7 @@ type GroupedDocuments = {
       title: string;
       filename: string;
       createdAt: string;
+      categoryId?: number | null;
       categoryName?: string;
       uploaderName?: string;
     }>;
@@ -40,6 +53,23 @@ export default function Documents() {
   const { user } = useUser();
   const { toast } = useToast();
   const [deletingDocument, setDeletingDocument] = useState<number | null>(null);
+  const [sortBy, setSortBy] = useState<string>("newest");
+
+  const sortDocuments = (docs: typeof documents) => {
+    if (!docs) return [];
+    return [...docs].sort((a, b) => {
+      switch (sortBy) {
+        case "oldest":
+          return new Date(a.createdAt || '').getTime() - new Date(b.createdAt || '').getTime();
+        case "title_asc":
+          return a.title.localeCompare(b.title);
+        case "title_desc":
+          return b.title.localeCompare(a.title);
+        default: // "newest"
+          return new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime();
+      }
+    });
+  };
 
   const handleDownload = async (id: number, filename: string) => {
     try {
@@ -91,8 +121,7 @@ export default function Documents() {
     }
   };
 
-  const groupedDocuments: GroupedDocuments = documents?.reduce((acc, doc) => {
-    // Use 'none' for documents without a category
+  const groupedDocuments: GroupedDocuments = sortDocuments(documents)?.reduce((acc, doc) => {
     const categoryId = doc.categoryId?.toString() || 'none';
     if (!acc[categoryId]) {
       acc[categoryId] = {
@@ -107,20 +136,27 @@ export default function Documents() {
     return acc;
   }, {} as GroupedDocuments) || {};
 
-  // Sort documents within each category by createdAt DESC
-  Object.values(groupedDocuments).forEach(category => {
-    category.documents.sort((a, b) => 
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-  });
-
   return (
     <>
       <PageHeader title="資料" />
       <div className="container px-4 md:px-8">
         <FileUpload onSuccess={() => mutate()} />
 
-        <div className="space-y-8 mt-8">
+        <div className="flex justify-between items-center mt-8 mb-4">
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="並び替え" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="newest">新しい順</SelectItem>
+              <SelectItem value="oldest">古い順</SelectItem>
+              <SelectItem value="title_asc">タイトル (A-Z)</SelectItem>
+              <SelectItem value="title_desc">タイトル (Z-A)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-8">
           {isLoading ? (
             <div className="flex items-center justify-center min-h-[200px]">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -139,53 +175,58 @@ export default function Documents() {
             </div>
           ) : (
             Object.entries(groupedDocuments).map(([categoryId, { categoryName, documents }]) => (
-              <div key={categoryId} className="space-y-4">
-                <h2 className="text-2xl font-bold">{categoryName}</h2>
-                <div className="grid gap-4">
-                  {documents.map((doc) => (
-                    <Card key={doc.id}>
-                      <CardHeader>
-                        <CardTitle className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span>{doc.title}</span>
-                            {doc.uploaderName && (
-                              <Badge variant="secondary" className="text-xs">
-                                アップロード: {doc.uploaderName}
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDownload(doc.id, doc.filename)}
-                            >
-                              <FileDown className="mr-2 h-4 w-4" />
-                              ダウンロード
-                            </Button>
-                            {user?.role === 'coach' && (
+              <Collapsible key={categoryId}>
+                <CollapsibleTrigger className="flex items-center gap-2 w-full">
+                  <ChevronRight className="h-4 w-4 transition-transform ui-expanded:rotate-90" />
+                  <h2 className="text-2xl font-bold text-left">{categoryName}</h2>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-4">
+                  <div className="grid gap-4">
+                    {documents.map((doc) => (
+                      <Card key={doc.id}>
+                        <CardHeader>
+                          <CardTitle className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span>{doc.title}</span>
+                              {doc.uploaderName && (
+                                <Badge variant="secondary" className="text-xs">
+                                  アップロード: {doc.uploaderName}
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex gap-2">
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => setDeletingDocument(doc.id)}
-                                className="text-red-500 hover:text-red-600"
+                                onClick={() => handleDownload(doc.id, doc.filename)}
                               >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                削除
+                                <FileDown className="mr-2 h-4 w-4" />
+                                ダウンロード
                               </Button>
-                            )}
-                          </div>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-gray-500">
-                          アップロード日: {new Date(doc.createdAt).toLocaleDateString()}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
+                              {user?.role === 'coach' && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setDeletingDocument(doc.id)}
+                                  className="text-red-500 hover:text-red-600"
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  削除
+                                </Button>
+                              )}
+                            </div>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-sm text-gray-500">
+                            アップロード日: {new Date(doc.createdAt).toLocaleDateString()}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             ))
           )}
         </div>
