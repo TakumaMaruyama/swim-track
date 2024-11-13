@@ -92,14 +92,18 @@ export default function Documents() {
   };
 
   const groupedDocuments: GroupedDocuments = documents?.reduce((acc, doc) => {
-    const categoryId = doc.categoryId?.toString() || 'uncategorized';
+    // Use 'none' for documents without a category
+    const categoryId = doc.categoryId?.toString() || 'none';
     if (!acc[categoryId]) {
       acc[categoryId] = {
         categoryName: doc.categoryName || 'カテゴリーなし',
         documents: [],
       };
     }
-    acc[categoryId].documents.push(doc);
+    acc[categoryId].documents.push({
+      ...doc,
+      createdAt: doc.createdAt?.toString() || new Date().toISOString(),
+    });
     return acc;
   }, {} as GroupedDocuments) || {};
 

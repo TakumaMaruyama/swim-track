@@ -105,6 +105,11 @@ export function registerRoutes(app: Express) {
         .select()
         .from(categories)
         .orderBy(categories.name);
+      
+      if (!allCategories) {
+        return res.status(500).json({ message: "カテゴリーの取得に失敗しました" });
+      }
+      
       res.json(allCategories);
     } catch (error) {
       console.error('Error fetching categories:', error);
@@ -115,14 +120,35 @@ export function registerRoutes(app: Express) {
   app.post("/api/categories", requireAuth, requireCoach, async (req, res) => {
     try {
       const { name, description } = req.body;
+      
+      if (!name || typeof name !== 'string' || name.trim().length === 0) {
+        return res.status(400).json({ message: "カテゴリー名は必須です" });
+      }
+
+      // Check if category with same name exists
+      const existingCategory = await db
+        .select()
+        .from(categories)
+        .where(eq(categories.name, name.trim()))
+        .limit(1);
+
+      if (existingCategory.length > 0) {
+        return res.status(400).json({ message: "同名のカテゴリーが既に存在します" });
+      }
+
       const [category] = await db
         .insert(categories)
         .values({
-          name,
-          description,
+          name: name.trim(),
+          description: description?.trim(),
           createdBy: req.user!.id
         })
         .returning();
+
+      if (!category) {
+        return res.status(500).json({ message: "カテゴリーの作成に失敗しました" });
+      }
+
       res.json(category);
     } catch (error) {
       console.error('Error creating category:', error);
