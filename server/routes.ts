@@ -3,7 +3,7 @@ import { setupAuth } from "./auth";
 import multer from "multer";
 import { db } from "db";
 import { documents, users, swimRecords, competitions } from "db/schema";
-import { eq, and, desc, or } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import path from "path";
 import fs from "fs/promises";
 import { scrypt } from "crypto";
@@ -528,32 +528,22 @@ export function registerRoutes(app: Express) {
   // Add the new password viewing endpoint
   app.get("/api/users/passwords", requireAuth, requireCoach, async (req, res) => {
     try {
-      const allUsers = await db
-        .select({
-          id: users.id,
-          username: users.username,
-          role: users.role,
-          password: users.originalPassword, // Return original password instead of hash
-        })
+      const students = await db
+        .select()
         .from(users)
-        .where(
-          or(
-            eq(users.role, "student"),
-            eq(users.role, "coach")
-          )
-        );
+        .where(eq(users.role, "student"));
 
-      const userInfo = allUsers.map(user => ({
-        id: user.id,
-        username: user.username,
-        role: user.role,
-        password: user.originalPassword // This is now the original password
+      // Return only username and original password
+      const studentInfo = students.map(student => ({
+        id: student.id,
+        username: student.username,
+        role: student.role,
       }));
 
-      res.json(userInfo);
+      res.json(studentInfo);
     } catch (error) {
-      console.error('Error fetching user passwords:', error);
-      res.status(500).json({ message: "ユーザー情報の取得に失敗しました" });
+      console.error('Error fetching student passwords:', error);
+      res.status(500).json({ message: "学生情報の取得に失敗しました" });
     }
   });
 

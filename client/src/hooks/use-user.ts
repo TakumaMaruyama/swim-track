@@ -28,22 +28,22 @@ export function useUser() {
   });
 
   const { 
-    data: user, 
+    data, 
     error: swrError, 
     isLoading: swrLoading, 
     mutate 
   } = useSWR<User>("/api/user", {
-    revalidateOnFocus: false,
+    revalidateOnFocus: true,
     revalidateOnReconnect: true,
     shouldRetryOnError: false,
-    dedupingInterval: 5000,
+    refreshInterval: 300000,
     onError: () => {
       console.log('[Auth] Session validation failed, clearing user data');
       mutate(undefined, false);
     }
   });
 
-  const register = useCallback(async (userData: InsertUser): Promise<AuthResult> => {
+  const register = useCallback(async (user: InsertUser): Promise<AuthResult> => {
     if (authState.isLoading) {
       console.log('[Auth] Registration already in progress');
       return { ok: false, message: "登録処理中です" };
@@ -56,7 +56,7 @@ export function useUser() {
       const response = await fetch("/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(userData),
+        body: JSON.stringify(user),
         credentials: "include",
       });
 
@@ -95,7 +95,7 @@ export function useUser() {
     }
   }, [authState.isLoading, mutate]);
 
-  const login = useCallback(async (credentials: InsertUser): Promise<AuthResult> => {
+  const login = useCallback(async (user: InsertUser): Promise<AuthResult> => {
     if (authState.isLoading) {
       console.log('[Auth] Login already in progress');
       return { ok: false, message: "ログイン処理中です" };
@@ -108,7 +108,7 @@ export function useUser() {
       const response = await fetch("/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(credentials),
+        body: JSON.stringify(user),
         credentials: "include",
       });
 
@@ -129,7 +129,7 @@ export function useUser() {
       }
 
       console.log('[Auth] Login successful');
-      await mutate(data.user, false);
+      await mutate();
       return { ok: true, user: data.user };
     } catch (e: any) {
       console.error('[Auth] Login error:', e);
@@ -155,7 +155,6 @@ export function useUser() {
     try {
       console.log('[Auth] Starting logout');
       setAuthState({ isLoading: true, error: null });
-      
       const response = await fetch("/logout", {
         method: "POST",
         credentials: "include",
@@ -187,54 +186,14 @@ export function useUser() {
     }
   }, [authState.isLoading, mutate]);
 
-  const deleteAccount = useCallback(async (): Promise<AuthResult> => {
-    if (authState.isLoading) {
-      return { ok: false, message: "処理中です" };
-    }
-
-    try {
-      setAuthState({ isLoading: true, error: null });
-      
-      const response = await fetch("/api/user", {
-        method: "DELETE",
-        credentials: "include",
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        const error = { message: data.message || "アカウントの削除に失敗しました" };
-        setAuthState({
-          isLoading: false,
-          error
-        });
-        return { ok: false, ...error };
-      }
-
-      await mutate(undefined, false);
-      return { ok: true };
-    } catch (e: any) {
-      console.error('[Auth] Account deletion error:', e);
-      const error = { message: "サーバーとの通信に失敗しました" };
-      setAuthState({
-        isLoading: false,
-        error
-      });
-      return { ok: false, ...error };
-    } finally {
-      setAuthState(prev => ({ ...prev, isLoading: false }));
-    }
-  }, [authState.isLoading, mutate]);
-
   return {
-    user,
+    user: data,
     isLoading: swrLoading || authState.isLoading,
     isLoginPending: authState.isLoading,
-    isAuthenticated: !!user,
+    isAuthenticated: !!data,
     error: authState.error || (swrError ? { message: "認証に失敗しました" } : null),
     register,
     login,
     logout,
-    deleteAccount,
   };
 }

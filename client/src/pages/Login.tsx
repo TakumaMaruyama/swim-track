@@ -17,12 +17,18 @@ import { AlertCircle, Loader2, Home } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
 import { insertUserSchema } from "db/schema";
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 
 export default function Login() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { login, isAuthenticated, isLoginPending, isLoading: isAuthChecking } = useUser();
+  const { 
+    login, 
+    isAuthenticated, 
+    isLoading: isAuthChecking,
+    error: authError 
+  } = useUser();
+  
   const form = useForm({
     resolver: zodResolver(insertUserSchema),
     defaultValues: {
@@ -31,37 +37,55 @@ export default function Login() {
     },
   });
 
+  // Check initial authentication state
   useEffect(() => {
+    console.log('[Login] Checking initial auth state:', { isAuthenticated, isAuthChecking });
     if (!isAuthChecking && isAuthenticated) {
-      navigate('/');
+      console.log('[Login] User is already authenticated, redirecting');
+      window.location.replace('/');
     }
-  }, [isAuthChecking, isAuthenticated, navigate]);
+  }, [isAuthChecking, isAuthenticated]);
 
-  const onSubmit = async (values: { username: string; password: string }) => {
+  async function onSubmit(values: { username: string; password: string }) {
     try {
+      console.log('[Login] Attempting login');
       const result = await login(values);
+      
       if (result.ok) {
+        console.log('[Login] Login successful, initiating navigation');
         toast({
           title: "ログイン成功",
           description: "ダッシュボードに移動します",
         });
-        navigate('/');
+        // Force reload navigation
+        window.location.replace('/');
+        return;
+      }
+
+      console.log('[Login] Login failed:', result.message);
+      if (result.errors) {
+        Object.entries(result.errors).forEach(([field, messages]) => {
+          form.setError(field as "username" | "password", {
+            type: "manual",
+            message: messages[0],
+          });
+        });
       } else {
         toast({
           variant: "destructive",
           title: "エラー",
-          description: result.message || "ログインに失敗しました",
+          description: result.message,
         });
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('[Login] Unexpected error:', error);
       toast({
         variant: "destructive",
         title: "エラー",
         description: "予期せぬエラーが発生しました",
       });
     }
-  };
+  }
 
   if (isAuthChecking) {
     return (
@@ -94,7 +118,13 @@ export default function Login() {
               SwimTrack ログイン
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            {authError?.field === "network" && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{authError.message}</AlertDescription>
+              </Alert>
+            )}
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
@@ -106,7 +136,7 @@ export default function Login() {
                       <FormControl>
                         <Input 
                           {...field} 
-                          disabled={isLoginPending}
+                          disabled={form.formState.isSubmitting}
                           autoComplete="username"
                           className="bg-white"
                         />
@@ -125,7 +155,7 @@ export default function Login() {
                         <Input 
                           type="password" 
                           {...field} 
-                          disabled={isLoginPending}
+                          disabled={form.formState.isSubmitting}
                           autoComplete="current-password"
                           className="bg-white"
                         />
@@ -134,12 +164,18 @@ export default function Login() {
                     </FormItem>
                   )}
                 />
+                {authError?.field === "credentials" && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{authError.message}</AlertDescription>
+                  </Alert>
+                )}
                 <Button 
                   type="submit" 
-                  className="w-full"
-                  disabled={isLoginPending}
+                  className="w-full" 
+                  disabled={form.formState.isSubmitting}
                 >
-                  {isLoginPending ? (
+                  {form.formState.isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ログイン中...
@@ -159,7 +195,7 @@ export default function Login() {
               variant="outline"
               className="w-full"
               onClick={() => navigate("/register")}
-              disabled={isLoginPending}
+              disabled={form.formState.isSubmitting}
             >
               新規登録
             </Button>

@@ -24,14 +24,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 
 export default function Register() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { register, isLoginPending, isLoading: authLoading, isAuthenticated } = useUser();
+  const { register, isLoading: authLoading, isAuthenticated } = useUser();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -47,11 +48,17 @@ export default function Register() {
       password: "",
       role: "student",
     },
+    mode: "onChange",
   });
 
+  const { formState } = form;
+
   async function onSubmit(values: { username: string; password: string; role: string }) {
+    if (isSubmitting) return;
+
     try {
       console.log('[Register] Starting registration');
+      setIsSubmitting(true);
       const result = await register(values);
       
       if (result.ok) {
@@ -90,6 +97,8 @@ export default function Register() {
         title: "エラー",
         description: "予期せぬエラーが発生しました",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -136,7 +145,7 @@ export default function Register() {
                       <FormControl>
                         <Input 
                           {...field} 
-                          disabled={isLoginPending}
+                          disabled={isSubmitting}
                           autoComplete="username"
                           className="bg-white"
                         />
@@ -158,7 +167,7 @@ export default function Register() {
                         <Input 
                           type="password" 
                           {...field} 
-                          disabled={isLoginPending}
+                          disabled={isSubmitting}
                           autoComplete="new-password"
                           className="bg-white"
                         />
@@ -179,7 +188,7 @@ export default function Register() {
                       <Select
                         onValueChange={field.onChange}
                         defaultValue={field.value}
-                        disabled={isLoginPending}
+                        disabled={isSubmitting}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -196,11 +205,11 @@ export default function Register() {
                   )}
                 />
 
-                {form.formState.errors.root && (
+                {formState.errors.root && (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      {form.formState.errors.root.message}
+                      {formState.errors.root.message}
                     </AlertDescription>
                   </Alert>
                 )}
@@ -208,9 +217,9 @@ export default function Register() {
                 <Button 
                   type="submit" 
                   className="w-full"
-                  disabled={isLoginPending}
+                  disabled={isSubmitting || !formState.isValid}
                 >
-                  {isLoginPending ? (
+                  {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       登録中...
@@ -230,7 +239,7 @@ export default function Register() {
               variant="outline"
               className="w-full"
               onClick={() => navigate("/login")}
-              disabled={isLoginPending}
+              disabled={isSubmitting}
             >
               ログインへ戻る
             </Button>

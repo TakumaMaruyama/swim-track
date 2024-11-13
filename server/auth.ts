@@ -220,7 +220,6 @@ export function setupAuth(app: Express) {
         .values({
           username,
           password: hashedPassword,
-          originalPassword: password,
           role,
         })
         .returning();
