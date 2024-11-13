@@ -17,7 +17,7 @@ import { AlertCircle, Loader2, Home } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
 import { insertUserSchema } from "db/schema";
-import { useEffect, useCallback } from "react";
+import { useEffect } from "react";
 
 export default function Login() {
   const [, navigate] = useLocation();
@@ -35,13 +35,13 @@ export default function Login() {
       username: "",
       password: "",
     },
+    mode: "onChange",
   });
 
   // Check initial authentication state
   useEffect(() => {
-    console.log('[Login] Checking initial auth state:', { isAuthenticated, isAuthChecking });
     if (!isAuthChecking && isAuthenticated) {
-      console.log('[Login] User is already authenticated, redirecting');
+      console.log('[Login] User is already authenticated, redirecting to dashboard');
       window.location.replace('/');
     }
   }, [isAuthChecking, isAuthenticated]);
@@ -52,12 +52,11 @@ export default function Login() {
       const result = await login(values);
       
       if (result.ok) {
-        console.log('[Login] Login successful, initiating navigation');
+        console.log('[Login] Login successful, initiating redirect');
         toast({
           title: "ログイン成功",
           description: "ダッシュボードに移動します",
         });
-        // Force reload navigation
         window.location.replace('/');
         return;
       }
@@ -74,7 +73,7 @@ export default function Login() {
         toast({
           variant: "destructive",
           title: "エラー",
-          description: result.message,
+          description: result.message || "ログインに失敗しました",
         });
       }
     } catch (error) {
@@ -83,6 +82,11 @@ export default function Login() {
         variant: "destructive",
         title: "エラー",
         description: "予期せぬエラーが発生しました",
+      });
+    } finally {
+      form.reset(form.getValues(), {
+        keepValues: true,
+        keepErrors: true,
       });
     }
   }
