@@ -3,7 +3,7 @@ import { setupAuth } from "./auth";
 import multer from "multer";
 import { db } from "db";
 import { documents, users, swimRecords, competitions } from "db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import path from "path";
 import fs from "fs/promises";
 import { scrypt } from "crypto";
@@ -489,12 +489,14 @@ export function registerRoutes(app: Express) {
       const userId = req.user.id;
 
       // Count remaining coaches
-      const coachCount = await db
-        .select({ count: sql`count(*)` })
+      const [coachCount] = await db
+        .select({
+          count: sql<number>`count(*)`.mapWith(Number)
+        })
         .from(users)
         .where(eq(users.role, "coach"));
 
-      if (coachCount[0].count <= 1) {
+      if (coachCount.count <= 1) {
         return res.status(400).json({ message: "最後のコーチアカウントは削除できません" });
       }
 
