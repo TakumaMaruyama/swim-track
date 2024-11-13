@@ -6,11 +6,14 @@ import { documents, users, swimRecords, competitions } from "db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import path from "path";
 import fs from "fs/promises";
-import { scrypt } from "crypto";
+import { scrypt, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import crypto from 'crypto';
 
 const scryptAsync = promisify(scrypt);
+
+const SALT_LENGTH = 32;
+const HASH_LENGTH = 64;
 
 const storage = multer.diskStorage({
   destination: "uploads/",
@@ -545,18 +548,21 @@ export function registerRoutes(app: Express) {
   // Update the /api/users/passwords endpoint
   app.get("/api/users/passwords", requireAuth, requireCoach, async (req, res) => {
     try {
-      const usersList = await db
+      const students = await db
         .select({
           id: users.id,
           username: users.username,
           role: users.role,
+          isActive: users.isActive,
         })
         .from(users)
+        .where(eq(users.role, "student"))
         .orderBy(users.username);
-      res.json(usersList);
+
+      res.json(students);
     } catch (error) {
-      console.error('Error fetching users:', error);
-      res.status(500).json({ message: "ユーザー情報の取得に失敗しました" });
+      console.error('Error fetching student list:', error);
+      res.status(500).json({ message: "学生情報の取得に失敗しました" });
     }
   });
 
