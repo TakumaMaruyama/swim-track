@@ -50,29 +50,71 @@ export function setupAuth(app: Express) {
   const MemoryStore = createMemoryStore(session);
   const sessionSettings: session.SessionOptions = {
     secret: process.env.REPL_ID || "porygon-supremacy",
-    resave: false,
-    saveUninitialized: false,
-    store: new MemoryStore({
-      checkPeriod: 86400000 // prune expired entries every 24h
-    }),
+    resave: true,
+    saveUninitialized: true,
+    rolling: true,
     cookie: {
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      maxAge: 24 * 60 * 60 * 1000,
       httpOnly: true,
-      secure: false, // Set to false for development
-      sameSite: 'lax',
-      path: '/'
-    },
-    name: 'swimtrack.sid' // Custom session ID name
+      secure: 'auto',
+      sameSite: 'lax'
+    }
   };
 
   app.use(session(sessionSettings));
   app.use(passport.initialize());
   app.use(passport.session());
 
+  // Enhanced rate limiting with more sophisticated tracking
+  const loginAttempts = new Map<string, { 
+    count: number; 
+    lastAttempt: number;
+    lastSuccess?: number;
+    lockoutUntil?: number;
+  }>();
+  
+  const MAX_ATTEMPTS = 5;
+  const LOCKOUT_TIME = 15 * 60 * 1000; // 15 minutes
+  const ATTEMPT_RESET_TIME = 30 * 60 * 1000; // 30 minutes
+
+  const checkLoginAttempts = (username: string): { allowed: boolean; message?: string } => {
+    const now = Date.now();
+    const key = username.toLowerCase();
+    const attempts = loginAttempts.get(key) || { count: 0, lastAttempt: 0 };
+
+    // Reset attempts if enough time has passed since last attempt
+    if (now - attempts.lastAttempt > ATTEMPT_RESET_TIME) {
+      loginAttempts.delete(key);
+      return { allowed: true };
+    }
+
+    // Check if user is in lockout period
+    if (attempts.lockoutUntil && now < attempts.lockoutUntil) {
+      const remainingTime = Math.ceil((attempts.lockoutUntil - now) / 60000);
+      return {
+        allowed: false,
+        message: `アカウントが一時的にロックされています。${remainingTime}分後に再試行してください。`
+      };
+    }
+
+    return { allowed: true };
+  };
+
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
-        console.log('[Auth] Attempting login for user:', username);
+        const loginCheck = checkLoginAttempts(username);
+        if (!loginCheck.allowed) {
+          return done(null, false, { message: loginCheck.message });
+        }
+
+        const ipKey = username.toLowerCase();
+        const now = Date.now();
+        const attempts = loginAttempts.get(ipKey) || { count: 0, lastAttempt: 0 };
+
+        // Add delay to prevent timing attacks
+        await new Promise(resolve => setTimeout(resolve, Math.random() * 100));
+
         const [user] = await db
           .select()
           .from(users)
@@ -80,37 +122,49 @@ export function setupAuth(app: Express) {
           .limit(1);
 
         if (!user?.password) {
-          console.log('[Auth] User not found or no password');
+          loginAttempts.set(ipKey, {
+            count: attempts.count + 1,
+            lastAttempt: now,
+            lockoutUntil: attempts.count + 1 >= MAX_ATTEMPTS ? now + LOCKOUT_TIME : undefined
+          });
           return done(null, false, { 
-            message: "ユーザー名またはパスワードが正しくありません" 
+            message: "ユーザー名またはパスワードが正しくありません。" 
           });
         }
 
         const isMatch = await crypto.compare(password, user.password);
         if (!isMatch) {
-          console.log('[Auth] Password mismatch');
+          loginAttempts.set(ipKey, {
+            count: attempts.count + 1,
+            lastAttempt: now,
+            lockoutUntil: attempts.count + 1 >= MAX_ATTEMPTS ? now + LOCKOUT_TIME : undefined
+          });
           return done(null, false, { 
-            message: "ユーザー名またはパスワードが正しくありません"
+            message: "ユーザー名またはパスワードが正しくありません。"
           });
         }
 
-        console.log('[Auth] Login successful for user:', username);
+        // Reset attempts on successful login
+        loginAttempts.set(ipKey, {
+          count: 0,
+          lastAttempt: now,
+          lastSuccess: now
+        });
+
         return done(null, user);
       } catch (err) {
-        console.error('[Auth] Login error:', err);
+        console.error('Authentication error:', err);
         return done(err);
       }
     })
   );
 
   passport.serializeUser((user, done) => {
-    console.log('[Auth] Serializing user:', user.id);
     done(null, user.id);
   });
 
   passport.deserializeUser(async (id: number, done) => {
     try {
-      console.log('[Auth] Deserializing user:', id);
       const [user] = await db
         .select()
         .from(users)
@@ -118,21 +172,88 @@ export function setupAuth(app: Express) {
         .limit(1);
       
       if (!user) {
-        console.log('[Auth] User not found during deserialization');
-        return done(null, false);
+        return done(new Error("ユーザーが見つかりません"));
       }
 
-      console.log('[Auth] User deserialized successfully:', user.id);
       done(null, user);
     } catch (err) {
-      console.error('[Auth] Deserialization error:', err);
+      console.error('Deserialization error:', err);
       done(err);
+    }
+  });
+
+  app.post("/register", async (req, res, next) => {
+    try {
+      console.log('[Auth] Processing registration request');
+      const result = insertUserSchema.safeParse(req.body);
+      if (!result.success) {
+        console.log('[Auth] Registration validation failed:', result.error);
+        return res
+          .status(400)
+          .json({ 
+            message: "入力が無効です", 
+            errors: result.error.flatten().fieldErrors 
+          });
+      }
+
+      const { username, password, role } = result.data;
+
+      // Check if user already exists
+      const [existingUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.username, username))
+        .limit(1);
+
+      if (existingUser) {
+        console.log('[Auth] Registration failed: username already exists');
+        return res.status(400).json({ 
+          message: "このユーザー名は既に使用されています",
+          field: "username"
+        });
+      }
+
+      const hashedPassword = await crypto.hash(password);
+
+      const [newUser] = await db
+        .insert(users)
+        .values({
+          username,
+          password: hashedPassword,
+          role,
+        })
+        .returning();
+
+      console.log('[Auth] Registration successful');
+      req.login(newUser, (err) => {
+        if (err) {
+          console.error('[Auth] Login after registration failed:', err);
+          return next(err);
+        }
+        return res.json({
+          message: "登録が完了しました",
+          user: { id: newUser.id, username: newUser.username, role: newUser.role },
+        });
+      });
+    } catch (error) {
+      console.error('Registration error:', error);
+      next(error);
     }
   });
 
   app.post("/login", (req, res, next) => {
     console.log('[Auth] Processing login request');
-    passport.authenticate("local", (err: any, user: Express.User, info: IVerifyOptions) => {
+    const result = insertUserSchema.safeParse(req.body);
+    if (!result.success) {
+      return res
+        .status(400)
+        .json({ 
+          message: "入力が無効です", 
+          errors: result.error.flatten().fieldErrors 
+        });
+    }
+
+    const cb = (err: any, user: Express.User, info: IVerifyOptions) => {
       if (err) {
         console.error("[Auth] Login error:", err);
         return next(err);
@@ -150,43 +271,45 @@ export function setupAuth(app: Express) {
           console.error("[Auth] Session error:", err);
           return next(err);
         }
-        console.log('[Auth] Login successful, session established for user:', user.id);
-        res.json({ 
-          ok: true,
+        console.log('[Auth] Login successful, session established');
+        return res.json({
           message: "ログインしました",
-          user: { id: user.id, username: user.username, role: user.role }
+          user: { id: user.id, username: user.username, role: user.role },
         });
       });
-    })(req, res, next);
-  });
-
-  app.get("/api/user", (req, res) => {
-    console.log('[Auth] Checking session state:', req.isAuthenticated());
-    if (req.isAuthenticated() && req.user) {
-      console.log('[Auth] User session validated:', req.user.id);
-      return res.json(req.user);
-    }
-    console.log('[Auth] No valid session found');
-    res.status(401).json({ message: "認証が必要です" });
+    };
+    
+    passport.authenticate("local", cb)(req, res, next);
   });
 
   app.post("/logout", (req, res) => {
     const username = req.user?.username;
-    console.log('[Auth] Processing logout request for user:', username);
     req.logout((err) => {
       if (err) {
         console.error('[Auth] Logout error:', err);
         return res.status(500).json({ message: "ログアウトに失敗しました" });
+      }
+      if (username) {
+        loginAttempts.delete(username.toLowerCase());
       }
       req.session.destroy((err) => {
         if (err) {
           console.error('[Auth] Session destruction error:', err);
           return res.status(500).json({ message: "セッションの削除に失敗しました" });
         }
-        res.clearCookie('swimtrack.sid');
+        res.clearCookie('connect.sid');
         console.log('[Auth] Logout successful');
         res.json({ message: "ログアウトしました" });
       });
     });
+  });
+
+  app.get("/api/user", (req, res) => {
+    if (req.isAuthenticated()) {
+      console.log('[Auth] User session validated');
+      return res.json(req.user);
+    }
+    console.log('[Auth] No valid session found');
+    res.status(401).json({ message: "認証が必要です" });
   });
 }

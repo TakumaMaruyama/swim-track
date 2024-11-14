@@ -17,7 +17,7 @@ import { AlertCircle, Loader2, Home } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
 import { insertUserSchema } from "db/schema";
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 
 export default function Login() {
   const [, navigate] = useLocation();
@@ -25,7 +25,7 @@ export default function Login() {
   const { 
     login, 
     isAuthenticated, 
-    isLoginPending,
+    isLoading: isAuthChecking,
     error: authError 
   } = useUser();
   
@@ -37,15 +37,21 @@ export default function Login() {
     },
   });
 
+  // Check initial authentication state with cleanup
   useEffect(() => {
-    if (isAuthenticated) {
-      console.log('[Login] User is authenticated, forcing navigation to dashboard');
-      // Force navigation after authentication is confirmed
-      setTimeout(() => {
-        navigate('/');
-      }, 100);
+    let mounted = true;
+    
+    console.log('[Login] Checking initial auth state:', { isAuthenticated, isAuthChecking });
+    
+    if (!isAuthChecking && isAuthenticated && mounted) {
+      console.log('[Login] User is already authenticated, redirecting');
+      window.location.replace('/');
     }
-  }, [isAuthenticated, navigate]);
+
+    return () => {
+      mounted = false;
+    };
+  }, [isAuthChecking, isAuthenticated]);
 
   async function onSubmit(values: { username: string; password: string }) {
     try {
@@ -53,31 +59,30 @@ export default function Login() {
       const result = await login(values);
       
       if (result.ok) {
-        console.log('[Login] Login successful, preparing navigation');
+        console.log('[Login] Login successful, initiating navigation');
         toast({
           title: "ログイン成功",
           description: "ダッシュボードに移動します",
         });
-        // Force navigation on successful login
-        setTimeout(() => {
-          navigate('/');
-        }, 100);
+        // Force reload navigation
+        window.location.replace('/');
+        return;
+      }
+
+      console.log('[Login] Login failed:', result.message);
+      if (result.errors) {
+        Object.entries(result.errors).forEach(([field, messages]) => {
+          form.setError(field as "username" | "password", {
+            type: "manual",
+            message: messages[0],
+          });
+        });
       } else {
-        console.log('[Login] Login failed:', result.message);
-        if (result.errors) {
-          Object.entries(result.errors).forEach(([field, messages]) => {
-            form.setError(field as "username" | "password", {
-              type: "manual",
-              message: messages[0],
-            });
-          });
-        } else {
-          toast({
-            variant: "destructive",
-            title: "エラー",
-            description: result.message,
-          });
-        }
+        toast({
+          variant: "destructive",
+          title: "エラー",
+          description: result.message,
+        });
       }
     } catch (error) {
       console.error('[Login] Unexpected error:', error);
@@ -89,12 +94,12 @@ export default function Login() {
     }
   }
 
-  if (isLoginPending) {
+  if (isAuthChecking) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="flex flex-col items-center gap-2">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">認証中...</p>
+          <p className="text-sm text-muted-foreground">認証状態を確認中...</p>
         </div>
       </div>
     );
