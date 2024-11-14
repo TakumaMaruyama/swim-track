@@ -43,6 +43,59 @@ export function useUser() {
     }
   });
 
+  const login = useCallback(async (user: InsertUser): Promise<AuthResult> => {
+    if (authState.isLoading) {
+      console.log('[Auth] Login already in progress');
+      return { ok: false, message: "ログイン処理中です" };
+    }
+
+    try {
+      console.log('[Auth] Starting login attempt');
+      setAuthState({ isLoading: true, error: null });
+
+      const response = await fetch("/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(user),
+        credentials: "include",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.log('[Auth] Login failed:', data.message);
+        const error = {
+          message: data.message || "ログインに失敗しました",
+          field: data.field,
+          errors: data.errors,
+        };
+        setAuthState({
+          isLoading: false,
+          error
+        });
+        return { ok: false, ...error };
+      }
+
+      console.log('[Auth] Login successful, updating state');
+      // Force immediate state update
+      await mutate(data.user, false);
+      return { ok: true, user: data.user };
+    } catch (e: any) {
+      console.error('[Auth] Login error:', e);
+      const error = {
+        message: "サーバーとの通信に失敗しました",
+        field: "network",
+      };
+      setAuthState({
+        isLoading: false,
+        error
+      });
+      return { ok: false, ...error };
+    } finally {
+      setAuthState(prev => ({ ...prev, isLoading: false }));
+    }
+  }, [authState.isLoading, mutate]);
+
   const register = useCallback(async (user: InsertUser): Promise<AuthResult> => {
     if (authState.isLoading) {
       console.log('[Auth] Registration already in progress');
@@ -81,58 +134,6 @@ export function useUser() {
       return { ok: true, user: data.user };
     } catch (e: any) {
       console.error('[Auth] Registration error:', e);
-      const error = {
-        message: "サーバーとの通信に失敗しました",
-        field: "network",
-      };
-      setAuthState({
-        isLoading: false,
-        error
-      });
-      return { ok: false, ...error };
-    } finally {
-      setAuthState(prev => ({ ...prev, isLoading: false }));
-    }
-  }, [authState.isLoading, mutate]);
-
-  const login = useCallback(async (user: InsertUser): Promise<AuthResult> => {
-    if (authState.isLoading) {
-      console.log('[Auth] Login already in progress');
-      return { ok: false, message: "ログイン処理中です" };
-    }
-
-    try {
-      console.log('[Auth] Starting login attempt');
-      setAuthState({ isLoading: true, error: null });
-
-      const response = await fetch("/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(user),
-        credentials: "include",
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        console.log('[Auth] Login failed:', data.message);
-        const error = {
-          message: data.message || "ログインに失敗しました",
-          field: data.field,
-          errors: data.errors,
-        };
-        setAuthState({
-          isLoading: false,
-          error
-        });
-        return { ok: false, ...error };
-      }
-
-      console.log('[Auth] Login successful');
-      await mutate();
-      return { ok: true, user: data.user };
-    } catch (e: any) {
-      console.error('[Auth] Login error:', e);
       const error = {
         message: "サーバーとの通信に失敗しました",
         field: "network",

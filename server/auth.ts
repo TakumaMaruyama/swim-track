@@ -58,10 +58,11 @@ export function setupAuth(app: Express) {
     cookie: {
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: false, // Set to false for development
       sameSite: 'lax',
       path: '/'
-    }
+    },
+    name: 'swimtrack.sid' // Custom session ID name
   };
 
   app.use(session(sessionSettings));
@@ -121,7 +122,7 @@ export function setupAuth(app: Express) {
         return done(null, false);
       }
 
-      console.log('[Auth] User deserialized successfully');
+      console.log('[Auth] User deserialized successfully:', user.id);
       done(null, user);
     } catch (err) {
       console.error('[Auth] Deserialization error:', err);
@@ -149,7 +150,7 @@ export function setupAuth(app: Express) {
           console.error("[Auth] Session error:", err);
           return next(err);
         }
-        console.log('[Auth] Login successful, session established');
+        console.log('[Auth] Login successful, session established for user:', user.id);
         res.json({ 
           ok: true,
           message: "ログインしました",
@@ -172,7 +173,7 @@ export function setupAuth(app: Express) {
           console.error('[Auth] Session destruction error:', err);
           return res.status(500).json({ message: "セッションの削除に失敗しました" });
         }
-        res.clearCookie('connect.sid');
+        res.clearCookie('swimtrack.sid');
         console.log('[Auth] Logout successful');
         res.json({ message: "ログアウトしました" });
       });
@@ -180,7 +181,8 @@ export function setupAuth(app: Express) {
   });
 
   app.get("/api/user", (req, res) => {
-    if (req.isAuthenticated()) {
+    console.log('[Auth] Checking session state:', req.isAuthenticated());
+    if (req.isAuthenticated() && req.user) {
       console.log('[Auth] User session validated:', req.user.id);
       return res.json(req.user);
     }

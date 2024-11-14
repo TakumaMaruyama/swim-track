@@ -39,8 +39,11 @@ export default function Login() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      console.log('[Login] User is authenticated, navigating to dashboard');
-      navigate('/');
+      console.log('[Login] User is authenticated, forcing navigation to dashboard');
+      // Force navigation after authentication is confirmed
+      setTimeout(() => {
+        navigate('/');
+      }, 100);
     }
   }, [isAuthenticated, navigate]);
 
@@ -50,12 +53,15 @@ export default function Login() {
       const result = await login(values);
       
       if (result.ok) {
-        console.log('[Login] Login successful');
+        console.log('[Login] Login successful, preparing navigation');
         toast({
           title: "ログイン成功",
           description: "ダッシュボードに移動します",
         });
-        // Let useEffect handle navigation after auth state updates
+        // Force navigation on successful login
+        setTimeout(() => {
+          navigate('/');
+        }, 100);
       } else {
         console.log('[Login] Login failed:', result.message);
         if (result.errors) {

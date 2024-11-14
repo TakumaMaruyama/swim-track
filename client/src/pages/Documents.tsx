@@ -73,7 +73,9 @@ export default function Documents() {
 
   const handleDownload = async (id: number, filename: string) => {
     try {
-      const response = await fetch(`/api/documents/${id}/download`);
+      const response = await fetch(`/api/documents/${id}/download`, {
+        credentials: 'include'  // Add this line
+      });
       if (!response.ok) {
         throw new Error('ダウンロードに失敗しました');
       }
@@ -82,9 +84,12 @@ export default function Documents() {
       const a = document.createElement('a');
       a.href = url;
       a.download = filename;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } catch (error) {
+      console.error('Download error:', error);
       toast({
         variant: "destructive",
         title: "エラー",
