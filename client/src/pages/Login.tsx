@@ -17,7 +17,7 @@ import { AlertCircle, Loader2, Home } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
 import { insertUserSchema } from "db/schema";
-import { useEffect, useCallback } from "react";
+import { useEffect } from "react";
 
 export default function Login() {
   const [, navigate] = useLocation();
@@ -37,21 +37,21 @@ export default function Login() {
     },
   });
 
-  // Check initial authentication state with cleanup
   useEffect(() => {
     let mounted = true;
-    
-    console.log('[Login] Checking initial auth state:', { isAuthenticated, isAuthChecking });
-    
-    if (!isAuthChecking && isAuthenticated && mounted) {
-      console.log('[Login] User is already authenticated, redirecting');
-      window.location.replace('/');
-    }
+    const checkAuth = async () => {
+      console.log('[Login] Checking auth state:', { isAuthenticated, isAuthChecking });
+      if (!isAuthChecking && isAuthenticated && mounted) {
+        console.log('[Login] User authenticated, navigating to dashboard');
+        navigate('/');
+      }
+    };
 
+    checkAuth();
     return () => {
       mounted = false;
     };
-  }, [isAuthChecking, isAuthenticated]);
+  }, [isAuthChecking, isAuthenticated, navigate]);
 
   async function onSubmit(values: { username: string; password: string }) {
     try {
@@ -59,30 +59,28 @@ export default function Login() {
       const result = await login(values);
       
       if (result.ok) {
-        console.log('[Login] Login successful, initiating navigation');
+        console.log('[Login] Login successful');
         toast({
           title: "ログイン成功",
           description: "ダッシュボードに移動します",
         });
-        // Force reload navigation
-        window.location.replace('/');
-        return;
-      }
-
-      console.log('[Login] Login failed:', result.message);
-      if (result.errors) {
-        Object.entries(result.errors).forEach(([field, messages]) => {
-          form.setError(field as "username" | "password", {
-            type: "manual",
-            message: messages[0],
-          });
-        });
+        navigate('/');
       } else {
-        toast({
-          variant: "destructive",
-          title: "エラー",
-          description: result.message,
-        });
+        console.log('[Login] Login failed:', result.message);
+        if (result.errors) {
+          Object.entries(result.errors).forEach(([field, messages]) => {
+            form.setError(field as "username" | "password", {
+              type: "manual",
+              message: messages[0],
+            });
+          });
+        } else {
+          toast({
+            variant: "destructive",
+            title: "エラー",
+            description: result.message,
+          });
+        }
       }
     } catch (error) {
       console.error('[Login] Unexpected error:', error);

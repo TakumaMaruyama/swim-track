@@ -62,11 +62,11 @@ const formatSeconds = (seconds: number): string => {
 const getLastMonthImprovements = (records: any[]) => {
   if (!records?.length) return [];
   
-  // Get October 2024 (last month) date range
-  const targetYear = 2024;
-  const targetMonth = 9; // 0-based index, so 9 is October
-  const monthStart = new Date(targetYear, targetMonth, 1);
-  const monthEnd = new Date(targetYear, targetMonth + 1, 0);
+  // Calculate last month dynamically
+  const now = new Date();
+  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1);
+  const monthStart = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1);
+  const monthEnd = new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 0);
 
   // Group records by athlete and event type
   const athleteRecords: { [key: string]: any[] } = {};
@@ -106,9 +106,11 @@ const getLastMonthImprovements = (records: any[]) => {
 
         if (previousRecords.length > 0) {
           // Find the best time among previous records
-          const previousBest = previousRecords.reduce((best, record) => 
-            convertTimeToSeconds(record.time) < convertTimeToSeconds(best.time) ? record : best
-          );
+          const previousBest = previousRecords.reduce((best, record) => {
+            const bestTime = convertTimeToSeconds(best.time);
+            const recordTime = convertTimeToSeconds(record.time);
+            return recordTime < bestTime ? record : best;
+          });
 
           const currentTime = convertTimeToSeconds(currentRecord.time);
           const bestTime = convertTimeToSeconds(previousBest.time);
