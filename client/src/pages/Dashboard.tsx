@@ -223,14 +223,32 @@ export default function Dashboard() {
         body: JSON.stringify(data),
         credentials: 'include'
       });
-      if (!response.ok) throw new Error();
+      
+      const responseData = await response.text();
+      let errorMessage = "大会の更新に失敗しました";
+      
+      if (!response.ok) {
+        try {
+          const errorJson = JSON.parse(responseData);
+          errorMessage = errorJson.message || errorMessage;
+        } catch {
+          errorMessage = responseData || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+      
       await mutateCompetitions();
       setEditingCompetition(null);
+      toast({
+        title: "更新成功",
+        description: "大会が更新されました",
+      });
     } catch (error) {
+      console.error('Error updating competition:', error);
       toast({
         variant: "destructive",
         title: "エラー",
-        description: "大会の更新に失敗しました",
+        description: error instanceof Error ? error.message : "大会の更新に失敗しました",
       });
     }
   };
@@ -243,36 +261,69 @@ export default function Dashboard() {
         body: JSON.stringify(data),
         credentials: 'include'
       });
-      if (!response.ok) throw new Error();
+      
+      const responseData = await response.text();
+      let errorMessage = "大会の作成に失敗しました";
+      
+      if (!response.ok) {
+        try {
+          const errorJson = JSON.parse(responseData);
+          errorMessage = errorJson.message || errorMessage;
+        } catch {
+          errorMessage = responseData || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+      
       await mutateCompetitions();
       setEditingCompetition(null);
+      toast({
+        title: "作成成功",
+        description: "大会が作成されました",
+      });
     } catch (error) {
+      console.error('Error creating competition:', error);
       toast({
         variant: "destructive",
         title: "エラー",
-        description: "大会の作成に失敗しました",
+        description: error instanceof Error ? error.message : "大会の作成に失敗しました",
       });
     }
   };
 
   const handleDeleteCompetition = async (id: number) => {
     if (!confirm('この大会を削除してもよろしいですか？')) return;
+    
     try {
       const response = await fetch(`/api/competitions/${id}`, {
         method: 'DELETE',
         credentials: 'include'
       });
-      if (!response.ok) throw new Error();
+      
+      const responseData = await response.text();
+      let errorMessage = "大会の削除に失敗しました";
+      
+      if (!response.ok) {
+        try {
+          const errorJson = JSON.parse(responseData);
+          errorMessage = errorJson.message || errorMessage;
+        } catch {
+          errorMessage = responseData || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+      
       await mutateCompetitions();
       toast({
         title: "削除成功",
         description: "大会が削除されました",
       });
     } catch (error) {
+      console.error('Error deleting competition:', error);
       toast({
         variant: "destructive",
         title: "エラー",
-        description: "大会の削除に失敗しました",
+        description: error instanceof Error ? error.message : "大会の削除に失敗しました",
       });
     }
   };

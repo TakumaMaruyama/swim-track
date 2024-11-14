@@ -88,7 +88,6 @@ export function registerRoutes(app: Express) {
       res.json(document);
     } catch (error) {
       console.error('Error uploading document:', error);
-      // Clean up uploaded file if database insertion fails
       if (req.file?.path) {
         await fs.unlink(req.file.path).catch(console.error);
       }
@@ -99,7 +98,6 @@ export function registerRoutes(app: Express) {
   app.get("/api/documents/:id/download", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
-
       const [doc] = await db
         .select()
         .from(documents)
@@ -111,30 +109,10 @@ export function registerRoutes(app: Express) {
       }
 
       const filePath = path.join(uploadsDir, doc.filename);
-      
-      try {
-        await fs.access(filePath);
-      } catch {
-        return res.status(404).json({ message: "ファイルが見つかりません" });
-      }
-
-      res.setHeader('Content-Type', doc.mimeType);
-      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(doc.filename)}"`);
-      
-      const fileStream = require('fs').createReadStream(filePath);
-      fileStream.pipe(res);
-
-      fileStream.on('error', (error: Error) => {
-        console.error('File streaming error:', error);
-        if (!res.headersSent) {
-          res.status(500).json({ message: "ファイルの読み込みに失敗しました" });
-        }
-      });
+      res.download(filePath, doc.filename);
     } catch (error) {
       console.error('Error downloading document:', error);
-      if (!res.headersSent) {
-        res.status(500).json({ message: "ファイルのダウンロードに失敗しました" });
-      }
+      res.status(500).json({ message: "ファイルのダウンロードに失敗しました" });
     }
   });
 
@@ -160,19 +138,27 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ message: "名前、日付、場所は必須です" });
       }
 
+      // Validate date format
+      const parsedDate = new Date(date);
+      if (isNaN(parsedDate.getTime())) {
+        return res.status(400).json({ message: "無効な日付形式です" });
+      }
+
       const [competition] = await db
         .insert(competitions)
         .values({
-          name,
-          date: new Date(date),
-          location,
+          name: name.trim(),
+          date: parsedDate,
+          location: location.trim(),
         })
         .returning();
 
       res.json(competition);
     } catch (error) {
       console.error('Error creating competition:', error);
-      res.status(500).json({ message: "大会の作成に失敗しました" });
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "大会の作成に失敗しました" 
+      });
     }
   });
 
@@ -185,12 +171,18 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ message: "名前、日付、場所は必須です" });
       }
 
+      // Validate date format
+      const parsedDate = new Date(date);
+      if (isNaN(parsedDate.getTime())) {
+        return res.status(400).json({ message: "無効な日付形式です" });
+      }
+
       const [competition] = await db
         .update(competitions)
         .set({
-          name,
-          date: new Date(date),
-          location,
+          name: name.trim(),
+          date: parsedDate,
+          location: location.trim(),
         })
         .where(eq(competitions.id, parseInt(id)))
         .returning();
@@ -202,7 +194,9 @@ export function registerRoutes(app: Express) {
       res.json(competition);
     } catch (error) {
       console.error('Error updating competition:', error);
-      res.status(500).json({ message: "大会の更新に失敗しました" });
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "大会の更新に失敗しました" 
+      });
     }
   });
 
@@ -222,7 +216,9 @@ export function registerRoutes(app: Express) {
       res.json({ message: "大会を削除しました" });
     } catch (error) {
       console.error('Error deleting competition:', error);
-      res.status(500).json({ message: "大会の削除に失敗しました" });
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "大会の削除に失敗しました" 
+      });
     }
   });
 }
