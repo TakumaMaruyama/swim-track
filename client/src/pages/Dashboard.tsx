@@ -49,13 +49,8 @@ const formatTimeImprovement = (seconds: number) => {
   return `${minutes}:${remainingSeconds.padStart(5, '0')}`;
 };
 
-const calculateImprovements = (records: ExtendedSwimRecord[] | undefined, monthOffset: number = 0): Improvement[] => {
+const calculateImprovements = (records: ExtendedSwimRecord[] | undefined): Improvement[] => {
   if (!records?.length) return [];
-
-  const now = new Date();
-  const targetMonth = new Date(now.getFullYear(), now.getMonth() - monthOffset, 1);
-  const monthStart = new Date(targetMonth.getFullYear(), targetMonth.getMonth(), 1);
-  const monthEnd = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0, 23, 59, 59, 999);
 
   // Group records by athlete and event type
   const recordsByAthlete = records.reduce((acc, record) => {
@@ -85,48 +80,38 @@ const calculateImprovements = (records: ExtendedSwimRecord[] | undefined, monthO
 
   // Process each athlete's records
   Object.values(recordsByAthlete).forEach(({ records: athleteRecords, athleteName, style, distance, poolLength }) => {
-    // Get records from the target month
-    const monthRecords = athleteRecords.filter(record => {
-      const recordDate = new Date(record.date!);
-      return recordDate >= monthStart && recordDate <= monthEnd;
-    });
-
     // Sort all records chronologically
     const sortedRecords = [...athleteRecords].sort((a, b) => 
       new Date(a.date!).getTime() - new Date(b.date!).getTime()
     );
 
-    // Process each record from the target month
-    monthRecords.forEach(currentRecord => {
-      // Find all previous records (before this record)
-      const previousRecords = sortedRecords.filter(r => 
-        new Date(r.date!) < new Date(currentRecord.date!)
-      );
+    // Compare each record with previous records
+    sortedRecords.forEach((currentRecord, index) => {
+      if (index === 0) return; // Skip first record as it has no previous records
 
-      if (previousRecords.length > 0) {
-        // Find personal best among previous records
-        const previousBest = previousRecords.reduce((best, record) => {
-          const bestTime = convertTimeToSeconds(best.time);
-          const recordTime = convertTimeToSeconds(record.time);
-          return recordTime < bestTime ? record : best;
+      // Find previous best time
+      const previousRecords = sortedRecords.slice(0, index);
+      const previousBest = previousRecords.reduce((best, record) => {
+        const bestTime = convertTimeToSeconds(best.time);
+        const recordTime = convertTimeToSeconds(record.time);
+        return recordTime < bestTime ? record : best;
+      });
+
+      const currentTime = convertTimeToSeconds(currentRecord.time);
+      const bestTime = convertTimeToSeconds(previousBest.time);
+
+      // Only count as improvement if current time beats previous best
+      if (currentTime < bestTime) {
+        improvements.push({
+          athleteName,
+          style,
+          distance,
+          poolLength,
+          previousBest: previousBest.time,
+          newTime: currentRecord.time,
+          improvement: formatTimeImprovement(bestTime - currentTime),
+          date: new Date(currentRecord.date!)
         });
-
-        const currentTime = convertTimeToSeconds(currentRecord.time);
-        const bestTime = convertTimeToSeconds(previousBest.time);
-
-        // Only count as improvement if current time beats previous best
-        if (currentTime < bestTime) {
-          improvements.push({
-            athleteName,
-            style,
-            distance,
-            poolLength,
-            previousBest: previousBest.time,
-            newTime: currentRecord.time,
-            improvement: formatTimeImprovement(bestTime - currentTime),
-            date: new Date(currentRecord.date!)
-          });
-        }
       }
     });
   });
@@ -145,9 +130,31 @@ export default function Dashboard() {
   const [editingCompetition, setEditingCompetition] = useState<number>(0);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-  // Calculate improvements for current and last month
-  const currentMonthImprovements = calculateImprovements(records, 0);
-  const lastMonthImprovements = calculateImprovements(records, 1);
+  // Calculate all improvements
+  const allImprovements = calculateImprovements(records);
+
+  // Filter improvements for current month
+  const currentMonthStart = new Date();
+  currentMonthStart.setDate(1);
+  currentMonthStart.setHours(0, 0, 0, 0);
+  const currentMonthEnd = new Date();
+  currentMonthEnd.setMonth(currentMonthEnd.getMonth() + 1, 0);
+  currentMonthEnd.setHours(23, 59, 59, 999);
+
+  const currentMonthImprovements = allImprovements.filter(imp => 
+    imp.date >= currentMonthStart && imp.date <= currentMonthEnd
+  );
+
+  // Filter improvements for last month
+  const lastMonthStart = new Date(currentMonthStart);
+  lastMonthStart.setMonth(lastMonthStart.getMonth() - 1);
+  const lastMonthEnd = new Date(currentMonthStart);
+  lastMonthEnd.setDate(0);
+  lastMonthEnd.setHours(23, 59, 59, 999);
+
+  const lastMonthImprovements = allImprovements.filter(imp => 
+    imp.date >= lastMonthStart && imp.date <= lastMonthEnd
+  );
 
   const handleLogout = async () => {
     const result = await logout();
@@ -417,7 +424,7 @@ export default function Dashboard() {
                               </div>
                             </div>
                             <div className="text-sm text-muted-foreground text-right">
-                              {new Date(imp.date).toLocaleDateString('ja-JP')}
+                              {imp.date.toLocaleDateString('ja-JP')}
                             </div>
                           </div>
                         </div>
@@ -463,7 +470,7 @@ export default function Dashboard() {
                               </div>
                             </div>
                             <div className="text-sm text-muted-foreground text-right">
-                              {new Date(imp.date).toLocaleDateString('ja-JP')}
+                              {imp.date.toLocaleDateString('ja-JP')}
                             </div>
                           </div>
                         </div>

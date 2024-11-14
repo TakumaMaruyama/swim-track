@@ -18,7 +18,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
 import { insertUserSchema } from "db/schema";
 import { useEffect } from "react";
-import { mutate } from "swr";
 
 export default function Login() {
   const [, navigate] = useLocation();
@@ -32,18 +31,12 @@ export default function Login() {
   } = useUser();
 
   useEffect(() => {
-    // Ensure we start with a clean session
-    mutate("/api/user", undefined, false);
-    
-    // Add delay to ensure state is cleared
-    setTimeout(() => {
-      if (isAuthenticated) {
-        console.log('[Login] User is authenticated, navigating to dashboard');
-        navigate('/');
-      } else {
-        console.log('[Login] Not authenticated, showing login page');
-      }
-    }, 100);
+    if (isAuthenticated) {
+      console.log('[Login] User is authenticated, navigating to dashboard');
+      navigate('/');
+    } else {
+      console.log('[Login] Not authenticated, showing login page');
+    }
   }, [isAuthenticated, navigate]);
   
   const form = useForm({
@@ -99,6 +92,24 @@ export default function Login() {
         <div className="flex flex-col items-center gap-2">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p className="text-sm text-muted-foreground">認証中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Add error boundary
+  if (authError) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-center">
+          <p className="text-red-500">エラーが発生しました</p>
+          <Button
+            variant="ghost"
+            onClick={() => window.location.reload()}
+            className="mt-4"
+          >
+            再読み込み
+          </Button>
         </div>
       </div>
     );
