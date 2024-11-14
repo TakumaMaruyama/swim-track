@@ -62,11 +62,11 @@ const formatSeconds = (seconds: number): string => {
 const getLastMonthImprovements = (records: any[]) => {
   if (!records?.length) return [];
   
-  // Get last month's date range
-  const now = new Date();
-  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1);
-  const lastMonthStart = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1);
-  const lastMonthEnd = new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 0);
+  // Get October 2024 (last month) date range
+  const targetYear = 2024;
+  const targetMonth = 9; // 0-based index, so 9 is October
+  const monthStart = new Date(targetYear, targetMonth, 1);
+  const monthEnd = new Date(targetYear, targetMonth + 1, 0);
 
   // Group records by athlete and event type
   const athleteRecords: { [key: string]: any[] } = {};
@@ -86,25 +86,26 @@ const getLastMonthImprovements = (records: any[]) => {
 
   const improvements = [];
 
-  // For each athlete's event records
+  // Process each athlete's event records
   Object.values(athleteRecords).forEach(group => {
     // Sort records by date
     const sortedRecords = group.records.sort((a, b) => 
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
-    // Process last month's records
+    // Process target month's records
     sortedRecords.forEach(currentRecord => {
       const recordDate = new Date(currentRecord.date);
       
-      // Check if record is from last month
-      if (recordDate >= lastMonthStart && recordDate <= lastMonthEnd) {
+      // Check if record is from target month
+      if (recordDate >= monthStart && recordDate <= monthEnd) {
         // Find previous best time (before this record)
         const previousRecords = sortedRecords.filter(r => 
           new Date(r.date) < recordDate
         );
 
         if (previousRecords.length > 0) {
+          // Find the best time among previous records
           const previousBest = previousRecords.reduce((best, record) => 
             convertTimeToSeconds(record.time) < convertTimeToSeconds(best.time) ? record : best
           );
@@ -113,6 +114,7 @@ const getLastMonthImprovements = (records: any[]) => {
           const bestTime = convertTimeToSeconds(previousBest.time);
 
           if (currentTime < bestTime) {
+            const improvement = bestTime - currentTime;
             improvements.push({
               athleteName: group.athleteName,
               style: group.style,
@@ -120,7 +122,7 @@ const getLastMonthImprovements = (records: any[]) => {
               poolLength: group.poolLength,
               newTime: currentRecord.time,
               previousBest: previousBest.time,
-              improvement: (bestTime - currentTime).toFixed(2),
+              improvement: improvement.toFixed(2),
               date: currentRecord.date
             });
           }
