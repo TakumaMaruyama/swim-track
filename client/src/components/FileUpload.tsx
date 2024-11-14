@@ -30,13 +30,20 @@ export function FileUpload({ onSuccess }: FileUploadProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>("none");
   const { toast } = useToast();
   const { user } = useUser();
-  const { data: categories, error: categoriesError } = useSWR<Category[]>("/api/categories");
+  const { data: categories } = useSWR<Category[]>("/api/categories", {
+    onError: () => {
+      toast({
+        variant: "destructive",
+        title: "エラー",
+        description: "カテゴリー情報の取得に失敗しました",
+      });
+    }
+  });
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLFormElement>) => {
+  const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const formData = new FormData(e.target);
+    const formData = new FormData(e.currentTarget);
     
-    // Update categoryId in formData
     if (selectedCategory !== "none") {
       formData.set("categoryId", selectedCategory);
     } else {
@@ -60,7 +67,7 @@ export function FileUpload({ onSuccess }: FileUploadProps) {
         description: "ファイルがアップロードされました",
       });
       onSuccess();
-      e.target.reset();
+      e.currentTarget.reset();
       setSelectedCategory("none");
     } catch (error: any) {
       toast({
@@ -115,14 +122,6 @@ export function FileUpload({ onSuccess }: FileUploadProps) {
       });
     }
   };
-
-  if (categoriesError) {
-    toast({
-      variant: "destructive",
-      title: "エラー",
-      description: "カテゴリー情報の取得に失敗しました",
-    });
-  }
 
   if (!user || user.role !== "coach") return null;
 

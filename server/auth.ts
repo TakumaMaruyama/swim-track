@@ -160,6 +160,16 @@ export function setupAuth(app: Express) {
     })(req, res, next);
   });
 
+  app.get("/api/user", (req, res) => {
+    console.log('[Auth] Checking session state:', req.isAuthenticated());
+    if (req.isAuthenticated() && req.user) {
+      console.log('[Auth] User session validated:', req.user.id);
+      return res.json(req.user);
+    }
+    console.log('[Auth] No valid session found');
+    res.status(401).json({ message: "認証が必要です" });
+  });
+
   app.post("/logout", (req, res) => {
     const username = req.user?.username;
     console.log('[Auth] Processing logout request for user:', username);
@@ -178,15 +188,5 @@ export function setupAuth(app: Express) {
         res.json({ message: "ログアウトしました" });
       });
     });
-  });
-
-  app.get("/api/user", (req, res) => {
-    console.log('[Auth] Checking session state:', req.isAuthenticated());
-    if (req.isAuthenticated() && req.user) {
-      console.log('[Auth] User session validated:', req.user.id);
-      return res.json(req.user);
-    }
-    console.log('[Auth] No valid session found');
-    res.status(401).json({ message: "認証が必要です" });
   });
 }
