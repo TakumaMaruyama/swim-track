@@ -6,15 +6,12 @@ import {
   Users,
   Trophy,
   Calendar,
-  Timer,
-  ClipboardList,
   TrendingDown,
   LogOut,
   Plus,
-  Edit2,
-  Trash2,
   UserX,
-  Key
+  Key,
+  ClipboardList
 } from 'lucide-react'
 import { useUser } from '../hooks/use-user'
 import { useLocation } from 'wouter'
@@ -24,7 +21,7 @@ import { useSwimRecords } from '../hooks/use-swim-records'
 import { useCompetitions } from '../hooks/use-competitions'
 import { PageHeader } from '../components/PageHeader'
 import { EditCompetitionForm } from '../components/EditCompetitionForm'
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,9 +31,21 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { UserPasswordList } from '../components/UserPasswordList';
-import { Badge } from "@/components/ui/badge";
+} from "@/components/ui/alert-dialog"
+import { UserPasswordList } from '../components/UserPasswordList'
+import { Badge } from "@/components/ui/badge"
+import type { ExtendedSwimRecord } from "../hooks/use-swim-records"
+
+interface Improvement {
+  athleteName: string;
+  style: string;
+  distance: number;
+  poolLength: number;
+  previousBest: string;
+  newTime: string;
+  improvement: string;
+  date: Date;
+}
 
 const calculateTimeUntilCompetition = (competitionDate: Date) => {
   const now = new Date();
@@ -52,40 +61,49 @@ const convertTimeToSeconds = (time: string) => {
   return minutes * 60 + seconds;
 };
 
-const calculateImprovements = (records: any[], targetYear: number, targetMonth: number) => {
+const calculateImprovements = (records: ExtendedSwimRecord[] | undefined, targetYear: number, targetMonth: number): Improvement[] => {
   if (!records?.length) return [];
 
   const monthStart = new Date(targetYear, targetMonth, 1);
   const monthEnd = new Date(targetYear, targetMonth + 1, 0);
 
   // Group records by athlete and event type
-  const athleteRecords: { [key: string]: any[] } = {};
+  const athleteRecords: { [key: string]: ExtendedSwimRecord[] } = {};
   records.forEach(record => {
+    if (!record.date) return;
     const key = `${record.studentId}-${record.style}-${record.distance}-${record.poolLength}`;
     if (!athleteRecords[key]) {
       athleteRecords[key] = [];
     }
-    athleteRecords[key].push({
-      ...record,
-      date: new Date(record.date)
-    });
+    athleteRecords[key].push(record);
   });
 
-  const improvements = [];
+  const improvements: Improvement[] = [];
 
   Object.entries(athleteRecords).forEach(([key, records]) => {
-    const sortedRecords = records.sort((a, b) => a.date.getTime() - b.date.getTime());
+    // Sort records by date
+    const sortedRecords = records.sort((a, b) => {
+      const dateA = new Date(a.date || '').getTime();
+      const dateB = new Date(b.date || '').getTime();
+      return dateA - dateB;
+    });
     
     // Filter records for target month
-    const monthRecords = sortedRecords.filter(record => 
-      record.date >= monthStart && record.date <= monthEnd
-    );
+    const monthRecords = sortedRecords.filter(record => {
+      const recordDate = new Date(record.date || '');
+      return recordDate >= monthStart && recordDate <= monthEnd;
+    });
 
     monthRecords.forEach(currentRecord => {
-      // Find previous best time (before this record)
-      const previousRecords = sortedRecords.filter(r => r.date < currentRecord.date);
+      if (!currentRecord.date) return;
+      
+      // Find previous records (before this record's date)
+      const previousRecords = sortedRecords.filter(r => 
+        r.date && new Date(r.date) < new Date(currentRecord.date)
+      );
       
       if (previousRecords.length > 0) {
+        // Find the best time among previous records
         const previousBest = previousRecords.reduce((best, record) => {
           const bestTime = convertTimeToSeconds(best.time);
           const recordTime = convertTimeToSeconds(record.time);
@@ -95,16 +113,17 @@ const calculateImprovements = (records: any[], targetYear: number, targetMonth: 
         const currentTime = convertTimeToSeconds(currentRecord.time);
         const bestTime = convertTimeToSeconds(previousBest.time);
 
+        // Only count as improvement if current time beats previous best
         if (currentTime < bestTime) {
           improvements.push({
-            athleteName: currentRecord.athleteName,
+            athleteName: currentRecord.athleteName || '',
             style: currentRecord.style,
             distance: currentRecord.distance,
             poolLength: currentRecord.poolLength,
             previousBest: previousBest.time,
             newTime: currentRecord.time,
             improvement: (bestTime - currentTime).toFixed(2),
-            date: currentRecord.date
+            date: new Date(currentRecord.date)
           });
         }
       }
@@ -121,7 +140,7 @@ export default function Dashboard() {
   const { toast } = useToast();
   const { records, isLoading: recordsLoading } = useSwimRecords(true);
   const { competitions, isLoading: competitionsLoading, mutate: mutateCompetitions } = useCompetitions();
-  const [editingCompetition, setEditingCompetition] = React.useState<number | null>(null);
+  const [editingCompetition, setEditingCompetition] = React.useState<number>(0);
   const [showLogoutDialog, setShowLogoutDialog] = React.useState(false);
   const [showDeleteAccountDialog, setShowDeleteAccountDialog] = React.useState(false);
   const [showPasswordList, setShowPasswordList] = React.useState(false);
@@ -176,7 +195,6 @@ export default function Dashboard() {
         });
       }
     } catch (error) {
-      console.error('Error deleting account:', error);
       toast({
         variant: "destructive",
         title: "エラー",
@@ -201,9 +219,8 @@ export default function Dashboard() {
       }
 
       await mutateCompetitions();
-      setEditingCompetition(null);
+      setEditingCompetition(0);
     } catch (error) {
-      console.error('Error creating competition:', error);
       throw error;
     }
   };
@@ -224,9 +241,8 @@ export default function Dashboard() {
       }
 
       await mutateCompetitions();
-      setEditingCompetition(null);
+      setEditingCompetition(0);
     } catch (error) {
-      console.error('Error updating competition:', error);
       throw error;
     }
   };
@@ -252,7 +268,6 @@ export default function Dashboard() {
         description: "大会が削除されました",
       });
     } catch (error) {
-      console.error('Error deleting competition:', error);
       toast({
         variant: "destructive",
         title: "エラー",
@@ -361,7 +376,7 @@ export default function Dashboard() {
 
       <main className="flex-grow">
         <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -402,7 +417,7 @@ export default function Dashboard() {
               <CardContent>
                 <div className="space-y-6">
                   <div>
-                    <h3 className="text-lg font-semibold mb-3">今月のベスト更新者</h3>
+                    <h3 className="text-lg font-semibold mb-3">今月の自己ベスト更新</h3>
                     <div className="space-y-2">
                       {currentMonthImprovements.length > 0 ? (
                         currentMonthImprovements.map((imp, index) => (
@@ -416,11 +431,11 @@ export default function Dashboard() {
                               </div>
                               <div className="grid grid-cols-2 gap-2 text-sm">
                                 <div>
-                                  <span className="text-muted-foreground">更新前: </span>
+                                  <span className="text-muted-foreground">前回ベスト: </span>
                                   <span>{imp.previousBest}</span>
                                 </div>
                                 <div>
-                                  <span className="text-muted-foreground">更新後: </span>
+                                  <span className="text-muted-foreground">新記録: </span>
                                   <span className="font-bold text-primary">{imp.newTime}</span>
                                 </div>
                               </div>
@@ -429,7 +444,7 @@ export default function Dashboard() {
                                   -{imp.improvement}秒
                                 </span>
                                 <span className="text-muted-foreground">
-                                  {new Date(imp.date).toLocaleDateString()}
+                                  {imp.date.toLocaleDateString()}
                                 </span>
                               </div>
                             </div>
@@ -437,14 +452,14 @@ export default function Dashboard() {
                         ))
                       ) : (
                         <p className="text-center text-muted-foreground">
-                          今月の記録更新はありません
+                          今月の更新はありません
                         </p>
                       )}
                     </div>
                   </div>
 
                   <div>
-                    <h3 className="text-lg font-semibold mb-3">先月のベスト更新者</h3>
+                    <h3 className="text-lg font-semibold mb-3">先月の自己ベスト更新</h3>
                     <div className="space-y-2">
                       {lastMonthImprovements.length > 0 ? (
                         lastMonthImprovements.map((imp, index) => (
@@ -458,11 +473,11 @@ export default function Dashboard() {
                               </div>
                               <div className="grid grid-cols-2 gap-2 text-sm">
                                 <div>
-                                  <span className="text-muted-foreground">更新前: </span>
+                                  <span className="text-muted-foreground">前回ベスト: </span>
                                   <span>{imp.previousBest}</span>
                                 </div>
                                 <div>
-                                  <span className="text-muted-foreground">更新後: </span>
+                                  <span className="text-muted-foreground">新記録: </span>
                                   <span className="font-bold text-primary">{imp.newTime}</span>
                                 </div>
                               </div>
@@ -471,7 +486,7 @@ export default function Dashboard() {
                                   -{imp.improvement}秒
                                 </span>
                                 <span className="text-muted-foreground">
-                                  {new Date(imp.date).toLocaleDateString()}
+                                  {imp.date.toLocaleDateString()}
                                 </span>
                               </div>
                             </div>
@@ -479,7 +494,7 @@ export default function Dashboard() {
                         ))
                       ) : (
                         <p className="text-center text-muted-foreground">
-                          先月の記録更新はありません
+                          先月の更新はありません
                         </p>
                       )}
                     </div>
@@ -487,136 +502,62 @@ export default function Dashboard() {
                 </div>
               </CardContent>
             </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    今後の大会
-                  </div>
-                  {user?.role === 'coach' && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setEditingCompetition(0)}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      大会追加
-                    </Button>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {upcomingCompetitions.length > 0 ? (
-                    upcomingCompetitions.map((comp) => (
-                      <div key={comp.id} className="p-3 rounded-lg bg-muted/50">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="font-medium">{comp.name}</h3>
-                            <p className="text-sm text-muted-foreground">
-                              {new Date(comp.date).toLocaleDateString('ja-JP')}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              {comp.location}
-                            </p>
-                          </div>
-                          {user?.role === 'coach' && (
-                            <div className="flex gap-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setEditingCompetition(comp.id)}
-                              >
-                                <Edit2 className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDeleteCompetition(comp.id)}
-                              >
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-center text-muted-foreground">
-                      予定されている大会はありません
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
           </div>
         </div>
       </main>
 
-      <AlertDialog 
-        open={showLogoutDialog} 
-        onOpenChange={setShowLogoutDialog}
-      >
+      {/* Logout Dialog */}
+      <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>ログアウトしますか？</AlertDialogTitle>
             <AlertDialogDescription>
-              ログアウトすると、再度ログインするまでサービスを利用できません。
+              ログアウトするとセッションが終了します
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>キャンセル</AlertDialogCancel>
-            <AlertDialogAction onClick={handleLogout}>
-              ログアウト
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleLogout}>ログアウト</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog 
-        open={showDeleteAccountDialog} 
-        onOpenChange={setShowDeleteAccountDialog}
-      >
+      {/* Delete Account Dialog */}
+      <AlertDialog open={showDeleteAccountDialog} onOpenChange={setShowDeleteAccountDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>アカウントを削除しますか？</AlertDialogTitle>
             <AlertDialogDescription>
-              この操作は取り消せません。アカウントに関連するすべてのデータが削除されます。
+              この操作は取り消せません。アカウントとすべてのデータが削除されます。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>キャンセル</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteAccount}
-              className="bg-red-500 hover:bg-red-600"
-            >
+            <AlertDialogAction onClick={handleDeleteAccount} className="bg-red-500 hover:bg-red-600">
               削除
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {competition !== undefined && (
+      {/* Password List Dialog */}
+      <UserPasswordList isOpen={showPasswordList} onClose={() => setShowPasswordList(false)} />
+
+      {/* Edit Competition Dialog */}
+      {competition && (
         <EditCompetitionForm
           competition={competition}
-          isOpen={!!editingCompetition}
-          onClose={() => setEditingCompetition(null)}
+          isOpen={true}
+          onClose={() => setEditingCompetition(0)}
           onSubmit={async (data) => {
-            if (editingCompetition === 0) {
-              await handleCreateCompetition(data);
-            } else {
+            if (editingCompetition > 0) {
               await handleEditCompetition(editingCompetition, data);
+            } else {
+              await handleCreateCompetition(data);
             }
           }}
         />
       )}
-
-      <UserPasswordList
-        isOpen={showPasswordList}
-        onClose={() => setShowPasswordList(false)}
-      />
     </div>
   );
 }
