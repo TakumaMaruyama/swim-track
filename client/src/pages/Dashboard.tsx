@@ -104,7 +104,7 @@ const calculateTimeImprovement = (records: any[]) => {
 
   return { 
     totalImprovement: parseFloat(totalImprovement.toFixed(2)), 
-    improvementCount 
+    improvementCount
   };
 };
 
@@ -446,7 +446,7 @@ export default function Dashboard() {
                               size="icon"
                               onClick={() => handleDeleteCompetition(competition.id)}
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-4 w-4 text-red-500" />
                             </Button>
                           </div>
                         )}
@@ -464,28 +464,27 @@ export default function Dashboard() {
         </div>
       </main>
 
-      <EditCompetitionForm
-        competition={editingCompetition === -1 ? undefined : competition}
-        isOpen={!!editingCompetition}
-        onClose={() => setEditingCompetition(null)}
-        onSubmit={async (data) => {
-          if (editingCompetition === -1) {
-            await handleCreateCompetition(data);
-          } else {
-            await handleEditCompetition(editingCompetition, data);
-          }
-        }}
-      />
+      {competition !== undefined && (
+        <EditCompetitionForm
+          competition={competition}
+          isOpen={!!editingCompetition}
+          onClose={() => setEditingCompetition(null)}
+          onSubmit={async (data) => {
+            if (editingCompetition === -1) {
+              await handleCreateCompetition(data);
+            } else {
+              await handleEditCompetition(editingCompetition, data);
+            }
+          }}
+        />
+      )}
 
-      <AlertDialog 
-        open={showLogoutDialog} 
-        onOpenChange={setShowLogoutDialog}
-      >
+      <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>ログアウトしますか？</AlertDialogTitle>
             <AlertDialogDescription>
-              ログアウトすると、再度ログインするまでサービスを利用できません。
+              セッションを終了します。再度ログインが必要になります。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -497,15 +496,12 @@ export default function Dashboard() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog
-        open={showDeleteAccountDialog}
-        onOpenChange={setShowDeleteAccountDialog}
-      >
+      <AlertDialog open={showDeleteAccountDialog} onOpenChange={setShowDeleteAccountDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>アカウントを削除しますか？</AlertDialogTitle>
             <AlertDialogDescription>
-              この操作は取り消せません。アカウントに関連するすべてのデータが削除されます。
+              この操作は取り消せません。アカウントとすべてのデータが完全に削除されます。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -520,12 +516,10 @@ export default function Dashboard() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {showPasswordList && (
-        <UserPasswordList
-          isOpen={showPasswordList}
-          onClose={() => setShowPasswordList(false)}
-        />
-      )}
+      <UserPasswordList
+        isOpen={showPasswordList}
+        onClose={() => setShowPasswordList(false)}
+      />
     </div>
   );
 }
