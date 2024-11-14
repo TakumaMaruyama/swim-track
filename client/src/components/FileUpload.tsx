@@ -16,7 +16,7 @@ import {
 import { Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
-import useSWR, { mutate } from "swr";
+import useSWR from "swr";
 import type { Category } from "db/schema";
 
 interface FileUploadProps {
@@ -30,13 +30,12 @@ export function FileUpload({ onSuccess }: FileUploadProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>("none");
   const { toast } = useToast();
   const { user } = useUser();
-  const { data: categories, error: categoriesError } = useSWR<Category[]>("/api/categories");
+  const { data: categories } = useSWR<Category[]>("/api/categories");
 
   const handleUpload = async (e: React.ChangeEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.target);
     
-    // Update categoryId in formData
     if (selectedCategory !== "none") {
       formData.set("categoryId", selectedCategory);
     } else {
@@ -98,7 +97,6 @@ export function FileUpload({ onSuccess }: FileUploadProps) {
       }
 
       const newCategory = await response.json();
-      await mutate("/api/categories");
       setNewCategoryName("");
       setShowNewCategory(false);
       setSelectedCategory(newCategory.id.toString());
@@ -115,14 +113,6 @@ export function FileUpload({ onSuccess }: FileUploadProps) {
       });
     }
   };
-
-  if (categoriesError) {
-    toast({
-      variant: "destructive",
-      title: "エラー",
-      description: "カテゴリー情報の取得に失敗しました",
-    });
-  }
 
   if (!user || user.role !== "coach") return null;
 

@@ -43,7 +43,6 @@ type GroupedDocuments = {
       createdAt: string;
       categoryId?: number | null;
       categoryName?: string;
-      uploaderName?: string;
     }>;
   };
 };
@@ -178,7 +177,7 @@ export default function Documents() {
               <Collapsible key={categoryId}>
                 <CollapsibleTrigger className="flex items-center gap-2 w-full">
                   <ChevronRight className="h-4 w-4 transition-transform ui-expanded:rotate-90" />
-                  <h2 className="text-2xl font-bold text-left">{categoryName}</h2>
+                  <h2 className="text-xl font-bold text-left">{categoryName}</h2>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="mt-4">
                   <div className="grid gap-4">
@@ -187,12 +186,7 @@ export default function Documents() {
                         <CardHeader>
                           <CardTitle className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <span>{doc.title}</span>
-                              {doc.uploaderName && (
-                                <Badge variant="secondary" className="text-xs">
-                                  アップロード: {doc.uploaderName}
-                                </Badge>
-                              )}
+                              <span className="text-sm">{doc.title}</span>
                             </div>
                             <div className="flex gap-2">
                               <Button

@@ -70,7 +70,6 @@ export function TimeHistoryModal({
       styleFilter === "all" || record.style === styleFilter
     );
 
-    // Sort records based on selected criteria
     const sorted = [...filtered].sort((a, b) => {
       switch (sortBy) {
         case "date_asc":
@@ -86,7 +85,6 @@ export function TimeHistoryModal({
       }
     });
 
-    // Group by style and distance
     return sorted.reduce((acc, record) => {
       const key = `${record.style}-${record.distance}`;
       if (!acc[key]) {
@@ -97,7 +95,6 @@ export function TimeHistoryModal({
     }, {} as GroupedRecords);
   }, [records, styleFilter, sortBy]);
 
-  // Find personal bests for each style-distance combination
   const personalBests = React.useMemo(() => {
     const bests: { [key: string]: string } = {};
     Object.entries(groupedAndFilteredRecords).forEach(([key, records]) => {
@@ -201,17 +198,11 @@ export function TimeHistoryModal({
                       {records.map((record) => (
                         <div
                           key={record.id}
-                          className={`p-3 rounded-lg ${
-                            record.time === personalBests[key]
-                              ? 'bg-primary/10'
-                              : 'bg-muted/50'
-                          }`}
+                          className="p-3 rounded-lg flex flex-col gap-2 md:flex-row md:justify-between md:items-center"
                         >
-                          <div className="flex justify-between items-center">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xl font-bold">
-                                {record.time}
-                              </span>
+                          <div className="flex flex-col gap-2">
+                            <span className="text-xl font-bold">{record.time}</span>
+                            <div className="flex flex-wrap gap-2">
                               {record.time === personalBests[key] && (
                                 <Badge variant="secondary" className="flex items-center gap-1">
                                   <Trophy className="h-3 w-3" />
@@ -225,22 +216,24 @@ export function TimeHistoryModal({
                                 </Badge>
                               )}
                             </div>
-                            <div className="flex items-center gap-4">
-                              <div className="text-sm text-muted-foreground">
-                                <div>{new Date(record.date).toLocaleDateString('ja-JP')}</div>
-                                <div>{record.poolLength}mプール</div>
-                              </div>
-                              {user?.role === 'coach' && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => setDeletingRecord(record.id)}
-                                >
-                                  <Trash2 className="h-4 w-4 text-red-500" />
-                                </Button>
-                              )}
+                          </div>
+                          <div className="flex flex-col items-start md:items-end gap-1">
+                            <div className="text-sm text-muted-foreground">
+                              {new Date(record.date).toLocaleDateString('ja-JP')}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {record.poolLength}mプール
                             </div>
                           </div>
+                          {user?.role === 'coach' && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setDeletingRecord(record.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          )}
                         </div>
                       ))}
                     </div>
