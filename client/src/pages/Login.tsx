@@ -25,6 +25,7 @@ export default function Login() {
   const { 
     login, 
     isAuthenticated, 
+    isLoading,
     isLoginPending,
     error: authError 
   } = useUser();
@@ -38,14 +39,15 @@ export default function Login() {
   });
 
   useEffect(() => {
-    if (isAuthenticated) {
-      console.log('[Login] User is authenticated, forcing navigation to dashboard');
-      // Force navigation after authentication is confirmed
-      setTimeout(() => {
-        navigate('/');
-      }, 100);
+    if (!isLoading && !isAuthenticated) {
+      console.log('[Login] Not authenticated, showing login page');
     }
-  }, [isAuthenticated, navigate]);
+
+    if (isAuthenticated) {
+      console.log('[Login] User is authenticated, navigating to dashboard');
+      navigate('/');
+    }
+  }, [isLoading, isAuthenticated, navigate]);
 
   async function onSubmit(values: { username: string; password: string }) {
     try {
@@ -53,15 +55,12 @@ export default function Login() {
       const result = await login(values);
       
       if (result.ok) {
-        console.log('[Login] Login successful, preparing navigation');
+        console.log('[Login] Login successful');
         toast({
           title: "ログイン成功",
           description: "ダッシュボードに移動します",
         });
-        // Force navigation on successful login
-        setTimeout(() => {
-          navigate('/');
-        }, 100);
+        navigate('/');
       } else {
         console.log('[Login] Login failed:', result.message);
         if (result.errors) {
@@ -89,7 +88,7 @@ export default function Login() {
     }
   }
 
-  if (isLoginPending) {
+  if (isLoading || isLoginPending) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="flex flex-col items-center gap-2">
