@@ -62,11 +62,11 @@ const formatSeconds = (seconds: number): string => {
 const getLastMonthImprovements = (records: any[]) => {
   if (!records?.length) return [];
   
-  // Calculate last month dynamically
-  const now = new Date();
-  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1);
-  const monthStart = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1);
-  const monthEnd = new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 0);
+  // Set target month to October 2024
+  const targetYear = 2024;
+  const targetMonth = 9; // 0-based index, so 9 is October
+  const monthStart = new Date(targetYear, targetMonth, 1);
+  const monthEnd = new Date(targetYear, targetMonth + 1, 0);
 
   // Group records by athlete and event type
   const athleteRecords: { [key: string]: any[] } = {};
@@ -93,30 +93,28 @@ const getLastMonthImprovements = (records: any[]) => {
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
-    // Process target month's records
+    // Check October records
     sortedRecords.forEach(currentRecord => {
       const recordDate = new Date(currentRecord.date);
       
-      // Check if record is from target month
-      if (recordDate >= monthStart && recordDate <= monthEnd) {
+      // Only process records from October 2024
+      if (recordDate.getFullYear() === targetYear && recordDate.getMonth() === targetMonth) {
         // Find previous best time (before this record)
         const previousRecords = sortedRecords.filter(r => 
           new Date(r.date) < recordDate
         );
 
         if (previousRecords.length > 0) {
-          // Find the best time among previous records
           const previousBest = previousRecords.reduce((best, record) => {
             const bestTime = convertTimeToSeconds(best.time);
             const recordTime = convertTimeToSeconds(record.time);
             return recordTime < bestTime ? record : best;
-          });
+          }, previousRecords[0]);
 
           const currentTime = convertTimeToSeconds(currentRecord.time);
           const bestTime = convertTimeToSeconds(previousBest.time);
 
           if (currentTime < bestTime) {
-            const improvement = bestTime - currentTime;
             improvements.push({
               athleteName: group.athleteName,
               style: group.style,
@@ -124,7 +122,7 @@ const getLastMonthImprovements = (records: any[]) => {
               poolLength: group.poolLength,
               newTime: currentRecord.time,
               previousBest: previousBest.time,
-              improvement: improvement.toFixed(2),
+              improvement: (bestTime - currentTime).toFixed(2),
               date: currentRecord.date
             });
           }
@@ -409,7 +407,7 @@ export default function Dashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <TrendingDown className="h-4 w-4" />
-                  先月の自己ベスト更新
+                  2024年10月の自己ベスト更新
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -447,7 +445,7 @@ export default function Dashboard() {
                     ))
                   ) : (
                     <p className="text-center text-muted-foreground">
-                      先月の記録更新はありません
+                      10月の記録更新はありません
                     </p>
                   )}
                 </div>
@@ -458,14 +456,14 @@ export default function Dashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Timer className="h-4 w-4" />
-                    次回大会
+                    <Calendar className="h-4 w-4" />
+                    大会予定
                   </div>
                   {user?.role === 'coach' && (
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => setEditingCompetition(0)}
+                      onClick={() => setEditingCompetition(null)}
                     >
                       <Plus className="h-4 w-4" />
                     </Button>
@@ -474,20 +472,15 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {upcomingCompetitions.map(comp => (
-                    <div
-                      key={comp.id}
-                      className="p-3 rounded-lg bg-muted/50"
-                    >
-                      <div className="flex justify-between items-center">
+                  {upcomingCompetitions.length > 0 ? (
+                    upcomingCompetitions.map((comp) => (
+                      <div key={comp.id} className="flex justify-between items-center p-3 rounded-lg bg-muted/50">
                         <div>
                           <p className="font-medium">{comp.name}</p>
-                          <p className="text-sm text-muted-foreground">
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Calendar className="h-3 w-3" />
                             {new Date(comp.date).toLocaleDateString('ja-JP')}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {comp.location}
-                          </p>
+                          </div>
                         </div>
                         {user?.role === 'coach' && (
                           <div className="flex gap-2">
@@ -508,9 +501,8 @@ export default function Dashboard() {
                           </div>
                         )}
                       </div>
-                    </div>
-                  ))}
-                  {upcomingCompetitions.length === 0 && (
+                    ))
+                  ) : (
                     <p className="text-center text-muted-foreground">
                       予定されている大会はありません
                     </p>
@@ -519,71 +511,73 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           </div>
+
+          {competition && (
+            <EditCompetitionForm
+              competition={competition}
+              isOpen={!!editingCompetition}
+              onClose={() => setEditingCompetition(null)}
+              onSubmit={async (data) => {
+                if (editingCompetition) {
+                  await handleEditCompetition(editingCompetition, data);
+                } else {
+                  await handleCreateCompetition(data);
+                }
+              }}
+            />
+          )}
+
+          {showPasswordList && (
+            <UserPasswordList
+              isOpen={showPasswordList}
+              onClose={() => setShowPasswordList(false)}
+            />
+          )}
+
+          <AlertDialog 
+            open={showLogoutDialog} 
+            onOpenChange={setShowLogoutDialog}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>ログアウトしますか？</AlertDialogTitle>
+                <AlertDialogDescription>
+                  セッションを終了します。再度ログインが必要になります。
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                <AlertDialogAction onClick={handleLogout}>
+                  ログアウト
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          <AlertDialog 
+            open={showDeleteAccountDialog} 
+            onOpenChange={setShowDeleteAccountDialog}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>アカウントを削除しますか？</AlertDialogTitle>
+                <AlertDialogDescription>
+                  この操作は取り消せません。すべてのデータが削除されます。
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDeleteAccount}
+                  className="bg-red-500 hover:bg-red-600"
+                >
+                  削除
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </main>
-
-      {competition !== undefined && (
-        <EditCompetitionForm
-          competition={competition}
-          isOpen={editingCompetition !== null}
-          onClose={() => setEditingCompetition(null)}
-          onSubmit={async (data) => {
-            if (editingCompetition === 0) {
-              await handleCreateCompetition(data);
-            } else if (editingCompetition) {
-              await handleEditCompetition(editingCompetition, data);
-            }
-          }}
-        />
-      )}
-
-      <AlertDialog 
-        open={showLogoutDialog} 
-        onOpenChange={setShowLogoutDialog}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>ログアウトしますか？</AlertDialogTitle>
-            <AlertDialogDescription>
-              現在のセッションを終了します。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>キャンセル</AlertDialogCancel>
-            <AlertDialogAction onClick={handleLogout}>
-              ログアウト
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog 
-        open={showDeleteAccountDialog} 
-        onOpenChange={setShowDeleteAccountDialog}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>アカウントを削除しますか？</AlertDialogTitle>
-            <AlertDialogDescription>
-              この操作は取り消せません。アカウントに関連するすべてのデータが削除されます。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>キャンセル</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteAccount}
-              className="bg-red-500 hover:bg-red-600"
-            >
-              削除
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <UserPasswordList
-        isOpen={showPasswordList}
-        onClose={() => setShowPasswordList(false)}
-      />
     </div>
   );
 }

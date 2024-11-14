@@ -25,7 +25,7 @@ export default function Login() {
   const { 
     login, 
     isAuthenticated, 
-    isLoading: isAuthChecking,
+    isLoginPending,
     error: authError 
   } = useUser();
   
@@ -38,20 +38,11 @@ export default function Login() {
   });
 
   useEffect(() => {
-    let mounted = true;
-    const checkAuth = async () => {
-      console.log('[Login] Checking auth state:', { isAuthenticated, isAuthChecking });
-      if (!isAuthChecking && isAuthenticated && mounted) {
-        console.log('[Login] User authenticated, navigating to dashboard');
-        navigate('/');
-      }
-    };
-
-    checkAuth();
-    return () => {
-      mounted = false;
-    };
-  }, [isAuthChecking, isAuthenticated, navigate]);
+    if (isAuthenticated) {
+      console.log('[Login] User is authenticated, navigating to dashboard');
+      navigate('/');
+    }
+  }, [isAuthenticated, navigate]);
 
   async function onSubmit(values: { username: string; password: string }) {
     try {
@@ -64,7 +55,7 @@ export default function Login() {
           title: "ログイン成功",
           description: "ダッシュボードに移動します",
         });
-        navigate('/');
+        // Let useEffect handle navigation after auth state updates
       } else {
         console.log('[Login] Login failed:', result.message);
         if (result.errors) {
@@ -92,12 +83,12 @@ export default function Login() {
     }
   }
 
-  if (isAuthChecking) {
+  if (isLoginPending) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="flex flex-col items-center gap-2">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">認証状態を確認中...</p>
+          <p className="text-sm text-muted-foreground">認証中...</p>
         </div>
       </div>
     );

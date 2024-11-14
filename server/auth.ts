@@ -58,7 +58,7 @@ export function setupAuth(app: Express) {
     cookie: {
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
       httpOnly: true,
-      secure: false,
+      secure: process.env.NODE_ENV === "production",
       sameSite: 'lax',
       path: '/'
     }
@@ -81,7 +81,7 @@ export function setupAuth(app: Express) {
         if (!user?.password) {
           console.log('[Auth] User not found or no password');
           return done(null, false, { 
-            message: "ユーザー名またはパスワードが正しくありません。" 
+            message: "ユーザー名またはパスワードが正しくありません" 
           });
         }
 
@@ -89,7 +89,7 @@ export function setupAuth(app: Express) {
         if (!isMatch) {
           console.log('[Auth] Password mismatch');
           return done(null, false, { 
-            message: "ユーザー名またはパスワードが正しくありません。"
+            message: "ユーザー名またはパスワードが正しくありません"
           });
         }
 
@@ -150,9 +150,10 @@ export function setupAuth(app: Express) {
           return next(err);
         }
         console.log('[Auth] Login successful, session established');
-        return res.json({
+        res.json({ 
+          ok: true,
           message: "ログインしました",
-          user: { id: user.id, username: user.username, role: user.role },
+          user: { id: user.id, username: user.username, role: user.role }
         });
       });
     })(req, res, next);
