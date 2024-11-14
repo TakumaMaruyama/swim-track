@@ -36,6 +36,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { UserPasswordList } from '../components/UserPasswordList';
+import { Badge } from "@/components/ui/badge";
 
 const calculateTimeUntilCompetition = (competitionDate: Date) => {
   const now = new Date();
@@ -52,61 +53,83 @@ const convertTimeToSeconds = (time: string) => {
   return minutes * 60 + seconds;
 };
 
+const formatSeconds = (seconds: number): string => {
+  const mins = Math.floor(seconds / 60);
+  const secs = (seconds % 60).toFixed(2);
+  return `${mins}:${secs.padStart(5, '0')}`;
+};
+
 const getLastMonthImprovements = (records: any[]) => {
   if (!records?.length) return [];
 
+  // Get last month's date range
   const now = new Date();
-  const lastMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
-  const lastMonthYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1);
+  const lastMonthStart = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1);
+  const lastMonthEnd = new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 0);
 
-  // Group records by athlete and event type
-  const recordsByGroup = records.reduce((acc, record) => {
+  // Group records by athlete and event type (style, distance, pool length)
+  const recordsByAthlete = records.reduce((acc, record) => {
     const key = `${record.studentId}-${record.style}-${record.distance}-${record.poolLength}`;
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(record);
+    if (!acc[key]) {
+      acc[key] = {
+        athleteName: record.athleteName,
+        style: record.style,
+        distance: record.distance,
+        poolLength: record.poolLength,
+        records: []
+      };
+    }
+    acc[key].records.push({
+      ...record,
+      timeInSeconds: convertTimeToSeconds(record.time)
+    });
     return acc;
   }, {});
 
   const improvements = [];
 
-  Object.values(recordsByGroup).forEach((group: any[]) => {
+  // Process each athlete's records
+  Object.values(recordsByAthlete).forEach((group: any) => {
     // Sort records by date
-    const sortedRecords = group.sort((a, b) =>
+    const sortedRecords = group.records.sort((a: any, b: any) => 
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
-    // For each record in last month
-    sortedRecords.forEach((record, index) => {
+    // Find records from last month
+    const lastMonthRecords = sortedRecords.filter((record: any) => {
       const recordDate = new Date(record.date);
-      if (recordDate.getMonth() !== lastMonth || recordDate.getFullYear() !== lastMonthYear) return;
+      return recordDate >= lastMonthStart && recordDate <= lastMonthEnd;
+    });
 
+    // For each record from last month, check if it's a personal best
+    lastMonthRecords.forEach((currentRecord: any) => {
       // Find previous best time before this record
-      let previousBest = null;
-      for (let i = 0; i < index; i++) {
-        const prevRecord = sortedRecords[i];
-        if (!previousBest || convertTimeToSeconds(prevRecord.time) < convertTimeToSeconds(previousBest.time)) {
-          previousBest = prevRecord;
-        }
-      }
+      const previousRecords = sortedRecords.filter((r: any) => 
+        new Date(r.date) < new Date(currentRecord.date)
+      );
 
-      if (previousBest) {
-        const prevTime = convertTimeToSeconds(previousBest.time);
-        const currentTime = convertTimeToSeconds(record.time);
-        if (currentTime < prevTime) {
+      if (previousRecords.length > 0) {
+        const previousBest = Math.min(...previousRecords.map((r: any) => r.timeInSeconds));
+        const improvement = previousBest - currentRecord.timeInSeconds;
+
+        if (improvement > 0) {  // Only include actual improvements
           improvements.push({
-            athleteName: record.athleteName,
-            style: record.style,
-            distance: record.distance,
-            poolLength: record.poolLength,
-            time: record.time,
-            improvement: (prevTime - currentTime).toFixed(2),
-            date: record.date
+            athleteName: group.athleteName,
+            style: group.style,
+            distance: group.distance,
+            poolLength: group.poolLength,
+            newTime: currentRecord.time,
+            improvement: improvement.toFixed(2),
+            date: currentRecord.date,
+            previousBest: formatSeconds(previousBest)
           });
         }
       }
     });
   });
 
+  // Sort improvements by amount (largest first)
   return improvements.sort((a, b) => Number(b.improvement) - Number(a.improvement));
 };
 
@@ -383,20 +406,39 @@ export default function Dashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <TrendingDown className="h-4 w-4" />
-                  先月の記録更新
+                  先月の自己ベスト更新
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
+                <div className="space-y-4">
                   {improvements.length > 0 ? (
                     improvements.map((imp, index) => (
-                      <div key={index} className="p-2 rounded-lg bg-muted/50">
-                        <div className="grid grid-cols-5 gap-2 text-sm">
-                          <div>{imp.athleteName}</div>
-                          <div>{imp.style} {imp.distance}m</div>
-                          <div className="font-bold">{imp.time}</div>
-                          <div className="text-primary">-{imp.improvement}秒</div>
-                          <div>{new Date(imp.date).toLocaleDateString()}</div>
+                      <div key={index} className="p-3 rounded-lg bg-muted/50">
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium">{imp.athleteName}</span>
+                            <Badge variant="secondary">
+                              {imp.style} {imp.distance}m ({imp.poolLength}m)
+                            </Badge>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">更新前: </span>
+                              <span>{imp.previousBest}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">更新後: </span>
+                              <span className="font-bold text-primary">{imp.newTime}</span>
+                            </div>
+                          </div>
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-green-600 font-medium">
+                              -{imp.improvement}秒
+                            </span>
+                            <span className="text-muted-foreground">
+                              {new Date(imp.date).toLocaleDateString()}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     ))
@@ -432,7 +474,7 @@ export default function Dashboard() {
                   {upcomingCompetitions.map(comp => (
                     <div
                       key={comp.id}
-                      className="p-2 rounded-lg bg-muted/50"
+                      className="p-3 rounded-lg bg-muted/50"
                     >
                       <div className="flex justify-between items-center">
                         <div>
@@ -465,6 +507,11 @@ export default function Dashboard() {
                       </div>
                     </div>
                   ))}
+                  {upcomingCompetitions.length === 0 && (
+                    <p className="text-center text-muted-foreground">
+                      予定されている大会はありません
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -472,15 +519,30 @@ export default function Dashboard() {
         </div>
       </main>
 
-      <AlertDialog
-        open={showLogoutDialog}
+      {competition !== undefined && (
+        <EditCompetitionForm
+          competition={competition}
+          isOpen={editingCompetition !== null}
+          onClose={() => setEditingCompetition(null)}
+          onSubmit={async (data) => {
+            if (editingCompetition === 0) {
+              await handleCreateCompetition(data);
+            } else if (editingCompetition) {
+              await handleEditCompetition(editingCompetition, data);
+            }
+          }}
+        />
+      )}
+
+      <AlertDialog 
+        open={showLogoutDialog} 
         onOpenChange={setShowLogoutDialog}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>ログアウトしますか？</AlertDialogTitle>
             <AlertDialogDescription>
-              セッションを終了してログアウトします。
+              現在のセッションを終了します。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -492,15 +554,15 @@ export default function Dashboard() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog
-        open={showDeleteAccountDialog}
+      <AlertDialog 
+        open={showDeleteAccountDialog} 
         onOpenChange={setShowDeleteAccountDialog}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>アカウントを削除しますか？</AlertDialogTitle>
             <AlertDialogDescription>
-              この操作は取り消せません。アカウントとすべてのデータが完全に削除されます。
+              この操作は取り消せません。アカウントに関連するすべてのデータが削除されます。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -518,19 +580,6 @@ export default function Dashboard() {
       <UserPasswordList
         isOpen={showPasswordList}
         onClose={() => setShowPasswordList(false)}
-      />
-
-      <EditCompetitionForm
-        competition={competition}
-        isOpen={!!editingCompetition}
-        onClose={() => setEditingCompetition(null)}
-        onSubmit={async (data) => {
-          if (editingCompetition && editingCompetition > 0) {
-            await handleEditCompetition(editingCompetition, data);
-          } else {
-            await handleCreateCompetition(data);
-          }
-        }}
       />
     </div>
   );
