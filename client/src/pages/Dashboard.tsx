@@ -11,7 +11,9 @@ import {
   Plus,
   UserX,
   Key,
-  ClipboardList
+  ClipboardList,
+  Edit2,
+  Trash2
 } from 'lucide-react'
 import { useUser } from '../hooks/use-user'
 import { useLocation } from 'wouter'
@@ -52,7 +54,6 @@ const calculateTimeUntilCompetition = (competitionDate: Date) => {
   const diffTime = competitionDate.getTime() - now.getTime();
   const days = Math.floor(diffTime / (1000 * 60 * 60 * 24));
   const hours = Math.floor((diffTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-
   return { days, hours };
 };
 
@@ -61,73 +62,91 @@ const convertTimeToSeconds = (time: string) => {
   return minutes * 60 + seconds;
 };
 
-const calculateImprovements = (records: ExtendedSwimRecord[] | undefined, targetYear: number, targetMonth: number): Improvement[] => {
+const findPreviousBest = (records: ExtendedSwimRecord[], currentRecord: ExtendedSwimRecord) => {
+  const sameTypeRecords = records.filter(r => 
+    r.style === currentRecord.style &&
+    r.distance === currentRecord.distance &&
+    r.poolLength === currentRecord.poolLength &&
+    r.date &&
+    currentRecord.date &&
+    new Date(r.date) < new Date(currentRecord.date)
+  );
+  
+  if (sameTypeRecords.length === 0) return null;
+  
+  return sameTypeRecords.reduce((best, record) => 
+    convertTimeToSeconds(record.time) < convertTimeToSeconds(best.time) ? record : best
+  );
+};
+
+const getLastMonthImprovements = (records: ExtendedSwimRecord[] | undefined): Improvement[] => {
   if (!records?.length) return [];
-
-  const monthStart = new Date(targetYear, targetMonth, 1);
-  const monthEnd = new Date(targetYear, targetMonth + 1, 0);
-
-  // Group records by athlete and event type
-  const athleteRecords: { [key: string]: ExtendedSwimRecord[] } = {};
-  records.forEach(record => {
-    if (!record.date) return;
-    const key = `${record.studentId}-${record.style}-${record.distance}-${record.poolLength}`;
-    if (!athleteRecords[key]) {
-      athleteRecords[key] = [];
-    }
-    athleteRecords[key].push(record);
-  });
+  
+  const now = new Date();
+  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1);
+  const monthStart = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1);
+  const monthEnd = new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 0);
 
   const improvements: Improvement[] = [];
-
-  Object.entries(athleteRecords).forEach(([key, records]) => {
-    // Sort records by date
-    const sortedRecords = records.sort((a, b) => {
-      const dateA = new Date(a.date || '').getTime();
-      const dateB = new Date(b.date || '').getTime();
-      return dateA - dateB;
-    });
-    
-    // Filter records for target month
-    const monthRecords = sortedRecords.filter(record => {
-      const recordDate = new Date(record.date || '');
-      return recordDate >= monthStart && recordDate <= monthEnd;
-    });
-
-    monthRecords.forEach(currentRecord => {
-      if (!currentRecord.date) return;
-      
-      // Find previous records (before this record's date)
-      const previousRecords = sortedRecords.filter(r => 
-        r.date && new Date(r.date) < new Date(currentRecord.date)
-      );
-      
-      if (previousRecords.length > 0) {
-        // Find the best time among previous records
-        const previousBest = previousRecords.reduce((best, record) => {
-          const bestTime = convertTimeToSeconds(best.time);
-          const recordTime = convertTimeToSeconds(record.time);
-          return recordTime < bestTime ? record : best;
-        }, previousRecords[0]);
-
-        const currentTime = convertTimeToSeconds(currentRecord.time);
+  
+  records.forEach(record => {
+    if (!record.date) return;
+    const recordDate = new Date(record.date);
+    if (recordDate >= monthStart && recordDate <= monthEnd) {
+      const previousBest = findPreviousBest(records, record);
+      if (previousBest) {
+        const currentTime = convertTimeToSeconds(record.time);
         const bestTime = convertTimeToSeconds(previousBest.time);
-
-        // Only count as improvement if current time beats previous best
         if (currentTime < bestTime) {
           improvements.push({
-            athleteName: currentRecord.athleteName || '',
-            style: currentRecord.style,
-            distance: currentRecord.distance,
-            poolLength: currentRecord.poolLength,
+            athleteName: record.athleteName || '',
+            style: record.style,
+            distance: record.distance,
+            poolLength: record.poolLength,
             previousBest: previousBest.time,
-            newTime: currentRecord.time,
+            newTime: record.time,
             improvement: (bestTime - currentTime).toFixed(2),
-            date: new Date(currentRecord.date)
+            date: new Date(record.date)
           });
         }
       }
-    });
+    }
+  });
+
+  return improvements.sort((a, b) => parseFloat(b.improvement) - parseFloat(a.improvement));
+};
+
+const getCurrentMonthImprovements = (records: ExtendedSwimRecord[] | undefined): Improvement[] => {
+  if (!records?.length) return [];
+  
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+  const improvements: Improvement[] = [];
+  
+  records.forEach(record => {
+    if (!record.date) return;
+    const recordDate = new Date(record.date);
+    if (recordDate >= monthStart && recordDate <= monthEnd) {
+      const previousBest = findPreviousBest(records, record);
+      if (previousBest) {
+        const currentTime = convertTimeToSeconds(record.time);
+        const bestTime = convertTimeToSeconds(previousBest.time);
+        if (currentTime < bestTime) {
+          improvements.push({
+            athleteName: record.athleteName || '',
+            style: record.style,
+            distance: record.distance,
+            poolLength: record.poolLength,
+            previousBest: previousBest.time,
+            newTime: record.time,
+            improvement: (bestTime - currentTime).toFixed(2),
+            date: new Date(record.date)
+          });
+        }
+      }
+    }
   });
 
   return improvements.sort((a, b) => parseFloat(b.improvement) - parseFloat(a.improvement));
@@ -140,20 +159,13 @@ export default function Dashboard() {
   const { toast } = useToast();
   const { records, isLoading: recordsLoading } = useSwimRecords(true);
   const { competitions, isLoading: competitionsLoading, mutate: mutateCompetitions } = useCompetitions();
-  const [editingCompetition, setEditingCompetition] = React.useState<number>(0);
+  const [editingCompetition, setEditingCompetition] = React.useState<number | null>(null);
   const [showLogoutDialog, setShowLogoutDialog] = React.useState(false);
   const [showDeleteAccountDialog, setShowDeleteAccountDialog] = React.useState(false);
   const [showPasswordList, setShowPasswordList] = React.useState(false);
 
-  // Calculate improvements for current and last month
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth();
-  const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-  const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
-
-  const currentMonthImprovements = calculateImprovements(records, currentYear, currentMonth);
-  const lastMonthImprovements = calculateImprovements(records, lastMonthYear, lastMonth);
+  const currentMonthImprovements = getCurrentMonthImprovements(records);
+  const lastMonthImprovements = getLastMonthImprovements(records);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -203,65 +215,54 @@ export default function Dashboard() {
     }
   };
 
+  const handleEditCompetition = async (id: number, data: any) => {
+    try {
+      const response = await fetch(`/api/competitions/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error();
+      await mutateCompetitions();
+      setEditingCompetition(null);
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "エラー",
+        description: "大会の更新に失敗しました",
+      });
+    }
+  };
+
   const handleCreateCompetition = async (data: any) => {
     try {
       const response = await fetch('/api/competitions', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
-        credentials: 'include',
+        credentials: 'include'
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to create competition');
-      }
-
+      if (!response.ok) throw new Error();
       await mutateCompetitions();
-      setEditingCompetition(0);
+      setEditingCompetition(null);
     } catch (error) {
-      throw error;
+      toast({
+        variant: "destructive",
+        title: "エラー",
+        description: "大会の作成に失敗しました",
+      });
     }
   };
 
-  const handleEditCompetition = async (competitionId: number, data: any) => {
+  const handleDeleteCompetition = async (id: number) => {
+    if (!confirm('この大会を削除してもよろしいですか？')) return;
     try {
-      const response = await fetch(`/api/competitions/${competitionId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update competition');
-      }
-
-      await mutateCompetitions();
-      setEditingCompetition(0);
-    } catch (error) {
-      throw error;
-    }
-  };
-
-  const handleDeleteCompetition = async (competitionId: number) => {
-    if (!confirm('この大会を削除してもよろしいですか？')) {
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/competitions/${competitionId}`, {
+      const response = await fetch(`/api/competitions/${id}`, {
         method: 'DELETE',
-        credentials: 'include',
+        credentials: 'include'
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete competition');
-      }
-
+      if (!response.ok) throw new Error();
       await mutateCompetitions();
       toast({
         title: "削除成功",
@@ -376,7 +377,7 @@ export default function Dashboard() {
 
       <main className="flex-grow">
         <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-3">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -397,6 +398,24 @@ export default function Dashboard() {
                       <p className="text-xs text-muted-foreground">
                         {new Date(nextCompetition.date).toLocaleDateString('ja-JP')}
                       </p>
+                      {user?.role === 'coach' && (
+                        <div className="mt-4 flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setEditingCompetition(nextCompetition.id)}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteCompetition(nextCompetition.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>
+                      )}
                     </>
                   ) : (
                     <p className="text-sm text-muted-foreground">
@@ -407,7 +426,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="col-span-2">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <TrendingDown className="h-4 w-4" />
@@ -506,8 +525,10 @@ export default function Dashboard() {
         </div>
       </main>
 
-      {/* Logout Dialog */}
-      <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+      <AlertDialog 
+        open={showLogoutDialog} 
+        onOpenChange={setShowLogoutDialog}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>ログアウトしますか？</AlertDialogTitle>
@@ -522,8 +543,10 @@ export default function Dashboard() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Delete Account Dialog */}
-      <AlertDialog open={showDeleteAccountDialog} onOpenChange={setShowDeleteAccountDialog}>
+      <AlertDialog 
+        open={showDeleteAccountDialog} 
+        onOpenChange={setShowDeleteAccountDialog}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>アカウントを削除しますか？</AlertDialogTitle>
@@ -540,17 +563,15 @@ export default function Dashboard() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Password List Dialog */}
       <UserPasswordList isOpen={showPasswordList} onClose={() => setShowPasswordList(false)} />
 
-      {/* Edit Competition Dialog */}
       {competition && (
         <EditCompetitionForm
           competition={competition}
-          isOpen={true}
-          onClose={() => setEditingCompetition(0)}
+          isOpen={!!editingCompetition}
+          onClose={() => setEditingCompetition(null)}
           onSubmit={async (data) => {
-            if (editingCompetition > 0) {
+            if (editingCompetition) {
               await handleEditCompetition(editingCompetition, data);
             } else {
               await handleCreateCompetition(data);
