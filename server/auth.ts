@@ -50,15 +50,15 @@ export function setupAuth(app: Express) {
   const MemoryStore = createMemoryStore(session);
   const sessionSettings: session.SessionOptions = {
     secret: process.env.REPL_ID || "porygon-supremacy",
-    resave: false,
-    saveUninitialized: false,
+    resave: true,
+    saveUninitialized: true,
     store: new MemoryStore({
       checkPeriod: 86400000 // prune expired entries every 24h
     }),
     cookie: {
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
       httpOnly: true,
-      secure: false, // Set to false for development
+      secure: false,
       sameSite: 'lax'
     }
   };
@@ -117,7 +117,7 @@ export function setupAuth(app: Express) {
       
       if (!user) {
         console.log('[Auth] User not found during deserialization');
-        return done(new Error("ユーザーが見つかりません"));
+        return done(null, false);
       }
 
       console.log('[Auth] User deserialized successfully');

@@ -1,3 +1,4 @@
+{/* Updated version of Dashboard.tsx with changes */}
 import React, { useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -47,9 +48,18 @@ const calculateTimeUntilCompetition = (competitionDate: Date) => {
 };
 
 const calculateTimeImprovement = (records: any[]) => {
-  if (!records || records.length === 0) return { totalImprovement: 0, improvementCount: 0 };
+  if (!records || records.length === 0) return {
+    currentMonth: { totalImprovement: 0, improvementCount: 0 },
+    lastMonth: { totalImprovement: 0, improvementCount: 0 }
+  };
 
-  // Group records by athlete first
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+  const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+  const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+
+  // Group records by athlete
   const athleteRecords: { [key: string]: any[] } = {};
   records.forEach(record => {
     if (!athleteRecords[record.studentId]) {
@@ -58,12 +68,12 @@ const calculateTimeImprovement = (records: any[]) => {
     athleteRecords[record.studentId].push(record);
   });
 
-  let totalImprovement = 0;
-  let improvementCount = 0;
+  let currentMonthImprovement = 0;
+  let currentMonthCount = 0;
+  let lastMonthImprovement = 0;
+  let lastMonthCount = 0;
 
-  // Process each athlete's records
   Object.values(athleteRecords).forEach(records => {
-    // Group records by style, distance, and pool length
     const typeGroups: { [key: string]: any[] } = {};
     records.forEach(record => {
       const key = `${record.style}-${record.distance}-${record.poolLength}`;
@@ -73,38 +83,48 @@ const calculateTimeImprovement = (records: any[]) => {
       typeGroups[key].push(record);
     });
 
-    // Process each type group
     Object.values(typeGroups).forEach(group => {
-      // Sort records chronologically
       const sortedRecords = group.sort((a, b) => 
         new Date(a.date).getTime() - new Date(b.date).getTime()
       );
 
-      // Compare each record with the previous one
       for (let i = 1; i < sortedRecords.length; i++) {
         const prevRecord = sortedRecords[i - 1];
         const currentRecord = sortedRecords[i];
+        const recordDate = new Date(currentRecord.date);
+        const recordMonth = recordDate.getMonth();
+        const recordYear = recordDate.getFullYear();
 
-        // Convert times to seconds for comparison
         const [prevMins, prevSecs] = prevRecord.time.split(':').map(Number);
         const [currentMins, currentSecs] = currentRecord.time.split(':').map(Number);
         
         const prevTimeInSeconds = prevMins * 60 + prevSecs;
         const currentTimeInSeconds = currentMins * 60 + currentSecs;
 
-        // If current time is better (smaller) than previous
         if (currentTimeInSeconds < prevTimeInSeconds) {
           const improvement = prevTimeInSeconds - currentTimeInSeconds;
-          totalImprovement += improvement;
-          improvementCount++;
+          
+          if (recordMonth === currentMonth && recordYear === currentYear) {
+            currentMonthImprovement += improvement;
+            currentMonthCount++;
+          } else if (recordMonth === lastMonth && recordYear === lastMonthYear) {
+            lastMonthImprovement += improvement;
+            lastMonthCount++;
+          }
         }
       }
     });
   });
 
-  return { 
-    totalImprovement: parseFloat(totalImprovement.toFixed(2)), 
-    improvementCount 
+  return {
+    currentMonth: {
+      totalImprovement: parseFloat(currentMonthImprovement.toFixed(2)),
+      improvementCount: currentMonthCount
+    },
+    lastMonth: {
+      totalImprovement: parseFloat(lastMonthImprovement.toFixed(2)),
+      improvementCount: lastMonthCount
+    }
   };
 };
 
@@ -261,7 +281,10 @@ export default function Dashboard() {
   const { days, hours } = nextCompetition 
     ? calculateTimeUntilCompetition(new Date(nextCompetition.date))
     : { days: 0, hours: 0 };
-  const { totalImprovement, improvementCount } = records ? calculateTimeImprovement(records) : { totalImprovement: 0, improvementCount: 0 };
+  const { currentMonth, lastMonth } = records ? calculateTimeImprovement(records) : {
+    currentMonth: { totalImprovement: 0, improvementCount: 0 },
+    lastMonth: { totalImprovement: 0, improvementCount: 0 }
+  };
 
   const competition = competitions?.find(c => c.id === editingCompetition);
 
@@ -385,13 +408,25 @@ export default function Dashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-center">
-                  <p className="text-3xl font-bold text-primary mb-2">
-                    {totalImprovement}秒
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    合計タイム短縮 ({improvementCount}回の更新)
-                  </p>
+                <div className="space-y-4">
+                  <div className="text-center">
+                    <p className="text-sm text-muted-foreground mb-1">今月の記録更新</p>
+                    <p className="text-2xl font-bold text-primary">
+                      {currentMonth.totalImprovement}秒
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      ({currentMonth.improvementCount}回の更新)
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm text-muted-foreground mb-1">先月の記録更新</p>
+                    <p className="text-2xl font-bold text-primary">
+                      {lastMonth.totalImprovement}秒
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      ({lastMonth.improvementCount}回の更新)
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -464,44 +499,38 @@ export default function Dashboard() {
         </div>
       </main>
 
-      {competition !== undefined && (
-        <EditCompetitionForm
-          competition={competition}
-          isOpen={!!editingCompetition}
-          onClose={() => setEditingCompetition(null)}
-          onSubmit={async (data) => {
-            if (editingCompetition === -1) {
-              await handleCreateCompetition(data);
-            } else {
-              await handleEditCompetition(editingCompetition, data);
-            }
-          }}
-        />
-      )}
-
-      <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+      <AlertDialog 
+        open={showLogoutDialog} 
+        onOpenChange={setShowLogoutDialog}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>ログアウトしますか？</AlertDialogTitle>
             <AlertDialogDescription>
-              セッションを終了します。再度ログインが必要になります。
+              セッションが終了し、ログイン画面に戻ります。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>キャンセル</AlertDialogCancel>
-            <AlertDialogAction onClick={handleLogout}>
+            <AlertDialogAction
+              onClick={handleLogout}
+              className="bg-primary hover:bg-primary/90"
+            >
               ログアウト
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={showDeleteAccountDialog} onOpenChange={setShowDeleteAccountDialog}>
+      <AlertDialog 
+        open={showDeleteAccountDialog} 
+        onOpenChange={setShowDeleteAccountDialog}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>アカウントを削除しますか？</AlertDialogTitle>
             <AlertDialogDescription>
-              この操作は取り消せません。アカウントとすべてのデータが完全に削除されます。
+              この操作は取り消せません。アカウントに関連するすべてのデータが削除されます。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -516,10 +545,27 @@ export default function Dashboard() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <UserPasswordList
-        isOpen={showPasswordList}
-        onClose={() => setShowPasswordList(false)}
-      />
+      {user?.role === 'coach' && (
+        <UserPasswordList 
+          isOpen={showPasswordList}
+          onClose={() => setShowPasswordList(false)}
+        />
+      )}
+
+      {competition && (
+        <EditCompetitionForm
+          competition={competition}
+          isOpen={!!editingCompetition}
+          onClose={() => setEditingCompetition(null)}
+          onSubmit={async (data) => {
+            if (editingCompetition === -1) {
+              await handleCreateCompetition(data);
+            } else {
+              await handleEditCompetition(editingCompetition, data);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
