@@ -61,18 +61,19 @@ const formatSeconds = (seconds: number): string => {
 
 const getLastMonthImprovements = (records: any[]) => {
   if (!records?.length) return [];
-
+  
   // Get last month's date range
   const now = new Date();
   const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1);
   const lastMonthStart = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1);
   const lastMonthEnd = new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 0);
 
-  // Group records by athlete and event type (style, distance, pool length)
-  const recordsByAthlete = records.reduce((acc, record) => {
+  // Group records by athlete and event type
+  const athleteRecords: { [key: string]: any[] } = {};
+  records.forEach(record => {
     const key = `${record.studentId}-${record.style}-${record.distance}-${record.poolLength}`;
-    if (!acc[key]) {
-      acc[key] = {
+    if (!athleteRecords[key]) {
+      athleteRecords[key] = {
         athleteName: record.athleteName,
         style: record.style,
         distance: record.distance,
@@ -80,56 +81,54 @@ const getLastMonthImprovements = (records: any[]) => {
         records: []
       };
     }
-    acc[key].records.push({
-      ...record,
-      timeInSeconds: convertTimeToSeconds(record.time)
-    });
-    return acc;
-  }, {});
+    athleteRecords[key].records.push(record);
+  });
 
   const improvements = [];
 
-  // Process each athlete's records
-  Object.values(recordsByAthlete).forEach((group: any) => {
+  // For each athlete's event records
+  Object.values(athleteRecords).forEach(group => {
     // Sort records by date
-    const sortedRecords = group.records.sort((a: any, b: any) => 
+    const sortedRecords = group.records.sort((a, b) => 
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
-    // Find records from last month
-    const lastMonthRecords = sortedRecords.filter((record: any) => {
-      const recordDate = new Date(record.date);
-      return recordDate >= lastMonthStart && recordDate <= lastMonthEnd;
-    });
+    // Process last month's records
+    sortedRecords.forEach(currentRecord => {
+      const recordDate = new Date(currentRecord.date);
+      
+      // Check if record is from last month
+      if (recordDate >= lastMonthStart && recordDate <= lastMonthEnd) {
+        // Find previous best time (before this record)
+        const previousRecords = sortedRecords.filter(r => 
+          new Date(r.date) < recordDate
+        );
 
-    // For each record from last month, check if it's a personal best
-    lastMonthRecords.forEach((currentRecord: any) => {
-      // Find previous best time before this record
-      const previousRecords = sortedRecords.filter((r: any) => 
-        new Date(r.date) < new Date(currentRecord.date)
-      );
+        if (previousRecords.length > 0) {
+          const previousBest = previousRecords.reduce((best, record) => 
+            convertTimeToSeconds(record.time) < convertTimeToSeconds(best.time) ? record : best
+          );
 
-      if (previousRecords.length > 0) {
-        const previousBest = Math.min(...previousRecords.map((r: any) => r.timeInSeconds));
-        const improvement = previousBest - currentRecord.timeInSeconds;
+          const currentTime = convertTimeToSeconds(currentRecord.time);
+          const bestTime = convertTimeToSeconds(previousBest.time);
 
-        if (improvement > 0) {  // Only include actual improvements
-          improvements.push({
-            athleteName: group.athleteName,
-            style: group.style,
-            distance: group.distance,
-            poolLength: group.poolLength,
-            newTime: currentRecord.time,
-            improvement: improvement.toFixed(2),
-            date: currentRecord.date,
-            previousBest: formatSeconds(previousBest)
-          });
+          if (currentTime < bestTime) {
+            improvements.push({
+              athleteName: group.athleteName,
+              style: group.style,
+              distance: group.distance,
+              poolLength: group.poolLength,
+              newTime: currentRecord.time,
+              previousBest: previousBest.time,
+              improvement: (bestTime - currentTime).toFixed(2),
+              date: currentRecord.date
+            });
+          }
         }
       }
     });
   });
 
-  // Sort improvements by amount (largest first)
   return improvements.sort((a, b) => Number(b.improvement) - Number(a.improvement));
 };
 
