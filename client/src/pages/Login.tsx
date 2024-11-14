@@ -25,19 +25,9 @@ export default function Login() {
   const { 
     login, 
     isAuthenticated, 
-    isLoading,
     isLoginPending,
     error: authError 
   } = useUser();
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      console.log('[Login] User is authenticated, navigating to dashboard');
-      navigate('/');
-    } else {
-      console.log('[Login] Not authenticated, showing login page');
-    }
-  }, [isAuthenticated, navigate]);
   
   const form = useForm({
     resolver: zodResolver(insertUserSchema),
@@ -47,18 +37,31 @@ export default function Login() {
     },
   });
 
+  useEffect(() => {
+    if (isAuthenticated) {
+      console.log('[Login] User is authenticated, forcing navigation to dashboard');
+      // Force navigation after authentication is confirmed
+      setTimeout(() => {
+        navigate('/');
+      }, 100);
+    }
+  }, [isAuthenticated, navigate]);
+
   async function onSubmit(values: { username: string; password: string }) {
     try {
       console.log('[Login] Attempting login');
       const result = await login(values);
       
       if (result.ok) {
-        console.log('[Login] Login successful');
+        console.log('[Login] Login successful, preparing navigation');
         toast({
           title: "ログイン成功",
           description: "ダッシュボードに移動します",
         });
-        navigate('/');
+        // Force navigation on successful login
+        setTimeout(() => {
+          navigate('/');
+        }, 100);
       } else {
         console.log('[Login] Login failed:', result.message);
         if (result.errors) {
@@ -86,30 +89,12 @@ export default function Login() {
     }
   }
 
-  if (isLoading || isLoginPending) {
+  if (isLoginPending) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="flex flex-col items-center gap-2">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p className="text-sm text-muted-foreground">認証中...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Add error boundary
-  if (authError) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="text-center">
-          <p className="text-red-500">エラーが発生しました</p>
-          <Button
-            variant="ghost"
-            onClick={() => window.location.reload()}
-            className="mt-4"
-          >
-            再読み込み
-          </Button>
         </div>
       </div>
     );
