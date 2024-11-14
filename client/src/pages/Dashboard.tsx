@@ -64,7 +64,7 @@ const calculateTimeImprovement = (records: any[]) => {
   const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
   const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
 
-  // Group records by athlete and type
+  // Group records by student and event type
   const groupedRecords: { [key: string]: any[] } = {};
   records.forEach(record => {
     const key = `${record.studentId}-${record.style}-${record.distance}-${record.poolLength}`;
@@ -79,21 +79,55 @@ const calculateTimeImprovement = (records: any[]) => {
   let lastMonthImprovement = 0;
   let lastMonthCount = 0;
 
-  // Process each group
+  // Process each group (student-event combination)
   Object.values(groupedRecords).forEach(group => {
     // Sort records by date
     const sortedRecords = group.sort((a, b) => 
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
-    // For each record, compare with previous best
+    // For each record, find the best previous time
     for (let i = 0; i < sortedRecords.length; i++) {
       const currentRecord = sortedRecords[i];
       const recordDate = new Date(currentRecord.date);
       const recordMonth = recordDate.getMonth();
       const recordYear = recordDate.getFullYear();
 
-      // Find previous best time (all records before current)
+      if (recordMonth !== currentMonth || recordYear !== currentYear) continue;
+
+      // Find best time before this record
+      let previousBest = null;
+      for (let j = 0; j < i; j++) {
+        const prevRecord = sortedRecords[j];
+        if (!previousBest || convertTimeToSeconds(prevRecord.time) < convertTimeToSeconds(previousBest.time)) {
+          previousBest = prevRecord;
+        }
+      }
+
+      if (previousBest) {
+        const prevTimeInSeconds = convertTimeToSeconds(previousBest.time);
+        const currentTimeInSeconds = convertTimeToSeconds(currentRecord.time);
+
+        if (currentTimeInSeconds < prevTimeInSeconds) {
+          // Record is an improvement over previous best
+          const improvement = prevTimeInSeconds - currentTimeInSeconds;
+          if (recordMonth === currentMonth && recordYear === currentYear) {
+            currentMonthImprovement += improvement;
+            currentMonthCount++;
+          }
+        }
+      }
+    }
+
+    // Same process for last month
+    for (let i = 0; i < sortedRecords.length; i++) {
+      const currentRecord = sortedRecords[i];
+      const recordDate = new Date(currentRecord.date);
+      const recordMonth = recordDate.getMonth();
+      const recordYear = recordDate.getFullYear();
+
+      if (recordMonth !== lastMonth || recordYear !== lastMonthYear) continue;
+
       let previousBest = null;
       for (let j = 0; j < i; j++) {
         const prevRecord = sortedRecords[j];
@@ -108,14 +142,8 @@ const calculateTimeImprovement = (records: any[]) => {
 
         if (currentTimeInSeconds < prevTimeInSeconds) {
           const improvement = prevTimeInSeconds - currentTimeInSeconds;
-          
-          if (recordMonth === currentMonth && recordYear === currentYear) {
-            currentMonthImprovement += improvement;
-            currentMonthCount++;
-          } else if (recordMonth === lastMonth && recordYear === lastMonthYear) {
-            lastMonthImprovement += improvement;
-            lastMonthCount++;
-          }
+          lastMonthImprovement += improvement;
+          lastMonthCount++;
         }
       }
     }
