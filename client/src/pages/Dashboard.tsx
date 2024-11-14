@@ -261,20 +261,14 @@ export default function Dashboard() {
         body: JSON.stringify(data),
         credentials: 'include'
       });
-      
-      const responseData = await response.text();
-      let errorMessage = "大会の作成に失敗しました";
-      
+
+      const errorText = await response.text();
+      console.error('Competition creation response:', errorText);
+
       if (!response.ok) {
-        try {
-          const errorJson = JSON.parse(responseData);
-          errorMessage = errorJson.message || errorMessage;
-        } catch {
-          errorMessage = responseData || errorMessage;
-        }
-        throw new Error(errorMessage);
+        throw new Error(errorText);
       }
-      
+
       await mutateCompetitions();
       setEditingCompetition(null);
       toast({
@@ -573,6 +567,21 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           </div>
+
+          {user?.role === 'coach' && (
+            <div className="flex justify-end mt-4">
+              <Button
+                onClick={() => {
+                  console.log('Opening new competition form');
+                  setEditingCompetition(0);
+                }}
+                className="text-sm"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                大会追加
+              </Button>
+            </div>
+          )}
         </div>
       </main>
 

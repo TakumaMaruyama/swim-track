@@ -8,19 +8,13 @@ import path from "path";
 import fs from "fs/promises";
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { scrypt, timingSafeEqual, randomBytes } from "crypto";
-import { promisify } from "util";
+import { existsSync } from 'fs';
 
-const scryptAsync = promisify(scrypt);
-const SALT_LENGTH = 32;
-const HASH_LENGTH = 64;
-
-// Fix for ES modules __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Create uploads directory if it doesn't exist
-const uploadsDir = path.join(dirname(__filename), '..', 'uploads');
+const uploadsDir = path.join(__dirname, '..', 'uploads');
 fs.mkdir(uploadsDir, { recursive: true }).catch(console.error);
 
 const storage = multer.diskStorage({
@@ -66,6 +60,28 @@ export function registerRoutes(app: Express) {
     next();
   };
 
+  // User passwords endpoint
+  app.get("/api/users/passwords", requireAuth, requireCoach, async (req, res) => {
+    try {
+      console.log('Fetching user passwords');
+      const allUsers = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          role: users.role,
+          isActive: users.isActive
+        })
+        .from(users)
+        .orderBy(desc(users.createdAt));
+
+      console.log('Found users:', allUsers.length);
+      res.json(allUsers);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      res.status(500).json({ message: "ユーザー情報の取得に失敗しました" });
+    }
+  });
+
   // Document management endpoints
   app.post("/api/documents/upload", requireAuth, requireCoach, upload.single("file"), async (req, res) => {
     try {
@@ -98,6 +114,8 @@ export function registerRoutes(app: Express) {
   app.get("/api/documents/:id/download", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
+      console.log('Attempting to download document:', id);
+
       const [doc] = await db
         .select()
         .from(documents)
@@ -105,14 +123,31 @@ export function registerRoutes(app: Express) {
         .limit(1);
 
       if (!doc) {
+        console.log('Document not found:', id);
         return res.status(404).json({ message: "ドキュメントが見つかりません" });
       }
 
-      const filePath = path.join(uploadsDir, doc.filename);
-      res.download(filePath, doc.filename);
+      const filePath = path.join(__dirname, '..', 'uploads', doc.filename);
+      console.log('File path:', filePath);
+
+      if (!existsSync(filePath)) {
+        console.error('File not found at path:', filePath);
+        return res.status(404).json({ message: "ファイルが見つかりません" });
+      }
+
+      res.download(filePath, doc.filename, (err) => {
+        if (err) {
+          console.error('Download error:', err);
+          if (!res.headersSent) {
+            res.status(500).json({ message: "ダウンロードに失敗しました" });
+          }
+        }
+      });
     } catch (error) {
       console.error('Error downloading document:', error);
-      res.status(500).json({ message: "ファイルのダウンロードに失敗しました" });
+      if (!res.headersSent) {
+        res.status(500).json({ message: "ファイルのダウンロードに失敗しました" });
+      }
     }
   });
 
@@ -138,7 +173,6 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ message: "名前、日付、場所は必須です" });
       }
 
-      // Validate date format
       const parsedDate = new Date(date);
       if (isNaN(parsedDate.getTime())) {
         return res.status(400).json({ message: "無効な日付形式です" });
@@ -149,16 +183,14 @@ export function registerRoutes(app: Express) {
         .values({
           name: name.trim(),
           date: parsedDate,
-          location: location.trim(),
+          location: location.trim()
         })
         .returning();
 
       res.json(competition);
     } catch (error) {
       console.error('Error creating competition:', error);
-      res.status(500).json({ 
-        message: error instanceof Error ? error.message : "大会の作成に失敗しました" 
-      });
+      res.status(500).json({ message: error instanceof Error ? error.message : "大会の作成に失敗しました" });
     }
   });
 
@@ -166,12 +198,11 @@ export function registerRoutes(app: Express) {
     try {
       const { id } = req.params;
       const { name, date, location } = req.body;
-      
+
       if (!name || !date || !location) {
         return res.status(400).json({ message: "名前、日付、場所は必須です" });
       }
 
-      // Validate date format
       const parsedDate = new Date(date);
       if (isNaN(parsedDate.getTime())) {
         return res.status(400).json({ message: "無効な日付形式です" });
@@ -182,7 +213,7 @@ export function registerRoutes(app: Express) {
         .set({
           name: name.trim(),
           date: parsedDate,
-          location: location.trim(),
+          location: location.trim()
         })
         .where(eq(competitions.id, parseInt(id)))
         .returning();
@@ -194,9 +225,7 @@ export function registerRoutes(app: Express) {
       res.json(competition);
     } catch (error) {
       console.error('Error updating competition:', error);
-      res.status(500).json({ 
-        message: error instanceof Error ? error.message : "大会の更新に失敗しました" 
-      });
+      res.status(500).json({ message: error instanceof Error ? error.message : "大会の更新に失敗しました" });
     }
   });
 
@@ -216,9 +245,7 @@ export function registerRoutes(app: Express) {
       res.json({ message: "大会を削除しました" });
     } catch (error) {
       console.error('Error deleting competition:', error);
-      res.status(500).json({ 
-        message: error instanceof Error ? error.message : "大会の削除に失敗しました" 
-      });
+      res.status(500).json({ message: error instanceof Error ? error.message : "大会の削除に失敗しました" });
     }
   });
 }
