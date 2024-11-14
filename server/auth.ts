@@ -15,7 +15,7 @@ const SALT_LENGTH = 32;
 const HASH_LENGTH = 64;
 
 const crypto = {
-  hash: async (password: string) => {
+  hash: async (password: string): Promise<string> => {
     try {
       const salt = randomBytes(SALT_LENGTH);
       const hash = (await scryptAsync(password, salt, HASH_LENGTH)) as Buffer;
@@ -49,20 +49,20 @@ declare global {
 export function setupAuth(app: Express) {
   const MemoryStore = createMemoryStore(session);
   const sessionSettings: session.SessionOptions = {
-    secret: process.env.REPL_ID || "porygon-supremacy",
+    secret: process.env.REPL_ID || "swimtrack-secret",
     resave: false,
-    saveUninitialized: false,
+    saveUninitialized: true,
     store: new MemoryStore({
       checkPeriod: 86400000 // prune expired entries every 24h
     }),
     cookie: {
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
       httpOnly: true,
-      secure: false, // Set to false for development
-      sameSite: 'lax',
-      path: '/'
+      secure: false,
+      sameSite: 'lax'
     },
-    name: 'swimtrack.sid' // Custom session ID name
+    name: 'swimtrack.sid',
+    rolling: true
   };
 
   app.use(session(sessionSettings));
@@ -160,6 +160,66 @@ export function setupAuth(app: Express) {
     })(req, res, next);
   });
 
+  app.post("/register", async (req, res) => {
+    try {
+      console.log('[Auth] Processing registration request');
+      const { username, password, role } = req.body;
+
+      // Validate input using schema
+      const parseResult = insertUserSchema.safeParse({ username, password, role });
+      if (!parseResult.success) {
+        return res.status(400).json({
+          message: "入力が正しくありません",
+          errors: parseResult.error.flatten().fieldErrors
+        });
+      }
+
+      // Check if username already exists
+      const existingUser = await db
+        .select()
+        .from(users)
+        .where(eq(users.username, username))
+        .limit(1);
+
+      if (existingUser.length > 0) {
+        return res.status(400).json({
+          message: "このユーザー名は既に使用されています",
+          field: "username"
+        });
+      }
+
+      // Hash password and create user
+      const hashedPassword = await crypto.hash(password);
+      const [user] = await db
+        .insert(users)
+        .values({
+          username,
+          password: hashedPassword,
+          role
+        })
+        .returning();
+
+      console.log('[Auth] Registration successful for user:', username);
+      res.status(201).json({
+        message: "アカウントが作成されました",
+        user: { id: user.id, username: user.username, role: user.role }
+      });
+    } catch (error) {
+      console.error('[Auth] Registration error:', error);
+      res.status(500).json({ message: "アカウントの作成に失敗しました" });
+    }
+  });
+
+  app.get("/api/user", (req, res) => {
+    console.log('[Auth] Checking session state:', req.isAuthenticated());
+    if (req.isAuthenticated() && req.user) {
+      console.log('[Auth] User session validated:', req.user.id);
+      return res.json(req.user);
+    }
+    console.log('[Auth] No valid session found');
+    res.status(401).json({ message: "認証が必要です" });
+  });
+
   app.post("/logout", (req, res) => {
     const username = req.user?.username;
     console.log('[Auth] Processing logout request for user:', username);
@@ -178,15 +238,5 @@ export function setupAuth(app: Express) {
         res.json({ message: "ログアウトしました" });
       });
     });
-  });
-
-  app.get("/api/user", (req, res) => {
-    console.log('[Auth] Checking session state:', req.isAuthenticated());
-    if (req.isAuthenticated() && req.user) {
-      console.log('[Auth] User session validated:', req.user.id);
-      return res.json(req.user);
-    }
-    console.log('[Auth] No valid session found');
-    res.status(401).json({ message: "認証が必要です" });
   });
 }

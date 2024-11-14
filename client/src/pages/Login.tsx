@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
 import { insertUserSchema } from "db/schema";
 import { useEffect } from "react";
+import { mutate } from "swr";
 
 export default function Login() {
   const [, navigate] = useLocation();
@@ -29,6 +30,18 @@ export default function Login() {
     isLoginPending,
     error: authError 
   } = useUser();
+
+  useEffect(() => {
+    // Clear any existing session data on mount
+    mutate("/api/user", undefined, false);
+    
+    if (isAuthenticated) {
+      console.log('[Login] User is authenticated, navigating to dashboard');
+      navigate('/');
+    } else {
+      console.log('[Login] Not authenticated, showing login page');
+    }
+  }, [isAuthenticated, navigate]);
   
   const form = useForm({
     resolver: zodResolver(insertUserSchema),
@@ -37,17 +50,6 @@ export default function Login() {
       password: "",
     },
   });
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      console.log('[Login] Not authenticated, showing login page');
-    }
-
-    if (isAuthenticated) {
-      console.log('[Login] User is authenticated, navigating to dashboard');
-      navigate('/');
-    }
-  }, [isLoading, isAuthenticated, navigate]);
 
   async function onSubmit(values: { username: string; password: string }) {
     try {

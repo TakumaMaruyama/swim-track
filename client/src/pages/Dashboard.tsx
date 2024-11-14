@@ -3,14 +3,12 @@ import { Button } from "@/components/ui/button";
 import {
   TrendingDown,
   Plus,
-  UserX,
   Key,
   ClipboardList,
   LogOut
 } from 'lucide-react';
 import { useUser } from "../hooks/use-user";
 import { useLocation } from "wouter";
-import { StudentPasswordList } from "@/components/StudentPasswordList";
 import { UserPasswordList } from "@/components/UserPasswordList";
 import { useSwimRecords, type ExtendedSwimRecord } from "../hooks/use-swim-records";
 import { useCompetitions } from "../hooks/use-competitions";
@@ -27,6 +25,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 
 interface Improvement {
   athleteName: string;
@@ -44,65 +43,73 @@ const convertTimeToSeconds = (time: string) => {
   return minutes * 60 + seconds;
 };
 
-const calculateImprovements = (records: ExtendedSwimRecord[] | undefined, targetYear: number = 2024, targetMonth: number = 9): Improvement[] => {
+const formatTimeImprovement = (seconds: number) => {
+  const minutes = Math.floor(Math.abs(seconds) / 60);
+  const remainingSeconds = (Math.abs(seconds) % 60).toFixed(2);
+  return `${minutes}:${remainingSeconds.padStart(5, '0')}`;
+};
+
+const calculateImprovements = (records: ExtendedSwimRecord[] | undefined, monthOffset: number = 0): Improvement[] => {
   if (!records?.length) return [];
 
-  const monthStart = new Date(targetYear, targetMonth, 1);
-  const monthEnd = new Date(targetYear, targetMonth + 1, 0);
-
-  console.log('Date range:', {
-    start: monthStart.toISOString(),
-    end: monthEnd.toISOString()
-  });
+  const now = new Date();
+  const targetMonth = new Date(now.getFullYear(), now.getMonth() - monthOffset, 1);
+  const monthStart = new Date(targetMonth.getFullYear(), targetMonth.getMonth(), 1);
+  const monthEnd = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0, 23, 59, 59, 999);
 
   // Group records by athlete and event type
-  const athleteRecords = records.reduce((acc, record) => {
+  const recordsByAthlete = records.reduce((acc, record) => {
     if (!record.date || !record.athleteName) return acc;
     
     const key = `${record.studentId}-${record.style}-${record.distance}-${record.poolLength}`;
     if (!acc[key]) {
       acc[key] = {
         records: [],
-        athleteName: record.athleteName
+        athleteName: record.athleteName,
+        style: record.style,
+        distance: record.distance,
+        poolLength: record.poolLength
       };
     }
     acc[key].records.push(record);
     return acc;
-  }, {} as { [key: string]: { records: ExtendedSwimRecord[], athleteName: string } });
+  }, {} as { [key: string]: { 
+    records: ExtendedSwimRecord[], 
+    athleteName: string,
+    style: string,
+    distance: number,
+    poolLength: number
+  }});
 
   const improvements: Improvement[] = [];
 
-  Object.entries(athleteRecords).forEach(([key, { records: athleteRecords, athleteName }]) => {
-    // Sort records by date
-    const sortedRecords = [...athleteRecords].sort((a, b) => 
-      new Date(a.date!).getTime() - new Date(b.date!).getTime()
-    );
-    
-    // Find records in target month
-    const monthRecords = sortedRecords.filter(record => {
+  // Process each athlete's records
+  Object.values(recordsByAthlete).forEach(({ records: athleteRecords, athleteName, style, distance, poolLength }) => {
+    // Get records from the target month
+    const monthRecords = athleteRecords.filter(record => {
       const recordDate = new Date(record.date!);
       return recordDate >= monthStart && recordDate <= monthEnd;
     });
 
-    console.log('Records found:', {
-      total: sortedRecords.length,
-      inMonth: monthRecords.length,
-      forAthlete: athleteName
-    });
+    // Sort all records chronologically
+    const sortedRecords = [...athleteRecords].sort((a, b) => 
+      new Date(a.date!).getTime() - new Date(b.date!).getTime()
+    );
 
+    // Process each record from the target month
     monthRecords.forEach(currentRecord => {
-      // Find previous records (before this record)
+      // Find all previous records (before this record)
       const previousRecords = sortedRecords.filter(r => 
         new Date(r.date!) < new Date(currentRecord.date!)
       );
-      
+
       if (previousRecords.length > 0) {
-        // Find previous best time
+        // Find personal best among previous records
         const previousBest = previousRecords.reduce((best, record) => {
           const bestTime = convertTimeToSeconds(best.time);
           const recordTime = convertTimeToSeconds(record.time);
           return recordTime < bestTime ? record : best;
-        }, previousRecords[0]);
+        });
 
         const currentTime = convertTimeToSeconds(currentRecord.time);
         const bestTime = convertTimeToSeconds(previousBest.time);
@@ -111,12 +118,12 @@ const calculateImprovements = (records: ExtendedSwimRecord[] | undefined, target
         if (currentTime < bestTime) {
           improvements.push({
             athleteName,
-            style: currentRecord.style,
-            distance: currentRecord.distance,
-            poolLength: currentRecord.poolLength,
+            style,
+            distance,
+            poolLength,
             previousBest: previousBest.time,
             newTime: currentRecord.time,
-            improvement: (bestTime - currentTime).toFixed(2),
+            improvement: formatTimeImprovement(bestTime - currentTime),
             date: new Date(currentRecord.date!)
           });
         }
@@ -124,24 +131,23 @@ const calculateImprovements = (records: ExtendedSwimRecord[] | undefined, target
     });
   });
 
-  // Sort improvements by amount (largest improvement first)
-  return improvements.sort((a, b) => parseFloat(b.improvement) - parseFloat(a.improvement));
+  // Sort improvements by date (most recent first)
+  return improvements.sort((a, b) => b.date.getTime() - a.date.getTime());
 };
 
 export default function Dashboard() {
-  const { user, logout, isLoading: userLoading } = useUser();
+  const { user, logout } = useUser();
   const [, navigate] = useLocation();
-  const { records, isLoading: recordsLoading } = useSwimRecords();
-  const { competitions, isLoading: competitionsLoading, mutate: mutateCompetitions } = useCompetitions();
+  const { records } = useSwimRecords();
+  const { competitions, mutate: mutateCompetitions } = useCompetitions();
   const { toast } = useToast();
-  const [showPasswordList, setShowPasswordList] = useState(false);
   const [showUserPasswordList, setShowUserPasswordList] = useState(false);
   const [editingCompetition, setEditingCompetition] = useState<number>(0);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-  // Update improvement calculations to use fixed October 2024
-  const currentMonthImprovements = calculateImprovements(records, 2024, 9); // October 2024
-  const lastMonthImprovements = calculateImprovements(records, 2024, 8); // September 2024
+  // Calculate improvements for current and last month
+  const currentMonthImprovements = calculateImprovements(records, 0);
+  const lastMonthImprovements = calculateImprovements(records, 1);
 
   const handleLogout = async () => {
     const result = await logout();
@@ -237,10 +243,6 @@ export default function Dashboard() {
       });
     }
   };
-
-  if (userLoading || recordsLoading || competitionsLoading) {
-    return <div className="flex items-center justify-center min-h-screen">読み込み中...</div>;
-  }
 
   if (!user) return null;
 
@@ -392,18 +394,30 @@ export default function Dashboard() {
                           key={index}
                           className="p-3 rounded-lg bg-muted/50"
                         >
-                          <div className="flex justify-between items-center">
+                          <div className="flex justify-between items-start">
                             <div>
-                              <div className="font-medium">{imp.athleteName}</div>
-                              <div className="text-sm text-muted-foreground">
-                                {imp.style} {imp.distance}m ({imp.poolLength}mプール)
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{imp.athleteName}</span>
+                                <Badge variant="outline">
+                                  {imp.style} {imp.distance}m
+                                </Badge>
+                                <Badge variant="secondary">
+                                  {imp.poolLength}mプール
+                                </Badge>
                               </div>
-                              <div className="text-sm">
-                                {imp.previousBest} → {imp.newTime} ({imp.improvement}秒更新)
+                              <div className="text-sm mt-1">
+                                <span className="text-muted-foreground">
+                                  {imp.previousBest}
+                                </span>
+                                {" → "}
+                                <span className="font-medium">{imp.newTime}</span>
+                                <span className="text-green-600 ml-2">
+                                  ({imp.improvement}秒更新)
+                                </span>
                               </div>
                             </div>
                             <div className="text-sm text-muted-foreground">
-                              {new Date(imp.date).toLocaleDateString()}
+                              {imp.date.toLocaleDateString()}
                             </div>
                           </div>
                         </div>
@@ -426,18 +440,30 @@ export default function Dashboard() {
                           key={index}
                           className="p-3 rounded-lg bg-muted/50"
                         >
-                          <div className="flex justify-between items-center">
+                          <div className="flex justify-between items-start">
                             <div>
-                              <div className="font-medium">{imp.athleteName}</div>
-                              <div className="text-sm text-muted-foreground">
-                                {imp.style} {imp.distance}m ({imp.poolLength}mプール)
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{imp.athleteName}</span>
+                                <Badge variant="outline">
+                                  {imp.style} {imp.distance}m
+                                </Badge>
+                                <Badge variant="secondary">
+                                  {imp.poolLength}mプール
+                                </Badge>
                               </div>
-                              <div className="text-sm">
-                                {imp.previousBest} → {imp.newTime} ({imp.improvement}秒更新)
+                              <div className="text-sm mt-1">
+                                <span className="text-muted-foreground">
+                                  {imp.previousBest}
+                                </span>
+                                {" → "}
+                                <span className="font-medium">{imp.newTime}</span>
+                                <span className="text-green-600 ml-2">
+                                  ({imp.improvement}秒更新)
+                                </span>
                               </div>
                             </div>
                             <div className="text-sm text-muted-foreground">
-                              {new Date(imp.date).toLocaleDateString()}
+                              {imp.date.toLocaleDateString()}
                             </div>
                           </div>
                         </div>
@@ -455,11 +481,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <StudentPasswordList
-        isOpen={showPasswordList}
-        onClose={() => setShowPasswordList(false)}
-      />
-
       <UserPasswordList
         isOpen={showUserPasswordList}
         onClose={() => setShowUserPasswordList(false)}
@@ -470,15 +491,17 @@ export default function Dashboard() {
         onClose={() => setEditingCompetition(0)}
         onSubmit={editingCompetition === -1 ? handleCreateCompetition : handleUpdateCompetition}
         competition={competition}
-        competitionId={editingCompetition}
       />
 
-      <AlertDialog open={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
+      <AlertDialog 
+        open={showLogoutConfirm} 
+        onOpenChange={setShowLogoutConfirm}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>ログアウトしますか？</AlertDialogTitle>
             <AlertDialogDescription>
-              セッションを終了してログアウトします。
+              ログアウトすると、再度ログインが必要になります。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
