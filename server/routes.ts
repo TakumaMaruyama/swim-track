@@ -3,9 +3,10 @@ import { setupAuth } from "./auth";
 import multer from "multer";
 import { db } from "db";
 import { documents, users, swimRecords, competitions, categories } from "db/schema";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import path from "path";
 import fs from "fs/promises";
+import { createReadStream } from "fs";
 import { scrypt, timingSafeEqual, randomBytes } from "crypto";
 import { promisify } from "util";
 
@@ -14,11 +15,31 @@ const scryptAsync = promisify(scrypt);
 const SALT_LENGTH = 32;
 const HASH_LENGTH = 64;
 
+// Ensure uploads directory exists and persists
+const UPLOAD_DIR = path.join(process.cwd(), "uploads");
+
+const initializeUploadDirectory = async () => {
+  try {
+    await fs.access(UPLOAD_DIR);
+  } catch {
+    await fs.mkdir(UPLOAD_DIR, { recursive: true });
+  }
+};
+
+// Initialize storage with error handling
 const storage = multer.diskStorage({
-  destination: "uploads/",
+  destination: async (req, file, cb) => {
+    try {
+      await initializeUploadDirectory();
+      cb(null, UPLOAD_DIR);
+    } catch (error) {
+      cb(error as Error, UPLOAD_DIR);
+    }
+  },
   filename: (req, file, cb) => {
     const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
-    cb(null, `${uniqueSuffix}-${file.originalname}`);
+    const safeFilename = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+    cb(null, `${uniqueSuffix}-${safeFilename}`);
   }
 });
 
@@ -35,6 +56,9 @@ const hashPassword = async (password: string): Promise<string> => {
 export function registerRoutes(app: Express) {
   setupAuth(app);
 
+  // Initialize upload directory when the server starts
+  initializeUploadDirectory().catch(console.error);
+
   // Ensure user is authenticated
   const requireAuth = (req: any, res: any, next: any) => {
     if (!req.isAuthenticated()) {
@@ -50,6 +74,122 @@ export function registerRoutes(app: Express) {
     }
     next();
   };
+
+  // Document download endpoint with proper error handling
+  app.get("/api/documents/:id/download", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const [document] = await db
+        .select()
+        .from(documents)
+        .where(eq(documents.id, parseInt(id)))
+        .limit(1);
+
+      if (!document) {
+        return res.status(404).json({ message: "ドキュメントが見つかりません" });
+      }
+
+      const filePath = path.join(UPLOAD_DIR, document.filename);
+
+      try {
+        await fs.access(filePath);
+      } catch (error) {
+        console.error(`File access error for ${filePath}:`, error);
+        return res.status(404).json({ message: "ファイルが見つかりません" });
+      }
+
+      res.setHeader('Content-Type', document.mimeType);
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(document.originalname || document.filename)}"`);
+      
+      const fileStream = createReadStream(filePath);
+      fileStream.pipe(res);
+
+      fileStream.on('error', (error) => {
+        console.error(`File streaming error for ${filePath}:`, error);
+        if (!res.headersSent) {
+          res.status(500).json({ message: "ファイルの読み込みに失敗しました" });
+        }
+      });
+    } catch (error) {
+      console.error('Document download error:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ message: "予期せぬエラーが発生しました" });
+      }
+    }
+  });
+
+  // Document upload endpoint with improved error handling
+  app.post("/api/documents/upload", requireAuth, requireCoach, upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "ファイルが選択されていません" });
+      }
+
+      const { title, categoryId } = req.body;
+      
+      const [document] = await db
+        .insert(documents)
+        .values({
+          title,
+          filename: req.file.filename,
+          mimeType: req.file.mimetype,
+          uploaderId: req.user!.id,
+          categoryId: categoryId === "none" ? null : parseInt(categoryId),
+        })
+        .returning();
+
+      res.json(document);
+    } catch (error) {
+      console.error('Document upload error:', error);
+      
+      // Clean up uploaded file if database operation fails
+      if (req.file) {
+        try {
+          await fs.unlink(path.join(UPLOAD_DIR, req.file.filename));
+        } catch (unlinkError) {
+          console.error('Error cleaning up uploaded file:', unlinkError);
+        }
+      }
+      
+      res.status(500).json({ message: "ドキュメントのアップロードに失敗しました" });
+    }
+  });
+
+  // Document deletion endpoint with proper cleanup
+  app.delete("/api/documents/:id", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const [document] = await db
+        .select()
+        .from(documents)
+        .where(eq(documents.id, parseInt(id)))
+        .limit(1);
+
+      if (!document) {
+        return res.status(404).json({ message: "ドキュメントが見つかりません" });
+      }
+
+      // Delete from database first
+      await db
+        .delete(documents)
+        .where(eq(documents.id, parseInt(id)));
+
+      // Then attempt to delete the file
+      try {
+        await fs.unlink(path.join(UPLOAD_DIR, document.filename));
+      } catch (unlinkError) {
+        console.error('Error deleting file:', unlinkError);
+        // Don't fail the request if file deletion fails
+      }
+
+      res.json({ message: "ドキュメントが削除されました" });
+    } catch (error) {
+      console.error('Document deletion error:', error);
+      res.status(500).json({ message: "ドキュメントの削除に失敗しました" });
+    }
+  });
 
   // Add password update endpoint
   app.put("/api/users/:id/password", requireAuth, requireCoach, async (req, res) => {
