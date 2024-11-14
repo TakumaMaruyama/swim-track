@@ -32,15 +32,18 @@ export default function Login() {
   } = useUser();
 
   useEffect(() => {
-    // Clear any existing session data on mount
+    // Ensure we start with a clean session
     mutate("/api/user", undefined, false);
     
-    if (isAuthenticated) {
-      console.log('[Login] User is authenticated, navigating to dashboard');
-      navigate('/');
-    } else {
-      console.log('[Login] Not authenticated, showing login page');
-    }
+    // Add delay to ensure state is cleared
+    setTimeout(() => {
+      if (isAuthenticated) {
+        console.log('[Login] User is authenticated, navigating to dashboard');
+        navigate('/');
+      } else {
+        console.log('[Login] Not authenticated, showing login page');
+      }
+    }, 100);
   }, [isAuthenticated, navigate]);
   
   const form = useForm({

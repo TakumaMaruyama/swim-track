@@ -412,19 +412,19 @@ export default function Dashboard() {
                                 {" → "}
                                 <span className="font-medium">{imp.newTime}</span>
                                 <span className="text-green-600 ml-2">
-                                  ({imp.improvement}秒更新)
+                                  (-{imp.improvement})
                                 </span>
                               </div>
                             </div>
-                            <div className="text-sm text-muted-foreground">
-                              {imp.date.toLocaleDateString()}
+                            <div className="text-sm text-muted-foreground text-right">
+                              {new Date(imp.date).toLocaleDateString('ja-JP')}
                             </div>
                           </div>
                         </div>
                       ))
                     ) : (
                       <div className="text-center text-muted-foreground">
-                        今月の更新はありません
+                        更新はありません
                       </div>
                     )}
                   </div>
@@ -458,19 +458,19 @@ export default function Dashboard() {
                                 {" → "}
                                 <span className="font-medium">{imp.newTime}</span>
                                 <span className="text-green-600 ml-2">
-                                  ({imp.improvement}秒更新)
+                                  (-{imp.improvement})
                                 </span>
                               </div>
                             </div>
-                            <div className="text-sm text-muted-foreground">
-                              {imp.date.toLocaleDateString()}
+                            <div className="text-sm text-muted-foreground text-right">
+                              {new Date(imp.date).toLocaleDateString('ja-JP')}
                             </div>
                           </div>
                         </div>
                       ))
                     ) : (
                       <div className="text-center text-muted-foreground">
-                        先月の更新はありません
+                        更新はありません
                       </div>
                     )}
                   </div>
@@ -478,40 +478,49 @@ export default function Dashboard() {
               </div>
             </CardContent>
           </Card>
+
+          {competition && (
+            <EditCompetitionForm
+              competition={competition}
+              onSubmit={handleUpdateCompetition}
+              onCancel={() => setEditingCompetition(0)}
+              onDelete={handleDeleteCompetition}
+            />
+          )}
+
+          {editingCompetition === -1 && (
+            <EditCompetitionForm
+              onSubmit={handleCreateCompetition}
+              onCancel={() => setEditingCompetition(0)}
+            />
+          )}
+
+          <UserPasswordList
+            isOpen={showUserPasswordList}
+            onClose={() => setShowUserPasswordList(false)}
+          />
+
+          <AlertDialog 
+            open={showLogoutConfirm} 
+            onOpenChange={setShowLogoutConfirm}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>ログアウトしますか？</AlertDialogTitle>
+                <AlertDialogDescription>
+                  ログアウトするとセッションが終了します
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                <AlertDialogAction onClick={handleLogout}>
+                  ログアウト
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
-
-      <UserPasswordList
-        isOpen={showUserPasswordList}
-        onClose={() => setShowUserPasswordList(false)}
-      />
-
-      <EditCompetitionForm
-        isOpen={editingCompetition !== 0}
-        onClose={() => setEditingCompetition(0)}
-        onSubmit={editingCompetition === -1 ? handleCreateCompetition : handleUpdateCompetition}
-        competition={competition}
-      />
-
-      <AlertDialog 
-        open={showLogoutConfirm} 
-        onOpenChange={setShowLogoutConfirm}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>ログアウトしますか？</AlertDialogTitle>
-            <AlertDialogDescription>
-              ログアウトすると、再度ログインが必要になります。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>キャンセル</AlertDialogCancel>
-            <AlertDialogAction onClick={handleLogout}>
-              ログアウト
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }

@@ -29,14 +29,18 @@ export function useUser() {
 
   const { 
     data: user, 
-    error: swrError,
-    isLoading: swrLoading,
+    error: swrError, 
+    isLoading: swrLoading, 
     mutate 
   } = useSWR<User>("/api/user", {
-    revalidateOnFocus: true,
-    revalidateOnReconnect: true,
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
     shouldRetryOnError: false,
-    dedupingInterval: 5000
+    dedupingInterval: 0,
+    onError: () => {
+      console.log('[Auth] Session validation failed, clearing user data');
+      mutate(undefined, false);
+    }
   });
 
   const login = useCallback(async (credentials: InsertUser): Promise<AuthResult> => {
