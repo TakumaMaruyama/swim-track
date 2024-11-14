@@ -1,4 +1,3 @@
-{/* Updated version of Dashboard.tsx with changes */}
 import React, { useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -47,6 +46,12 @@ const calculateTimeUntilCompetition = (competitionDate: Date) => {
   return { days, hours };
 };
 
+// Helper function to convert MM:SS.ss to seconds
+const convertTimeToSeconds = (time: string) => {
+  const [minutes, seconds] = time.split(':').map(Number);
+  return minutes * 60 + seconds;
+};
+
 const calculateTimeImprovement = (records: any[]) => {
   if (!records || records.length === 0) return {
     currentMonth: { totalImprovement: 0, improvementCount: 0 },
@@ -59,13 +64,14 @@ const calculateTimeImprovement = (records: any[]) => {
   const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
   const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
 
-  // Group records by athlete
-  const athleteRecords: { [key: string]: any[] } = {};
+  // Group records by athlete and type
+  const groupedRecords: { [key: string]: any[] } = {};
   records.forEach(record => {
-    if (!athleteRecords[record.studentId]) {
-      athleteRecords[record.studentId] = [];
+    const key = `${record.studentId}-${record.style}-${record.distance}-${record.poolLength}`;
+    if (!groupedRecords[key]) {
+      groupedRecords[key] = [];
     }
-    athleteRecords[record.studentId].push(record);
+    groupedRecords[key].push(record);
   });
 
   let currentMonthImprovement = 0;
@@ -73,33 +79,32 @@ const calculateTimeImprovement = (records: any[]) => {
   let lastMonthImprovement = 0;
   let lastMonthCount = 0;
 
-  Object.values(athleteRecords).forEach(records => {
-    const typeGroups: { [key: string]: any[] } = {};
-    records.forEach(record => {
-      const key = `${record.style}-${record.distance}-${record.poolLength}`;
-      if (!typeGroups[key]) {
-        typeGroups[key] = [];
+  // Process each group
+  Object.values(groupedRecords).forEach(group => {
+    // Sort records by date
+    const sortedRecords = group.sort((a, b) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+
+    // For each record, compare with previous best
+    for (let i = 0; i < sortedRecords.length; i++) {
+      const currentRecord = sortedRecords[i];
+      const recordDate = new Date(currentRecord.date);
+      const recordMonth = recordDate.getMonth();
+      const recordYear = recordDate.getFullYear();
+
+      // Find previous best time (all records before current)
+      let previousBest = null;
+      for (let j = 0; j < i; j++) {
+        const prevRecord = sortedRecords[j];
+        if (!previousBest || convertTimeToSeconds(prevRecord.time) < convertTimeToSeconds(previousBest.time)) {
+          previousBest = prevRecord;
+        }
       }
-      typeGroups[key].push(record);
-    });
 
-    Object.values(typeGroups).forEach(group => {
-      const sortedRecords = group.sort((a, b) => 
-        new Date(a.date).getTime() - new Date(b.date).getTime()
-      );
-
-      for (let i = 1; i < sortedRecords.length; i++) {
-        const prevRecord = sortedRecords[i - 1];
-        const currentRecord = sortedRecords[i];
-        const recordDate = new Date(currentRecord.date);
-        const recordMonth = recordDate.getMonth();
-        const recordYear = recordDate.getFullYear();
-
-        const [prevMins, prevSecs] = prevRecord.time.split(':').map(Number);
-        const [currentMins, currentSecs] = currentRecord.time.split(':').map(Number);
-        
-        const prevTimeInSeconds = prevMins * 60 + prevSecs;
-        const currentTimeInSeconds = currentMins * 60 + currentSecs;
+      if (previousBest) {
+        const prevTimeInSeconds = convertTimeToSeconds(previousBest.time);
+        const currentTimeInSeconds = convertTimeToSeconds(currentRecord.time);
 
         if (currentTimeInSeconds < prevTimeInSeconds) {
           const improvement = prevTimeInSeconds - currentTimeInSeconds;
@@ -113,7 +118,7 @@ const calculateTimeImprovement = (records: any[]) => {
           }
         }
       }
-    });
+    }
   });
 
   return {
@@ -463,7 +468,7 @@ export default function Dashboard() {
                           <p className="text-sm text-muted-foreground">
                             {new Date(competition.date).toLocaleDateString('ja-JP')}
                           </p>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-sm text-muted-foreground">
                             {competition.location}
                           </p>
                         </div>
