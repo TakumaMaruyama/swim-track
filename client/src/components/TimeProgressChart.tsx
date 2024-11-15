@@ -37,8 +37,8 @@ export function TimeProgressChart({ records, style, distance }: TimeProgressChar
         distance: r.distance,
         poolLength: r.poolLength
       });
-      return r.style === style && 
-             r.distance === distance && 
+      return r.style === style &&
+             r.distance === distance &&
              r.poolLength === 15; // Force 15m pool length
     })
     .sort((a, b) => {
@@ -112,8 +112,12 @@ export function TimeProgressChart({ records, style, distance }: TimeProgressChar
   };
 
   return (
-    <div className="w-full h-[300px]">
-      <Line data={data} options={options} />
+    <div className="w-full h-[400px] sm:h-[500px] md:h-[300px]">
+      <Line data={data} options={{
+        ...options,
+        maintainAspectRatio: false,
+        responsive: true,
+      }} />
     </div>
   );
 }

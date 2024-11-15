@@ -15,10 +15,10 @@ const scryptAsync = promisify(scrypt);
 const SALT_LENGTH = 32;
 const HASH_LENGTH = 64;
 
-// Use persistent storage path in Replit
-const UPLOAD_DIR = path.join(process.cwd(), "..", "..", "..", "storage", "uploads");
+// Update UPLOAD_DIR to use project directory
+const UPLOAD_DIR = path.join(process.cwd(), "uploads");
 
-// Robust initialization with better error handling
+// Update initialization to be more robust
 const initializeUploadDirectory = async () => {
   try {
     await fs.access(UPLOAD_DIR);
@@ -35,7 +35,7 @@ const initializeUploadDirectory = async () => {
   }
 };
 
-// Update storage configuration with better error handling
+// Update storage configuration
 const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
     try {
@@ -87,7 +87,7 @@ export function registerRoutes(app: Express) {
     next();
   };
 
-  // Document download endpoint with improved error handling
+  // Document download endpoint with better error handling
   app.get("/api/documents/:id/download", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
