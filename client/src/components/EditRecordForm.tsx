@@ -21,10 +21,18 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { SwimRecord } from "db/schema";
+import { SwimRecord, Competition } from "db/schema";
 import * as z from "zod";
+import useSWR from "swr";
 
 // Time format validation regex: MM:SS.ms
 const timeRegex = /^([0-5]?[0-9]):([0-5][0-9])\.([0-9]{1,3})$/;
@@ -52,7 +60,8 @@ const editRecordSchema = z.object({
   time: z.string().regex(timeRegex, "タイム形式は MM:SS.ms である必要があります"),
   date: z.string().min(1, "日付を選択してください"),
   isCompetition: z.boolean().default(false),
-  poolLength: z.number().refine(val => poolLengths.includes(val), "有効なプール長を選択してください")
+  poolLength: z.number().refine(val => poolLengths.includes(val), "有効なプール長を選択してください"),
+  competitionId: z.number().nullable()
 });
 
 type EditRecordFormProps = {
@@ -66,6 +75,7 @@ type EditRecordFormProps = {
 export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }: EditRecordFormProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const { data: competitions } = useSWR<Competition[]>("/api/competitions");
 
   const form = useForm({
     resolver: zodResolver(editRecordSchema),
@@ -75,13 +85,20 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
       time: record?.time ?? "",
       date: record ? new Date(record.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       isCompetition: record?.isCompetition ?? false,
-      poolLength: record?.poolLength ?? 25
+      poolLength: record?.poolLength ?? 25,
+      competitionId: record?.competitionId ?? null
     },
   });
+
+  const watchIsCompetition = form.watch('isCompetition');
 
   const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
     try {
       setIsSubmitting(true);
+      // If not a competition, ensure competitionId is null
+      if (!values.isCompetition) {
+        values.competitionId = null;
+      }
       await onSubmit({ ...values, studentId });
       toast({
         title: record ? "更新成功" : "記録追加成功",
@@ -253,6 +270,38 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
                 </FormItem>
               )}
             />
+            {watchIsCompetition && (
+              <FormField
+                control={form.control}
+                name="competitionId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>大会</FormLabel>
+                    <Select
+                      value={field.value?.toString()}
+                      onValueChange={(value) => field.onChange(Number(value))}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="大会を選択" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {competitions?.map((competition) => (
+                          <SelectItem
+                            key={competition.id}
+                            value={competition.id.toString()}
+                          >
+                            {competition.name} ({new Date(competition.date).toLocaleDateString()})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             <DialogFooter>
               <Button
                 type="button"

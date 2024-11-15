@@ -38,7 +38,8 @@ export const swimRecords = pgTable("swim_records", {
   time: text("time").notNull(),
   date: timestamp("date").defaultNow(),
   isCompetition: boolean("is_competition").default(false),
-  poolLength: integer("pool_length").notNull().default(25)
+  poolLength: integer("pool_length").notNull().default(25),
+  competitionId: integer("competition_id").references(() => competitions.id)
 });
 
 export const competitions = pgTable("competitions", {

@@ -31,6 +31,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
 import type { ExtendedSwimRecord } from "../hooks/use-swim-records";
 import { TimeProgressChart } from './TimeProgressChart';
+import useSWR from "swr";
+import type { Competition } from "db/schema";
 
 type TimeHistoryModalProps = {
   isOpen: boolean;
@@ -52,6 +54,11 @@ const swimStyles = [
   "個人メドレー"
 ];
 
+const formatDate = (date: string | Date | null) => {
+  if (!date) return '';
+  return new Date(date).toLocaleDateString('ja-JP');
+};
+
 export function TimeHistoryModal({ 
   isOpen, 
   onClose, 
@@ -64,6 +71,7 @@ export function TimeHistoryModal({
   const [styleFilter, setStyleFilter] = React.useState<string>("all");
   const [sortBy, setSortBy] = React.useState<string>("date_desc");
   const [deletingRecord, setDeletingRecord] = React.useState<number | null>(null);
+  const { data: competitions } = useSWR<Competition[]>("/api/competitions");
 
   const groupedAndFilteredRecords: GroupedRecords = React.useMemo(() => {
     const filtered = records.filter(record => 
@@ -73,9 +81,11 @@ export function TimeHistoryModal({
     const sorted = [...filtered].sort((a, b) => {
       switch (sortBy) {
         case "date_asc":
-          return new Date(a.date).getTime() - new Date(b.date).getTime();
+          return (a.date ? new Date(a.date).getTime() : 0) - 
+                 (b.date ? new Date(b.date).getTime() : 0);
         case "date_desc":
-          return new Date(b.date).getTime() - new Date(a.date).getTime();
+          return (b.date ? new Date(b.date).getTime() : 0) - 
+                 (a.date ? new Date(a.date).getTime() : 0);
         case "time_asc":
           return a.time.localeCompare(b.time);
         case "time_desc":
@@ -134,6 +144,12 @@ export function TimeHistoryModal({
     } finally {
       setDeletingRecord(null);
     }
+  };
+
+  const getCompetitionName = (competitionId: number | null) => {
+    if (!competitionId || !competitions) return null;
+    const competition = competitions.find(c => c.id === competitionId);
+    return competition ? competition.name : null;
   };
 
   return (
@@ -195,47 +211,50 @@ export function TimeHistoryModal({
                     />
 
                     <div className="space-y-3 mt-4">
-                      {records.map((record) => (
-                        <div
-                          key={record.id}
-                          className="p-3 rounded-lg flex flex-col gap-2 md:flex-row md:justify-between md:items-center"
-                        >
-                          <div className="flex flex-col gap-2">
-                            <span className="text-xl font-bold">{record.time}</span>
-                            <div className="flex flex-wrap gap-2">
-                              {record.time === personalBests[key] && (
-                                <Badge variant="secondary" className="flex items-center gap-1">
-                                  <Trophy className="h-3 w-3" />
-                                  自己ベスト
-                                </Badge>
-                              )}
-                              {record.isCompetition && (
-                                <Badge className="flex items-center gap-1">
-                                  <TrendingUp className="h-3 w-3" />
-                                  大会記録
-                                </Badge>
-                              )}
+                      {records.map((record) => {
+                        const competitionName = getCompetitionName(record.competitionId);
+                        return (
+                          <div
+                            key={record.id}
+                            className="p-3 rounded-lg flex flex-col gap-2 md:flex-row md:justify-between md:items-center"
+                          >
+                            <div className="flex flex-col gap-2">
+                              <span className="text-xl font-bold">{record.time}</span>
+                              <div className="flex flex-wrap gap-2">
+                                {record.time === personalBests[key] && (
+                                  <Badge variant="secondary" className="flex items-center gap-1">
+                                    <Trophy className="h-3 w-3" />
+                                    自己ベスト
+                                  </Badge>
+                                )}
+                                {record.isCompetition && (
+                                  <Badge className="flex items-center gap-1">
+                                    <TrendingUp className="h-3 w-3" />
+                                    {competitionName || '大会記録'}
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
+                            <div className="flex flex-col items-start md:items-end gap-1">
+                              <div className="text-sm text-muted-foreground">
+                                {formatDate(record.date)}
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {record.poolLength}mプール
+                              </div>
+                            </div>
+                            {user?.role === 'coach' && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setDeletingRecord(record.id)}
+                              >
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </Button>
+                            )}
                           </div>
-                          <div className="flex flex-col items-start md:items-end gap-1">
-                            <div className="text-sm text-muted-foreground">
-                              {new Date(record.date).toLocaleDateString('ja-JP')}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {record.poolLength}mプール
-                            </div>
-                          </div>
-                          {user?.role === 'coach' && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setDeletingRecord(record.id)}
-                            >
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
-                          )}
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </CardContent>
                 </Card>
