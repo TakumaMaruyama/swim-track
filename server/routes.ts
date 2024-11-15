@@ -15,25 +15,32 @@ const scryptAsync = promisify(scrypt);
 const SALT_LENGTH = 32;
 const HASH_LENGTH = 64;
 
-// Use relative path from project root for storage
-const UPLOAD_DIR = path.join(process.cwd(), "uploads");
+// Use persistent storage path in Replit
+const UPLOAD_DIR = path.join(process.cwd(), "..", "..", "..", "storage", "uploads");
 
-// Update initialization to create directory if not exists
+// Robust initialization with better error handling
 const initializeUploadDirectory = async () => {
   try {
     await fs.access(UPLOAD_DIR);
-    console.log('Uploads directory exists:', UPLOAD_DIR);
+    console.log('Upload directory exists:', UPLOAD_DIR);
   } catch {
-    console.log('Creating uploads directory:', UPLOAD_DIR);
-    await fs.mkdir(UPLOAD_DIR, { recursive: true });
+    console.log('Creating upload directory:', UPLOAD_DIR);
+    try {
+      await fs.mkdir(UPLOAD_DIR, { recursive: true });
+      console.log('Upload directory created successfully');
+    } catch (error) {
+      console.error('Failed to create upload directory:', error);
+      throw error;
+    }
   }
 };
 
-// Update multer storage configuration
+// Update storage configuration with better error handling
 const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
     try {
       await initializeUploadDirectory();
+      console.log('Using upload directory:', UPLOAD_DIR);
       cb(null, UPLOAD_DIR);
     } catch (error) {
       console.error('Storage destination error:', error);
@@ -43,11 +50,12 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => {
     const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
     const safeFilename = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-    cb(null, `${uniqueSuffix}-${safeFilename}`);
+    const filename = `${uniqueSuffix}-${safeFilename}`;
+    console.log('Generated filename:', filename);
+    cb(null, filename);
   }
 });
 
-// Keep files between deploys
 const upload = multer({ storage });
 
 // Password hashing utility functions
@@ -126,7 +134,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Document upload endpoint with file existence check
+  // Document upload endpoint with improved error handling
   app.post("/api/documents/upload", requireAuth, requireCoach, upload.single('file'), async (req, res) => {
     try {
       if (!req.file) {
@@ -152,6 +160,7 @@ export function registerRoutes(app: Express) {
         })
         .returning();
 
+      console.log('Document uploaded successfully:', document.id);
       res.json(document);
     } catch (error) {
       console.error('Document upload error:', error);
@@ -159,7 +168,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Document deletion endpoint - keep the file
+  // Document deletion endpoint - keep files for persistence
   app.delete("/api/documents/:id", requireAuth, requireCoach, async (req, res) => {
     try {
       const { id } = req.params;
@@ -174,7 +183,7 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ message: "ドキュメントが見つかりません" });
       }
 
-      // Delete from database only, keep the file
+      // Only remove database entry, keep the file
       await db
         .delete(documents)
         .where(eq(documents.id, parseInt(id)));
