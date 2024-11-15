@@ -15,10 +15,10 @@ const scryptAsync = promisify(scrypt);
 const SALT_LENGTH = 32;
 const HASH_LENGTH = 64;
 
-// Use absolute path to ensure persistence
-const UPLOAD_DIR = path.join(process.cwd(), "uploads");
+// Use absolute path in parent directory to ensure persistence
+const UPLOAD_DIR = path.join(process.cwd(), "..", "uploads");
 
-// Update directory initialization
+// Update directory initialization to be more robust
 const initializeUploadDirectory = async () => {
   try {
     await fs.access(UPLOAD_DIR);
@@ -34,7 +34,6 @@ const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
     try {
       await initializeUploadDirectory();
-      console.log('Upload destination:', UPLOAD_DIR);
       cb(null, UPLOAD_DIR);
     } catch (error) {
       console.error('Storage destination error:', error);
@@ -44,9 +43,7 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => {
     const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
     const safeFilename = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const filename = `${uniqueSuffix}-${safeFilename}`;
-    console.log('Generated filename:', filename);
-    cb(null, filename);
+    cb(null, `${uniqueSuffix}-${safeFilename}`);
   }
 });
 
@@ -130,15 +127,21 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Document upload endpoint without cleanup logic
+  // Document upload endpoint with file existence check
   app.post("/api/documents/upload", requireAuth, requireCoach, upload.single('file'), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "ファイルが選択されていません" });
       }
 
+      const filePath = path.join(UPLOAD_DIR, req.file.filename);
+      try {
+        await fs.access(filePath);
+      } catch {
+        return res.status(500).json({ message: "ファイルの保存に失敗しました" });
+      }
+
       const { title, categoryId } = req.body;
-      
       const [document] = await db
         .insert(documents)
         .values({
@@ -172,12 +175,11 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ message: "ドキュメントが見つかりません" });
       }
 
-      // Delete from database first
+      // Delete from database only, keep the file
       await db
         .delete(documents)
         .where(eq(documents.id, parseInt(id)));
 
-      // No file deletion logic
       res.json({ message: "ドキュメントが削除されました" });
     } catch (error) {
       console.error('Document deletion error:', error);
