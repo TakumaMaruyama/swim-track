@@ -15,31 +15,38 @@ const scryptAsync = promisify(scrypt);
 const SALT_LENGTH = 32;
 const HASH_LENGTH = 64;
 
-// Ensure uploads directory exists and persists
+// Use absolute path to ensure persistence
 const UPLOAD_DIR = path.join(process.cwd(), "uploads");
 
+// Update directory initialization
 const initializeUploadDirectory = async () => {
   try {
     await fs.access(UPLOAD_DIR);
+    console.log('Uploads directory exists:', UPLOAD_DIR);
   } catch {
+    console.log('Creating uploads directory:', UPLOAD_DIR);
     await fs.mkdir(UPLOAD_DIR, { recursive: true });
   }
 };
 
-// Initialize storage with error handling
+// Initialize storage with improved error handling
 const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
     try {
       await initializeUploadDirectory();
+      console.log('Upload destination:', UPLOAD_DIR);
       cb(null, UPLOAD_DIR);
     } catch (error) {
+      console.error('Storage destination error:', error);
       cb(error as Error, UPLOAD_DIR);
     }
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
     const safeFilename = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-    cb(null, `${uniqueSuffix}-${safeFilename}`);
+    const filename = `${uniqueSuffix}-${safeFilename}`;
+    console.log('Generated filename:', filename);
+    cb(null, filename);
   }
 });
 
@@ -56,10 +63,10 @@ const hashPassword = async (password: string): Promise<string> => {
 export function registerRoutes(app: Express) {
   setupAuth(app);
 
-  // Initialize upload directory when the server starts
+  // Initialize upload directory when server starts
   initializeUploadDirectory().catch(console.error);
 
-  // Ensure user is authenticated
+  // Authentication middleware
   const requireAuth = (req: any, res: any, next: any) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "認証が必要です" });
@@ -67,7 +74,6 @@ export function registerRoutes(app: Express) {
     next();
   };
 
-  // Ensure user is a coach
   const requireCoach = (req: any, res: any, next: any) => {
     if (req.user?.role !== "coach") {
       return res.status(403).json({ message: "コーチ権限が必要です" });
@@ -75,10 +81,11 @@ export function registerRoutes(app: Express) {
     next();
   };
 
-  // Document download endpoint with proper error handling
+  // Document download endpoint with improved error handling and logging
   app.get("/api/documents/:id/download", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
+      console.log('Download request for document:', id);
 
       const [document] = await db
         .select()
@@ -87,10 +94,12 @@ export function registerRoutes(app: Express) {
         .limit(1);
 
       if (!document) {
+        console.log('Document not found:', id);
         return res.status(404).json({ message: "ドキュメントが見つかりません" });
       }
 
       const filePath = path.join(UPLOAD_DIR, document.filename);
+      console.log('Attempting to access file:', filePath);
 
       try {
         await fs.access(filePath);
@@ -99,9 +108,11 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ message: "ファイルが見つかりません" });
       }
 
+      // Set proper headers for file download
       res.setHeader('Content-Type', document.mimeType);
-      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(document.originalname || document.filename)}"`);
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(document.filename)}"`);
       
+      // Stream file directly to response
       const fileStream = createReadStream(filePath);
       fileStream.pipe(res);
 
@@ -119,7 +130,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Document upload endpoint with improved error handling
+  // Document upload endpoint without cleanup logic
   app.post("/api/documents/upload", requireAuth, requireCoach, upload.single('file'), async (req, res) => {
     try {
       if (!req.file) {
@@ -142,21 +153,11 @@ export function registerRoutes(app: Express) {
       res.json(document);
     } catch (error) {
       console.error('Document upload error:', error);
-      
-      // Clean up uploaded file if database operation fails
-      if (req.file) {
-        try {
-          await fs.unlink(path.join(UPLOAD_DIR, req.file.filename));
-        } catch (unlinkError) {
-          console.error('Error cleaning up uploaded file:', unlinkError);
-        }
-      }
-      
       res.status(500).json({ message: "ドキュメントのアップロードに失敗しました" });
     }
   });
 
-  // Document deletion endpoint with proper cleanup
+  // Document deletion endpoint without cleanup logic
   app.delete("/api/documents/:id", requireAuth, requireCoach, async (req, res) => {
     try {
       const { id } = req.params;
@@ -176,14 +177,7 @@ export function registerRoutes(app: Express) {
         .delete(documents)
         .where(eq(documents.id, parseInt(id)));
 
-      // Then attempt to delete the file
-      try {
-        await fs.unlink(path.join(UPLOAD_DIR, document.filename));
-      } catch (unlinkError) {
-        console.error('Error deleting file:', unlinkError);
-        // Don't fail the request if file deletion fails
-      }
-
+      // No file deletion logic
       res.json({ message: "ドキュメントが削除されました" });
     } catch (error) {
       console.error('Document deletion error:', error);
@@ -690,86 +684,6 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Documents API
-  app.post(
-    "/api/documents/upload",
-    requireAuth,
-    requireCoach,
-    upload.single("file"),
-    async (req, res) => {
-      if (!req.file || !req.body.title) {
-        return res.status(400).json({ message: "ファイルとタイトルが必要です" });
-      }
-
-      try {
-        const [document] = await db
-          .insert(documents)
-          .values({
-            title: req.body.title,
-            filename: req.file.filename,
-            mimeType: req.file.mimetype,
-            uploaderId: req.user!.id,
-            categoryId: req.body.categoryId ? parseInt(req.body.categoryId) : null,
-          })
-          .returning();
-
-        res.json(document);
-      } catch (error) {
-        console.error('Error uploading document:', error);
-        // Delete uploaded file if database operation fails
-        if (req.file) {
-          await fs.unlink(path.join("uploads", req.file.filename)).catch(console.error);
-        }
-        res.status(500).json({ message: "ドキュメントのアップロードに失敗しました" });
-      }
-    }
-  );
-
-  app.get("/api/documents/:id/download", requireAuth, async (req, res) => {
-    try {
-      const [document] = await db
-        .select()
-        .from(documents)
-        .where(eq(documents.id, parseInt(req.params.id)))
-        .limit(1);
-
-      if (!document) {
-        return res.status(404).json({ message: "ドキュメントが見つかりません" });
-      }
-
-      res.download(path.join("uploads", document.filename));
-    } catch (error) {
-      console.error('Error downloading document:', error);
-      res.status(500).json({ message: "ダウンロードに失敗しました" });
-    }
-  });
-
-  app.delete("/api/documents/:id", requireAuth, requireCoach, async (req, res) => {
-    try {
-      const { id } = req.params;
-
-      const [document] = await db
-        .select()
-        .from(documents)
-        .where(eq(documents.id, parseInt(id)))
-        .limit(1);
-
-      if (!document) {
-        return res.status(404).json({ message: "ドキュメントが見つかりません" });
-      }
-
-      await fs.unlink(path.join("uploads", document.filename)).catch(console.error);
-
-      await db
-        .delete(documents)
-        .where(eq(documents.id, parseInt(id)));
-
-      res.json({ message: "ドキュメントが削除されました" });
-    } catch (error) {
-      console.error('Error deleting document:', error);
-      res.status(500).json({ message: "ドキュメントの削除に失敗しました" });
-    }
-  });
   // Categories API
   app.post("/api/categories", requireAuth, requireCoach, async (req, res) => {
     try {
