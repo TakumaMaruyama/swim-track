@@ -15,10 +15,10 @@ const scryptAsync = promisify(scrypt);
 const SALT_LENGTH = 32;
 const HASH_LENGTH = 64;
 
-// Use absolute path for uploads directory
-const UPLOAD_DIR = path.resolve(process.cwd(), "..", "storage");
+// Use absolute path in home directory for persistent storage
+const UPLOAD_DIR = path.join(process.env.HOME || process.cwd(), "storage");
 
-// Update initialization to handle directory creation
+// Update initialization to be more robust
 const initializeUploadDirectory = async () => {
   try {
     await fs.access(UPLOAD_DIR);
@@ -37,7 +37,10 @@ const initializeUploadDirectory = async () => {
   }
 };
 
-// Update storage configuration
+// Call initialization before setting up routes
+await initializeUploadDirectory();
+
+// Update storage configuration to preserve original filenames
 const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
     try {
@@ -51,7 +54,9 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => {
     const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
     const safeFilename = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-    cb(null, `${uniqueSuffix}-${safeFilename}`);
+    const filename = `${uniqueSuffix}-${safeFilename}`;
+    console.log('Generated filename:', filename);
+    cb(null, filename);
   }
 });
 
