@@ -3,7 +3,7 @@ import { setupAuth } from "./auth";
 import multer from "multer";
 import { db } from "db";
 import { documents, users, swimRecords, competitions, categories } from "db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import path from "path";
 import fs from "fs/promises";
 import { createReadStream } from "fs";
@@ -16,7 +16,7 @@ const SALT_LENGTH = 32;
 const HASH_LENGTH = 64;
 
 // Use absolute path in persistent storage directory
-const UPLOAD_DIR = path.join('/home/runner/storage');
+const UPLOAD_DIR = path.join(process.env.HOME || process.cwd(), "storage/uploads");
 
 // Update initialization to be more robust with proper permissions
 const initializeUploadDirectory = async () => {
@@ -36,9 +36,6 @@ const initializeUploadDirectory = async () => {
     }
   }
 };
-
-// Call initialization at startup
-await initializeUploadDirectory();
 
 // Configure storage with better error handling
 const storage = multer.diskStorage({
@@ -69,6 +66,9 @@ const hashPassword = async (password: string): Promise<string> => {
 };
 
 export function registerRoutes(app: Express) {
+  // Initialize upload directory during route registration
+  initializeUploadDirectory().catch(console.error);
+  
   setupAuth(app);
 
   // Authentication middleware
@@ -117,8 +117,9 @@ export function registerRoutes(app: Express) {
       res.setHeader('Content-Type', document.mimeType);
       res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(document.filename)}"`);
       
-      // Stream the file with error handling
+      // Stream the file with proper error handling
       const fileStream = createReadStream(filePath);
+      
       fileStream.on('error', (error) => {
         console.error(`File streaming error for ${filePath}:`, error);
         if (!res.headersSent) {
@@ -170,7 +171,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Document deletion endpoint - keep files for persistence
+  // Document deletion endpoint - only remove database entry, keep files
   app.delete("/api/documents/:id", requireAuth, requireCoach, async (req, res) => {
     try {
       const { id } = req.params;
@@ -185,7 +186,7 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ message: "ドキュメントが見つかりません" });
       }
 
-      // Only remove database entry, keep the file for persistence
+      // Only remove database entry, keep files for persistence
       await db
         .delete(documents)
         .where(eq(documents.id, parseInt(id)));
@@ -235,7 +236,7 @@ export function registerRoutes(app: Express) {
           isActive: users.isActive,
         })
         .from(users)
-        .orderBy(users.role, users.username);
+        .orderBy(users.username);
 
       res.json(usersList);
     } catch (error) {
@@ -244,17 +245,13 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Categories API endpoints
+  // Categories API endpoints with error handling
   app.get("/api/categories", requireAuth, async (req, res) => {
     try {
       const allCategories = await db
         .select()
         .from(categories)
         .orderBy(categories.name);
-      
-      if (!allCategories) {
-        return res.status(500).json({ message: "カテゴリーの取得に失敗しました" });
-      }
       
       res.json(allCategories);
     } catch (error) {
@@ -271,17 +268,6 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ message: "カテゴリー名は必須です" });
       }
 
-      // Check if category with same name exists
-      const existingCategory = await db
-        .select()
-        .from(categories)
-        .where(eq(categories.name, name.trim()))
-        .limit(1);
-
-      if (existingCategory.length > 0) {
-        return res.status(400).json({ message: "同名のカテゴリーが既に存在します" });
-      }
-
       const [category] = await db
         .insert(categories)
         .values({
@@ -290,10 +276,6 @@ export function registerRoutes(app: Express) {
           createdBy: req.user!.id
         })
         .returning();
-
-      if (!category) {
-        return res.status(500).json({ message: "カテゴリーの作成に失敗しました" });
-      }
 
       res.json(category);
     } catch (error) {
@@ -305,20 +287,19 @@ export function registerRoutes(app: Express) {
   app.delete("/api/categories/:id", requireAuth, requireCoach, async (req, res) => {
     try {
       const { id } = req.params;
-      
-      // Update documents to remove category reference first
+
+      // Update documents to remove category reference
       await db
         .update(documents)
         .set({ categoryId: null })
         .where(eq(documents.categoryId, parseInt(id)));
-      
-      // Delete the category
-      const [deletedCategory] = await db
+
+      const [category] = await db
         .delete(categories)
         .where(eq(categories.id, parseInt(id)))
         .returning();
 
-      if (!deletedCategory) {
+      if (!category) {
         return res.status(404).json({ message: "カテゴリーが見つかりません" });
       }
 
@@ -329,12 +310,18 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Update documents API to include categories and sorting
+  // Documents listing with categories
   app.get("/api/documents", requireAuth, async (req, res) => {
     try {
       const docs = await db
         .select({
-          ...documents,
+          id: documents.id,
+          title: documents.title,
+          filename: documents.filename,
+          mimeType: documents.mimeType,
+          uploaderId: documents.uploaderId,
+          categoryId: documents.categoryId,
+          createdAt: documents.createdAt,
           categoryName: categories.name,
           uploaderName: users.username
         })
@@ -342,6 +329,7 @@ export function registerRoutes(app: Express) {
         .leftJoin(categories, eq(documents.categoryId, categories.id))
         .leftJoin(users, eq(documents.uploaderId, users.id))
         .orderBy(desc(documents.createdAt));
+
       res.json(docs);
     } catch (error) {
       console.error('Error fetching documents:', error);
@@ -438,10 +426,11 @@ export function registerRoutes(app: Express) {
 
       // Add optional isActive filter
       if (isActive !== undefined) {
-        query.where(and(
-          eq(users.role, "student"), 
+        const filteredAthletes = await query.where(
           eq(users.isActive, isActive === 'true')
-        ));
+        );
+        res.json(filteredAthletes);
+        return;
       }
 
       const athletes = await query;
@@ -693,98 +682,6 @@ export function registerRoutes(app: Express) {
     } catch (error) {
       console.error('Error deleting record:', error);
       res.status(500).json({ message: "記録の削除に失敗しました" });
-    }
-  });
-
-  // Categories API
-  app.post("/api/categories", requireAuth, requireCoach, async (req, res) => {
-    try {
-      const { name, description } = req.body;
-      const [category] = await db
-        .insert(categories)
-        .values({
-          name,
-          description,
-          createdBy: req.user!.id
-        })
-        .returning();
-
-      res.json(category);
-    } catch (error) {
-      console.error('Error creating category:', error);
-      res.status(500).json({ message: "カテゴリーの作成に失敗しました" });
-    }
-  });
-
-  app.get("/api/categories", requireAuth, async (req, res) => {
-    try {
-      const categoryList = await db
-        .select({
-          id: categories.id,
-          name: categories.name,
-          description: categories.description,
-          createdAt: categories.createdAt,
-          createdBy: categories.createdBy,
-          documentCount: sql<number>`count(${documents.id})`
-        })
-        .from(categories)
-        .leftJoin(documents, eq(documents.categoryId, categories.id))
-        .groupBy(categories.id)
-        .orderBy(categories.name);
-
-      res.json(categoryList);
-    } catch (error) {
-      console.error('Error fetching categories:', error);
-      res.status(500).json({ message: "カテゴリーの取得に失敗しました" });
-    }
-  });
-
-  app.put("/api/categories/:id", requireAuth, requireCoach, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { name, description } = req.body;
-
-      const [category] = await db
-        .update(categories)
-        .set({ name, description })
-        .where(eq(categories.id, parseInt(id)))
-        .returning();
-
-      if (!category) {
-        return res.status(404).json({ message: "カテゴリーが見つかりません" });
-      }
-
-      res.json(category);
-    } catch (error) {
-      console.error('Error updating category:', error);
-      res.status(500).json({ message: "カテゴリーの更新に失敗しました" });
-    }
-  });
-
-  app.delete("/api/categories/:id", requireAuth, requireCoach, async (req, res) => {
-    try {
-      const { id } = req.params;
-
-      // First update all documents in this category to have no category
-      await db
-        .update(documents)
-        .set({ categoryId: null })
-        .where(eq(documents.categoryId, parseInt(id)));
-
-      // Then delete the category
-      const [deletedCategory] = await db
-        .delete(categories)
-        .where(eq(categories.id, parseInt(id)))
-        .returning();
-
-      if (!deletedCategory) {
-        return res.status(404).json({ message: "カテゴリーが見つかりません" });
-      }
-
-      res.json({ message: "カテゴリーが削除されました" });
-    } catch (error) {
-      console.error('Error deleting category:', error);
-      res.status(500).json({ message: "カテゴリーの削除に失敗しました" });
     }
   });
 

@@ -44,7 +44,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",
     "date-fns": "^3.6.0",
-    "drizzle-orm": "^0.36.0",
+    "drizzle-orm": "^0.36.2",
     "drizzle-zod": "^0.5.1",
     "embla-carousel-react": "^8.3.0",
     "express": "^4.21.1",
@@ -71,7 +71,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@types/express": "4.17.21",
+    "@types/express": "^4.17.21",
     "@types/express-session": "^1.18.0",
     "@types/node": "^20.16.11",
     "@types/passport": "^1.0.17",
