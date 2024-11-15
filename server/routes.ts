@@ -15,10 +15,10 @@ const scryptAsync = promisify(scrypt);
 const SALT_LENGTH = 32;
 const HASH_LENGTH = 64;
 
-// Use absolute path in home directory for persistent storage
-const UPLOAD_DIR = path.join(process.env.HOME || process.cwd(), "storage");
+// Use absolute path in persistent storage directory
+const UPLOAD_DIR = path.join('/home/runner/storage');
 
-// Update initialization to be more robust
+// Update initialization to be more robust with proper permissions
 const initializeUploadDirectory = async () => {
   try {
     await fs.access(UPLOAD_DIR);
@@ -27,9 +27,9 @@ const initializeUploadDirectory = async () => {
     console.log('Creating storage directory:', UPLOAD_DIR);
     try {
       await fs.mkdir(UPLOAD_DIR, { recursive: true });
-      console.log('Storage directory created successfully');
       // Set directory permissions to ensure persistence
       await fs.chmod(UPLOAD_DIR, 0o777);
+      console.log('Storage directory created successfully with full permissions');
     } catch (error) {
       console.error('Failed to create storage directory:', error);
       throw error;
@@ -37,26 +37,24 @@ const initializeUploadDirectory = async () => {
   }
 };
 
-// Call initialization before setting up routes
+// Call initialization at startup
 await initializeUploadDirectory();
 
-// Update storage configuration to preserve original filenames
+// Configure storage with better error handling
 const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
     try {
       await initializeUploadDirectory();
       cb(null, UPLOAD_DIR);
     } catch (error) {
-      console.error('Storage error:', error);
+      console.error('Storage destination error:', error);
       cb(error as Error, UPLOAD_DIR);
     }
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
     const safeFilename = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const filename = `${uniqueSuffix}-${safeFilename}`;
-    console.log('Generated filename:', filename);
-    cb(null, filename);
+    cb(null, `${uniqueSuffix}-${safeFilename}`);
   }
 });
 
@@ -73,9 +71,6 @@ const hashPassword = async (password: string): Promise<string> => {
 export function registerRoutes(app: Express) {
   setupAuth(app);
 
-  // Initialize upload directory when server starts
-  initializeUploadDirectory().catch(console.error);
-
   // Authentication middleware
   const requireAuth = (req: any, res: any, next: any) => {
     if (!req.isAuthenticated()) {
@@ -91,7 +86,7 @@ export function registerRoutes(app: Express) {
     next();
   };
 
-  // Document download endpoint with better error handling
+  // Document download endpoint with enhanced error handling
   app.get("/api/documents/:id/download", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
@@ -118,19 +113,20 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ message: "ファイルが見つかりません" });
       }
 
-      // Set proper headers
+      // Set proper headers for download
       res.setHeader('Content-Type', document.mimeType);
       res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(document.filename)}"`);
       
+      // Stream the file with error handling
       const fileStream = createReadStream(filePath);
-      fileStream.pipe(res);
-
       fileStream.on('error', (error) => {
         console.error(`File streaming error for ${filePath}:`, error);
         if (!res.headersSent) {
           res.status(500).json({ message: "ファイルの読み込みに失敗しました" });
         }
       });
+
+      fileStream.pipe(res);
     } catch (error) {
       console.error('Document download error:', error);
       if (!res.headersSent) {
@@ -146,6 +142,7 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ message: "ファイルが選択されていません" });
       }
 
+      // Verify file was saved successfully
       const filePath = path.join(UPLOAD_DIR, req.file.filename);
       try {
         await fs.access(filePath);
@@ -188,7 +185,7 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ message: "ドキュメントが見つかりません" });
       }
 
-      // Only remove database entry, keep the file
+      // Only remove database entry, keep the file for persistence
       await db
         .delete(documents)
         .where(eq(documents.id, parseInt(id)));
