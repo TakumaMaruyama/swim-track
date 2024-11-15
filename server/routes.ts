@@ -15,21 +15,23 @@ const scryptAsync = promisify(scrypt);
 const SALT_LENGTH = 32;
 const HASH_LENGTH = 64;
 
-// Update UPLOAD_DIR to use project directory
-const UPLOAD_DIR = path.join(process.cwd(), "uploads");
+// Use absolute path for uploads directory
+const UPLOAD_DIR = path.resolve(process.cwd(), "..", "storage");
 
-// Update initialization to be more robust
+// Update initialization to handle directory creation
 const initializeUploadDirectory = async () => {
   try {
     await fs.access(UPLOAD_DIR);
-    console.log('Upload directory exists:', UPLOAD_DIR);
+    console.log('Storage directory exists:', UPLOAD_DIR);
   } catch {
-    console.log('Creating upload directory:', UPLOAD_DIR);
+    console.log('Creating storage directory:', UPLOAD_DIR);
     try {
       await fs.mkdir(UPLOAD_DIR, { recursive: true });
-      console.log('Upload directory created successfully');
+      console.log('Storage directory created successfully');
+      // Set directory permissions to ensure persistence
+      await fs.chmod(UPLOAD_DIR, 0o777);
     } catch (error) {
-      console.error('Failed to create upload directory:', error);
+      console.error('Failed to create storage directory:', error);
       throw error;
     }
   }
@@ -40,19 +42,16 @@ const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
     try {
       await initializeUploadDirectory();
-      console.log('Using upload directory:', UPLOAD_DIR);
       cb(null, UPLOAD_DIR);
     } catch (error) {
-      console.error('Storage destination error:', error);
+      console.error('Storage error:', error);
       cb(error as Error, UPLOAD_DIR);
     }
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
     const safeFilename = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const filename = `${uniqueSuffix}-${safeFilename}`;
-    console.log('Generated filename:', filename);
-    cb(null, filename);
+    cb(null, `${uniqueSuffix}-${safeFilename}`);
   }
 });
 
@@ -114,6 +113,7 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ message: "ファイルが見つかりません" });
       }
 
+      // Set proper headers
       res.setHeader('Content-Type', document.mimeType);
       res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(document.filename)}"`);
       
