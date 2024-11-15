@@ -26,20 +26,15 @@ interface TimeProgressChartProps {
   records: ExtendedSwimRecord[];
   style: string;
   distance: number;
-  poolLength?: number; // Made optional since we'll force 15m
+  poolLength?: number;
 }
 
 export function TimeProgressChart({ records, style, distance }: TimeProgressChartProps) {
   const filteredRecords = records
     .filter(r => {
-      console.log('Record:', {
-        style: r.style,
-        distance: r.distance,
-        poolLength: r.poolLength
-      });
       return r.style === style &&
              r.distance === distance &&
-             r.poolLength === 15; // Force 15m pool length
+             r.poolLength === 15;
     })
     .sort((a, b) => {
       const dateA = new Date(a.date || '');
@@ -112,7 +107,7 @@ export function TimeProgressChart({ records, style, distance }: TimeProgressChar
   };
 
   return (
-    <div className="w-full h-[400px] sm:h-[500px] md:h-[300px]">
+    <div className="w-full h-[500px] sm:h-[600px] md:h-[400px]">
       <Line data={data} options={{
         ...options,
         maintainAspectRatio: false,

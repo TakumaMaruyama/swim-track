@@ -6,9 +6,7 @@ import {
   Users, 
   Trophy, 
   Calendar, 
-  Timer, 
   ClipboardList,
-  TrendingDown,
   LogOut,
   Plus,
   Edit2,
@@ -44,21 +42,6 @@ const calculateTimeUntilCompetition = (competitionDate: Date) => {
   const hours = Math.floor((diffTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
 
   return { days, hours };
-};
-
-const calculateTimeImprovement = (records: any[]) => {
-  const lastMonth = new Date();
-  lastMonth.setMonth(lastMonth.getMonth() - 1);
-  
-  const improvements = records
-    .filter(record => new Date(record.date) >= lastMonth)
-    .reduce((acc, record) => {
-      const [mins, secs] = record.time.split(':');
-      const totalSeconds = parseInt(mins) * 60 + parseFloat(secs);
-      return acc + totalSeconds;
-    }, 0);
-
-  return improvements.toFixed(2);
 };
 
 export default function Dashboard() {
@@ -212,7 +195,6 @@ export default function Dashboard() {
   const { days, hours } = nextCompetition 
     ? calculateTimeUntilCompetition(new Date(nextCompetition.date))
     : { days: 0, hours: 0 };
-  const timeImprovement = records ? calculateTimeImprovement(records) : 0;
 
   const competition = competitions?.find(c => c.id === editingCompetition);
 
@@ -220,7 +202,7 @@ export default function Dashboard() {
     { label: '選手一覧', icon: <Users className="h-4 w-4" />, href: '/athletes' },
     { label: '歴代記録', icon: <Trophy className="h-4 w-4" />, href: '/all-time-records' },
     { label: '大会記録', icon: <Calendar className="h-4 w-4" />, href: '/competitions' },
-    { label: '資料', icon: <ClipboardList className="h-4 w-4" />, href: '/documents' }, // Updated label
+    { label: '資料', icon: <ClipboardList className="h-4 w-4" />, href: '/documents' },
   ];
 
   return (
@@ -297,7 +279,7 @@ export default function Dashboard() {
 
       <main className="flex-grow">
         <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -327,31 +309,12 @@ export default function Dashboard() {
                 </div>
               </CardContent>
             </Card>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingDown className="h-4 w-4" />
-                  先月の記録更新
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center">
-                  <p className="text-3xl font-bold text-primary mb-2">
-                    {timeImprovement}秒
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    平均タイム改善
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
 
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Timer className="h-4 w-4" />
+                    <Calendar className="h-4 w-4" />
                     今後の大会
                   </div>
                   {user.role === 'coach' && (
@@ -468,7 +431,7 @@ export default function Dashboard() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <UserPasswordList
+      <UserPasswordList 
         isOpen={showPasswordList}
         onClose={() => setShowPasswordList(false)}
       />
