@@ -15,10 +15,10 @@ const scryptAsync = promisify(scrypt);
 const SALT_LENGTH = 32;
 const HASH_LENGTH = 64;
 
-// Use absolute path in parent directory to ensure persistence
-const UPLOAD_DIR = path.join(process.cwd(), "..", "uploads");
+// Use Replit's persistent storage path
+const UPLOAD_DIR = path.join(process.cwd(), "..", "..", "..", "storage");
 
-// Update directory initialization to be more robust
+// Update initialization to be more robust
 const initializeUploadDirectory = async () => {
   try {
     await fs.access(UPLOAD_DIR);
@@ -34,6 +34,7 @@ const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
     try {
       await initializeUploadDirectory();
+      console.log('Upload destination:', UPLOAD_DIR);
       cb(null, UPLOAD_DIR);
     } catch (error) {
       console.error('Storage destination error:', error);
@@ -43,7 +44,9 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => {
     const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
     const safeFilename = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-    cb(null, `${uniqueSuffix}-${safeFilename}`);
+    const filename = `${uniqueSuffix}-${safeFilename}`;
+    console.log('Generated filename:', filename);
+    cb(null, filename);
   }
 });
 
@@ -105,11 +108,9 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ message: "ファイルが見つかりません" });
       }
 
-      // Set proper headers for file download
       res.setHeader('Content-Type', document.mimeType);
       res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(document.filename)}"`);
       
-      // Stream file directly to response
       const fileStream = createReadStream(filePath);
       fileStream.pipe(res);
 
