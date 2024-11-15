@@ -15,10 +15,10 @@ const scryptAsync = promisify(scrypt);
 const SALT_LENGTH = 32;
 const HASH_LENGTH = 64;
 
-// Use Replit's persistent storage path
-const UPLOAD_DIR = path.join(process.cwd(), "..", "..", "..", "storage");
+// Use relative path from project root for storage
+const UPLOAD_DIR = path.join(process.cwd(), "uploads");
 
-// Update initialization to be more robust
+// Update initialization to create directory if not exists
 const initializeUploadDirectory = async () => {
   try {
     await fs.access(UPLOAD_DIR);
@@ -29,12 +29,11 @@ const initializeUploadDirectory = async () => {
   }
 };
 
-// Initialize storage with improved error handling
+// Update multer storage configuration
 const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
     try {
       await initializeUploadDirectory();
-      console.log('Upload destination:', UPLOAD_DIR);
       cb(null, UPLOAD_DIR);
     } catch (error) {
       console.error('Storage destination error:', error);
@@ -44,12 +43,11 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => {
     const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
     const safeFilename = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const filename = `${uniqueSuffix}-${safeFilename}`;
-    console.log('Generated filename:', filename);
-    cb(null, filename);
+    cb(null, `${uniqueSuffix}-${safeFilename}`);
   }
 });
 
+// Keep files between deploys
 const upload = multer({ storage });
 
 // Password hashing utility functions
@@ -81,7 +79,7 @@ export function registerRoutes(app: Express) {
     next();
   };
 
-  // Document download endpoint with improved error handling and logging
+  // Document download endpoint with improved error handling
   app.get("/api/documents/:id/download", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
@@ -161,7 +159,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Document deletion endpoint without cleanup logic
+  // Document deletion endpoint - keep the file
   app.delete("/api/documents/:id", requireAuth, requireCoach, async (req, res) => {
     try {
       const { id } = req.params;
