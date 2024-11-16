@@ -26,11 +26,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, TrendingUp, Trash2 } from "lucide-react";
+import { Trophy, TrendingUp, Trash2, Edit2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
 import type { ExtendedSwimRecord } from "../hooks/use-swim-records";
 import { TimeProgressChart } from './TimeProgressChart';
+import { EditRecordForm } from './EditRecordForm';
 import useSWR from "swr";
 import type { Competition } from "db/schema";
 
@@ -40,6 +41,7 @@ type TimeHistoryModalProps = {
   records: ExtendedSwimRecord[];
   athleteName: string;
   onRecordDeleted?: () => void;
+  onRecordUpdated?: () => void;
 };
 
 type GroupedRecords = {
@@ -64,13 +66,15 @@ export function TimeHistoryModal({
   onClose, 
   records, 
   athleteName,
-  onRecordDeleted 
+  onRecordDeleted,
+  onRecordUpdated 
 }: TimeHistoryModalProps) {
   const { toast } = useToast();
   const { user } = useUser();
   const [styleFilter, setStyleFilter] = React.useState<string>("all");
   const [sortBy, setSortBy] = React.useState<string>("date_desc");
   const [deletingRecord, setDeletingRecord] = React.useState<number | null>(null);
+  const [editingRecord, setEditingRecord] = React.useState<number | null>(null);
   const { data: competitions } = useSWR<Competition[]>("/api/competitions");
 
   const groupedAndFilteredRecords: GroupedRecords = React.useMemo(() => {
@@ -96,7 +100,6 @@ export function TimeHistoryModal({
     });
 
     return sorted.reduce((acc, record) => {
-      // Include poolLength in the grouping key
       const key = `${record.style}-${record.distance}-${record.poolLength}`;
       if (!acc[key]) {
         acc[key] = [];
@@ -147,11 +150,47 @@ export function TimeHistoryModal({
     }
   };
 
+  const handleEdit = async (recordId: number, data: any) => {
+    try {
+      const response = await fetch(`/api/records/${recordId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update record');
+      }
+
+      toast({
+        title: "更新成功",
+        description: "記録が更新されました",
+      });
+
+      if (onRecordUpdated) {
+        onRecordUpdated();
+      }
+    } catch (error) {
+      console.error('Error updating record:', error);
+      toast({
+        variant: "destructive",
+        title: "エラー",
+        description: "記録の更新に失敗しました",
+      });
+      throw error;
+    }
+  };
+
   const getCompetitionName = (competitionId: number | null) => {
     if (!competitionId || !competitions) return null;
     const competition = competitions.find(c => c.id === competitionId);
     return competition ? competition.name : null;
   };
+
+  const record = records.find(r => r.id === editingRecord);
 
   return (
     <>
@@ -164,9 +203,9 @@ export function TimeHistoryModal({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex gap-4 mb-4">
+          <div className="flex flex-col sm:flex-row gap-4 mb-4">
             <Select value={styleFilter} onValueChange={setStyleFilter}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue placeholder="種目で絞り込み" />
               </SelectTrigger>
               <SelectContent>
@@ -178,7 +217,7 @@ export function TimeHistoryModal({
             </Select>
 
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue placeholder="並び替え" />
               </SelectTrigger>
               <SelectContent>
@@ -216,7 +255,7 @@ export function TimeHistoryModal({
                         return (
                           <div
                             key={record.id}
-                            className="p-3 rounded-lg flex flex-col gap-2 md:flex-row md:justify-between md:items-center"
+                            className="p-3 rounded-lg flex flex-col gap-2 md:flex-row md:justify-between md:items-center bg-muted/50"
                           >
                             <div className="flex flex-col gap-2">
                               <span className="text-xl font-bold">{record.time}</span>
@@ -230,8 +269,13 @@ export function TimeHistoryModal({
                                 {record.isCompetition && (
                                   <Badge className="flex items-center gap-1">
                                     <TrendingUp className="h-3 w-3" />
-                                    {competitionName || '大会記録'}
+                                    {competitionName ? competitionName : '大会記録'}
                                   </Badge>
+                                )}
+                                {competitionName && (
+                                  <div className="text-sm font-medium text-primary">
+                                    {competitionName}
+                                  </div>
                                 )}
                               </div>
                             </div>
@@ -244,13 +288,24 @@ export function TimeHistoryModal({
                               </div>
                             </div>
                             {user?.role === 'coach' && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setDeletingRecord(record.id)}
-                              >
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                              </Button>
+                              <div className="flex gap-2 justify-end md:justify-start">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setEditingRecord(record.id)}
+                                  className="hover:bg-secondary"
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setDeletingRecord(record.id)}
+                                  className="hover:bg-destructive/10"
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
+                              </div>
                             )}
                           </div>
                         );
@@ -290,6 +345,18 @@ export function TimeHistoryModal({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <EditRecordForm
+        record={record}
+        isOpen={!!editingRecord}
+        onClose={() => setEditingRecord(null)}
+        onSubmit={async (data) => {
+          if (record) {
+            await handleEdit(record.id, data);
+            setEditingRecord(null);
+          }
+        }}
+      />
     </>
   );
 }
