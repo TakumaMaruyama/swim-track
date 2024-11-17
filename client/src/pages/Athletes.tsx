@@ -111,11 +111,7 @@ export default function Athletes() {
 
   const handleCreateRecord = async (data: any) => {
     try {
-      console.log('[Records] Creating new record:', {
-        ...data,
-        poolLength: Number(data.poolLength)
-      });
-      
+      console.log('[Records] Creating new record:', data);
       const response = await fetch('/api/records', {
         method: 'POST',
         headers: {
@@ -132,16 +128,16 @@ export default function Athletes() {
         throw new Error('Failed to create record');
       }
 
-      // Force immediate refresh with no cache
-      await mutateRecords(undefined, { revalidate: true });
-      
-      // Add multiple delayed refreshes to ensure data is updated
-      setTimeout(async () => {
-        await mutateRecords(undefined, { revalidate: true });
-        setTimeout(async () => {
-          await mutateRecords(undefined, { revalidate: true });
-        }, 1000);
-      }, 1000);
+      // Force immediate refresh of all records data
+      console.log('[Records] Starting data refresh');
+      await Promise.all([
+        mutateRecords(undefined, { revalidate: true }),
+        // Add a small delay and force another refresh
+        new Promise(resolve => setTimeout(resolve, 500)).then(() => 
+          mutateRecords(undefined, { revalidate: true })
+        )
+      ]);
+      console.log('[Records] Completed data refresh');
 
       toast({
         title: "追加成功",
