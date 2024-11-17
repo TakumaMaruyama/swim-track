@@ -137,7 +137,6 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
         ...values,
         poolLength: `${values.poolLength}m`,
         type: record ? 'update' : 'create',
-        operation: record ? 'update' : 'create',
         timestamp: new Date().toISOString()
       });
 
