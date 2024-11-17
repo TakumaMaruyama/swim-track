@@ -1,6 +1,13 @@
+import { useEffect, useState } from 'react';
+import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
+import { useUser } from "../hooks/use-user";
+import { insertUserSchema } from "db/schema";
+import { Loader2, Home, AlertCircle } from "lucide-react";
+
+// UI Components
 import {
   Form,
   FormControl,
@@ -11,13 +18,17 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Loader2, Home } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { useUser } from "../hooks/use-user";
-import { insertUserSchema } from "db/schema";
-import { useEffect, useCallback } from "react";
+import { 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle, 
+  CardFooter 
+} from "@/components/ui/card";
+import { 
+  Alert, 
+  AlertDescription 
+} from "@/components/ui/alert";
 
 export default function Login() {
   const [, navigate] = useLocation();
@@ -37,14 +48,10 @@ export default function Login() {
     },
   });
 
-  // Check initial authentication state with cleanup
   useEffect(() => {
     let mounted = true;
     
-    console.log('[Login] Checking initial auth state:', { isAuthenticated, isAuthChecking });
-    
     if (!isAuthChecking && isAuthenticated && mounted) {
-      console.log('[Login] User is already authenticated, redirecting');
       window.location.replace('/');
     }
 
@@ -55,21 +62,17 @@ export default function Login() {
 
   async function onSubmit(values: { username: string; password: string }) {
     try {
-      console.log('[Login] Attempting login');
       const result = await login(values);
       
       if (result.ok) {
-        console.log('[Login] Login successful, initiating navigation');
         toast({
           title: "ログイン成功",
           description: "ダッシュボードに移動します",
         });
-        // Force reload navigation
         window.location.replace('/');
         return;
       }
 
-      console.log('[Login] Login failed:', result.message);
       if (result.errors) {
         Object.entries(result.errors).forEach(([field, messages]) => {
           form.setError(field as "username" | "password", {
@@ -85,7 +88,6 @@ export default function Login() {
         });
       }
     } catch (error) {
-      console.error('[Login] Unexpected error:', error);
       toast({
         variant: "destructive",
         title: "エラー",

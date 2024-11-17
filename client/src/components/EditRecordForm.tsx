@@ -1,6 +1,13 @@
-import React from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useToast } from "@/hooks/use-toast";
+import { SwimRecord, Competition } from "db/schema";
+import useSWR from "swr";
+import * as z from "zod";
+import { Loader2 } from "lucide-react";
+
+// UI Components
 import {
   Form,
   FormControl,
@@ -28,33 +35,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { SwimRecord, Competition } from "db/schema";
-import * as z from "zod";
-import useSWR from "swr";
 
-// Time format validation regex: MM:SS.ms
-const timeRegex = /^([0-5]?[0-9]):([0-5][0-9])\.([0-9]{1,3})$/;
-
-// Pool length configuration with type safety
+// Constants and Types
 const POOL_LENGTHS = [15, 25, 50] as const;
 type PoolLength = typeof POOL_LENGTHS[number];
 
-// Enhanced pool length validation
+const TIME_FORMAT_REGEX = /^([0-5]?[0-9]):([0-5][0-9])\.([0-9]{1,3})$/;
+const SWIM_STYLES = [
+  "自由形",
+  "背泳ぎ",
+  "平泳ぎ",
+  "バタフライ",
+  "個人メドレー"
+] as const;
+
+// Validation functions
 const validatePoolLength = (value: number): value is PoolLength => {
-  const isValid = POOL_LENGTHS.includes(value as PoolLength);
-  console.log(`[Records] Validating pool length ${value}m:`, {
-    isValid,
-    allowedLengths: POOL_LENGTHS,
-    timestamp: new Date().toISOString()
-  });
-  return isValid;
+  return POOL_LENGTHS.includes(value as PoolLength);
 };
 
-// Get available distances based on pool length
+// Helper functions
 const getAvailableDistances = (poolLength: PoolLength): number[] => {
-  console.log(`[Records] Getting available distances for pool length: ${poolLength}m`);
   switch (poolLength) {
     case 15:
       return [15, 30, 60, 90, 120, 240];
@@ -63,16 +64,15 @@ const getAvailableDistances = (poolLength: PoolLength): number[] => {
     case 50:
       return [50, 100, 200, 400, 800, 1500];
     default:
-      console.warn(`[Records] Invalid pool length: ${poolLength}m`);
       return [];
   }
 };
 
-// Enhanced record schema with strict pool length validation
+// Schema definition
 const editRecordSchema = z.object({
   style: z.string().min(1, "種目を選択してください"),
   distance: z.number().min(1, "距離を選択してください"),
-  time: z.string().regex(timeRegex, "タイム形式は MM:SS.ms である必要があります"),
+  time: z.string().regex(TIME_FORMAT_REGEX, "タイム形式は MM:SS.ms である必要があります"),
   date: z.string().min(1, "日付を選択してください"),
   isCompetition: z.boolean().default(false),
   poolLength: z.number().refine(
@@ -95,19 +95,10 @@ type EditRecordFormProps = {
 
 export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }: EditRecordFormProps) {
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { data: competitions } = useSWR<Competition[]>("/api/competitions");
 
-  // Initialize form with safe default pool length and logging
   const defaultPoolLength: PoolLength = 25;
-
-  React.useEffect(() => {
-    if (record?.poolLength) {
-      console.log(`[Records] Loading existing record with pool length: ${record.poolLength}m`);
-    } else {
-      console.log(`[Records] Creating new record with default pool length: ${defaultPoolLength}m`);
-    }
-  }, [record]);
 
   const form = useForm<z.infer<typeof editRecordSchema>>({
     resolver: zodResolver(editRecordSchema),
@@ -133,12 +124,6 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
   const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
     try {
       setIsSubmitting(true);
-      console.log('[Records] Submitting record:', {
-        ...values,
-        poolLength: `${values.poolLength}m`,
-        type: record ? 'update' : 'create',
-        timestamp: new Date().toISOString()
-      });
 
       if (!values.isCompetition) {
         values.competitionId = null;
@@ -152,7 +137,6 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
       });
       onClose();
     } catch (error) {
-      console.error('[Records] Error submitting record:', error);
       toast({
         variant: "destructive",
         title: "エラー",
@@ -162,14 +146,6 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
       setIsSubmitting(false);
     }
   };
-
-  const swimStyles = [
-    "自由形",
-    "背泳ぎ",
-    "平泳ぎ",
-    "バタフライ",
-    "個人メドレー"
-  ];
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -199,7 +175,7 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {swimStyles.map(style => (
+                      {SWIM_STYLES.map(style => (
                         <SelectItem key={style} value={style}>{style}</SelectItem>
                       ))}
                     </SelectContent>
@@ -218,13 +194,10 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
                     value={field.value.toString()}
                     onValueChange={(value) => {
                       const poolLength = Number(value) as PoolLength;
-                      console.log(`[Records] Pool length changed to: ${poolLength}m`);
                       field.onChange(poolLength);
-                      // Reset distance when pool length changes
                       const availableDistances = getAvailableDistances(poolLength);
                       if (!availableDistances.includes(form.getValues('distance'))) {
                         const newDistance = availableDistances[0];
-                        console.log(`[Records] Resetting distance to ${newDistance}m for ${poolLength}m pool`);
                         form.setValue('distance', newDistance);
                       }
                     }}
@@ -260,7 +233,6 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
                     value={field.value.toString()}
                     onValueChange={(value) => {
                       const distance = Number(value);
-                      console.log(`[Records] Distance changed to: ${distance}m`);
                       field.onChange(distance);
                     }}
                     disabled={isSubmitting}
