@@ -132,17 +132,16 @@ export default function Athletes() {
         throw new Error('Failed to create record');
       }
 
-      // Force immediate refresh
-      await mutateRecords();
+      // Force immediate refresh with no cache
+      await mutateRecords(undefined, { revalidate: true });
       
-      // Add a delay before second refresh
+      // Add multiple delayed refreshes to ensure data is updated
       setTimeout(async () => {
-        await mutateRecords();
-        // Force a third refresh after another delay
+        await mutateRecords(undefined, { revalidate: true });
         setTimeout(async () => {
-          await mutateRecords();
-        }, 500);
-      }, 500);
+          await mutateRecords(undefined, { revalidate: true });
+        }, 1000);
+      }, 1000);
 
       toast({
         title: "追加成功",
