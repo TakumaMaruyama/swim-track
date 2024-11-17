@@ -42,9 +42,14 @@ export default function Athletes() {
 
   const getLatestPerformance = (studentId: number) => {
     if (!records) return null;
-    return records
-      .filter(record => record.studentId === studentId)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+    const studentRecords = records.filter(record => record.studentId === studentId);
+    if (studentRecords.length === 0) return null;
+    
+    return studentRecords.sort((a, b) => {
+      const dateA = new Date(a.date || '').getTime();
+      const dateB = new Date(b.date || '').getTime();
+      return dateB - dateA;
+    })[0];
   };
 
   const getAthleteRecords = (studentId: number) => {
@@ -127,17 +132,16 @@ export default function Athletes() {
         throw new Error('Failed to create record');
       }
 
-      // Force immediate refresh
+      // Force immediate refresh of records data
       await mutateRecords();
       
-      // Add a longer delay for second refresh to ensure data is updated
-      setTimeout(async () => {
-        await mutateRecords();
-        // Force a third refresh after another delay
-        setTimeout(async () => {
-          await mutateRecords();
-        }, 500);
-      }, 1000);
+      // Add a delay and force a second refresh to ensure data is updated
+      await new Promise(resolve => setTimeout(resolve, 500));
+      await mutateRecords();
+
+      // Add a third refresh after another delay
+      await new Promise(resolve => setTimeout(resolve, 500));
+      await mutateRecords();
 
       toast({
         title: "追加成功",
@@ -161,7 +165,10 @@ export default function Athletes() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          poolLength: Number(data.poolLength),
+        }),
         credentials: 'include',
       });
 
@@ -365,7 +372,7 @@ export default function Athletes() {
                         <div>
                           <p className="text-sm font-medium">日付</p>
                           <p className="text-base">
-                            {new Date(latestRecord.date).toLocaleDateString()}
+                            {latestRecord.date ? new Date(latestRecord.date).toLocaleDateString() : ''}
                           </p>
                         </div>
                       </div>
