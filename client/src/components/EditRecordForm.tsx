@@ -37,11 +37,24 @@ import useSWR from "swr";
 // Time format validation regex: MM:SS.ms
 const timeRegex = /^([0-5]?[0-9]):([0-5][0-9])\.([0-9]{1,3})$/;
 
-// Available pool lengths
-const poolLengths = [15, 25, 50];
+// Pool length configuration with type safety
+const POOL_LENGTHS = [15, 25, 50] as const;
+type PoolLength = typeof POOL_LENGTHS[number];
+
+// Enhanced pool length validation
+const validatePoolLength = (value: number): value is PoolLength => {
+  const isValid = POOL_LENGTHS.includes(value as PoolLength);
+  console.log(`[Records] Validating pool length ${value}m:`, {
+    isValid,
+    allowedLengths: POOL_LENGTHS,
+    timestamp: new Date().toISOString()
+  });
+  return isValid;
+};
 
 // Get available distances based on pool length
-const getAvailableDistances = (poolLength: number) => {
+const getAvailableDistances = (poolLength: PoolLength): number[] => {
+  console.log(`[Records] Getting available distances for pool length: ${poolLength}m`);
   switch (poolLength) {
     case 15:
       return [15, 30, 60, 90, 120, 240];
@@ -50,18 +63,26 @@ const getAvailableDistances = (poolLength: number) => {
     case 50:
       return [50, 100, 200, 400, 800, 1500];
     default:
+      console.warn(`[Records] Invalid pool length: ${poolLength}m`);
       return [];
   }
 };
 
+// Enhanced record schema with strict pool length validation
 const editRecordSchema = z.object({
   style: z.string().min(1, "種目を選択してください"),
   distance: z.number().min(1, "距離を選択してください"),
   time: z.string().regex(timeRegex, "タイム形式は MM:SS.ms である必要があります"),
   date: z.string().min(1, "日付を選択してください"),
   isCompetition: z.boolean().default(false),
-  poolLength: z.number().refine(val => poolLengths.includes(val), "有効なプール長を選択してください"),
-  competitionId: z.number().nullable()
+  poolLength: z.number().refine(
+    validatePoolLength,
+    val => ({
+      message: `プール長は ${POOL_LENGTHS.join(', ')}m のいずれかである必要があります。入力値: ${val}m`
+    })
+  ),
+  competitionId: z.number().nullable(),
+  studentId: z.number().optional(),
 });
 
 type EditRecordFormProps = {
@@ -77,35 +98,62 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const { data: competitions } = useSWR<Competition[]>("/api/competitions");
 
-  const form = useForm({
+  // Initialize form with safe default pool length and logging
+  const defaultPoolLength: PoolLength = 25;
+
+  React.useEffect(() => {
+    if (record?.poolLength) {
+      console.log(`[Records] Loading existing record with pool length: ${record.poolLength}m`);
+    } else {
+      console.log(`[Records] Creating new record with default pool length: ${defaultPoolLength}m`);
+    }
+  }, [record]);
+
+  const form = useForm<z.infer<typeof editRecordSchema>>({
     resolver: zodResolver(editRecordSchema),
     defaultValues: {
       style: record?.style ?? "",
       distance: record?.distance ?? 50,
       time: record?.time ?? "",
-      date: record ? new Date(record.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      date: record?.date 
+        ? new Date(record.date).toISOString().split('T')[0] 
+        : new Date().toISOString().split('T')[0],
       isCompetition: record?.isCompetition ?? false,
-      poolLength: record?.poolLength ?? 25,
-      competitionId: record?.competitionId ?? null
+      poolLength: (record?.poolLength && POOL_LENGTHS.includes(record.poolLength as PoolLength))
+        ? record.poolLength as PoolLength
+        : defaultPoolLength,
+      competitionId: record?.competitionId ?? null,
+      studentId: studentId ?? record?.studentId,
     },
   });
 
   const watchIsCompetition = form.watch('isCompetition');
+  const watchedPoolLength = form.watch('poolLength') as PoolLength;
 
   const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
     try {
       setIsSubmitting(true);
-      // If not a competition, ensure competitionId is null
+      console.log('[Records] Submitting record:', {
+        ...values,
+        poolLength: `${values.poolLength}m`,
+        type: record ? 'update' : 'create',
+        operation: record ? 'update' : 'create',
+        timestamp: new Date().toISOString()
+      });
+
       if (!values.isCompetition) {
         values.competitionId = null;
       }
-      await onSubmit({ ...values, studentId });
+
+      await onSubmit(values);
+      
       toast({
         title: record ? "更新成功" : "記録追加成功",
         description: record ? "記録が更新されました" : "新しい記録が追加されました",
       });
       onClose();
     } catch (error) {
+      console.error('[Records] Error submitting record:', error);
       toast({
         variant: "destructive",
         title: "エラー",
@@ -124,8 +172,6 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
     "個人メドレー"
   ];
 
-  const watchedPoolLength = form.watch('poolLength');
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
@@ -143,18 +189,22 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>種目</FormLabel>
-                  <FormControl>
-                    <select
-                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                      {...field}
-                      disabled={isSubmitting}
-                    >
-                      <option value="">種目を選択</option>
+                  <Select
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    disabled={isSubmitting}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="種目を選択" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
                       {swimStyles.map(style => (
-                        <option key={style} value={style}>{style}</option>
+                        <SelectItem key={style} value={style}>{style}</SelectItem>
                       ))}
-                    </select>
-                  </FormControl>
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
@@ -165,26 +215,38 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>プール長 (m)</FormLabel>
-                  <FormControl>
-                    <select
-                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                      {...field}
-                      onChange={e => {
-                        const value = Number(e.target.value);
-                        field.onChange(value);
-                        // Reset distance when pool length changes
-                        const availableDistances = getAvailableDistances(value);
-                        if (!availableDistances.includes(form.getValues('distance'))) {
-                          form.setValue('distance', availableDistances[0]);
-                        }
-                      }}
-                      disabled={isSubmitting}
-                    >
-                      {poolLengths.map(length => (
-                        <option key={length} value={length}>{length}mプール</option>
+                  <Select
+                    value={field.value.toString()}
+                    onValueChange={(value) => {
+                      const poolLength = Number(value) as PoolLength;
+                      console.log(`[Records] Pool length changed to: ${poolLength}m`);
+                      field.onChange(poolLength);
+                      // Reset distance when pool length changes
+                      const availableDistances = getAvailableDistances(poolLength);
+                      if (!availableDistances.includes(form.getValues('distance'))) {
+                        const newDistance = availableDistances[0];
+                        console.log(`[Records] Resetting distance to ${newDistance}m for ${poolLength}m pool`);
+                        form.setValue('distance', newDistance);
+                      }
+                    }}
+                    disabled={isSubmitting}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="プール長を選択" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {POOL_LENGTHS.map(length => (
+                        <SelectItem key={length} value={length.toString()}>
+                          {length}mプール
+                        </SelectItem>
                       ))}
-                    </select>
-                  </FormControl>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    選択可能なプール長: {POOL_LENGTHS.join(', ')}m
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -195,19 +257,26 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>距離 (m)</FormLabel>
-                  <FormControl>
-                    <select
-                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                      {...field}
-                      onChange={e => field.onChange(Number(e.target.value))}
-                      disabled={isSubmitting}
-                    >
-                      <option value="">距離を選択</option>
+                  <Select
+                    value={field.value.toString()}
+                    onValueChange={(value) => {
+                      const distance = Number(value);
+                      console.log(`[Records] Distance changed to: ${distance}m`);
+                      field.onChange(distance);
+                    }}
+                    disabled={isSubmitting}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="距離を選択" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
                       {getAvailableDistances(watchedPoolLength).map(d => (
-                        <option key={d} value={d}>{d}m</option>
+                        <SelectItem key={d} value={d.toString()}>{d}m</SelectItem>
                       ))}
-                    </select>
-                  </FormControl>
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
@@ -257,7 +326,12 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
                   <FormControl>
                     <Checkbox
                       checked={field.value}
-                      onCheckedChange={field.onChange}
+                      onCheckedChange={(checked) => {
+                        field.onChange(checked);
+                        if (!checked) {
+                          form.setValue('competitionId', null);
+                        }
+                      }}
                       disabled={isSubmitting}
                     />
                   </FormControl>

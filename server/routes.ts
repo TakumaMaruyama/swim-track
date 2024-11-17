@@ -15,6 +15,10 @@ const scryptAsync = promisify(scrypt);
 const SALT_LENGTH = 32;
 const HASH_LENGTH = 64;
 
+// Valid pool lengths with proper type assertion
+const POOL_LENGTHS = [15, 25, 50] as const;
+type PoolLength = typeof POOL_LENGTHS[number];
+
 // Use absolute path in persistent storage directory
 const UPLOAD_DIR = path.join(process.env.HOME || process.cwd(), "storage/uploads");
 
@@ -63,6 +67,35 @@ const hashPassword = async (password: string): Promise<string> => {
   const hash = (await scryptAsync(password, salt, HASH_LENGTH)) as Buffer;
   const hashedPassword = Buffer.concat([hash, salt]);
   return hashedPassword.toString('hex');
+};
+
+// Validate pool length with proper type checking
+const validatePoolLength = (value: number): value is PoolLength => {
+  return POOL_LENGTHS.includes(value as PoolLength);
+};
+
+// Enhanced pool length validation with detailed logging
+const validatePoolLengthMiddleware = (req: any, res: any, next: any) => {
+  const poolLength = Number(req.body.poolLength);
+  console.log(`[Records] Validating pool length: ${poolLength}m`, {
+    body: req.body,
+    method: req.method,
+    path: req.path
+  });
+  
+  if (!validatePoolLength(poolLength)) {
+    const error = `Invalid pool length: ${poolLength}m. Must be one of: ${POOL_LENGTHS.join(', ')}m`;
+    console.error(`[Records] ${error}`);
+    return res.status(400).json({
+      message: "無効なプール長です",
+      errors: {
+        poolLength: [`プール長は ${POOL_LENGTHS.join(', ')}m のいずれかである必要があります。入力値: ${poolLength}m`]
+      }
+    });
+  }
+
+  console.log(`[Records] Pool length validation successful: ${poolLength}m`);
+  next();
 };
 
 export function registerRoutes(app: Express) {
@@ -591,47 +624,71 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Create new record
-  app.post("/api/records", requireAuth, requireCoach, async (req, res) => {
+  // Create new record with enhanced pool length validation
+  app.post("/api/records", requireAuth, validatePoolLengthMiddleware, async (req, res) => {
     try {
-      const { studentId, style, distance, time, date, isCompetition } = req.body;
-      
-      // Verify student exists
-      const [student] = await db
-        .select()
-        .from(users)
-        .where(and(eq(users.id, studentId), eq(users.role, "student")))
-        .limit(1);
+      const {
+        style,
+        distance,
+        time,
+        date,
+        isCompetition,
+        poolLength,
+        competitionId,
+        studentId
+      } = req.body;
 
-      if (!student) {
-        return res.status(404).json({ message: "選手が見つかりません" });
-      }
+      console.log('[Records] Creating new record:', {
+        style,
+        distance,
+        poolLength: `${poolLength}m`,
+        isCompetition,
+        studentId
+      });
 
       const [record] = await db
         .insert(swimRecords)
         .values({
-          studentId,
           style,
           distance,
           time,
           date: new Date(date),
-          isCompetition,
-          poolLength: 15, // Force 15m pool length
+          isCompetition: isCompetition || false,
+          poolLength,
+          competitionId: competitionId || null,
+          studentId
         })
         .returning();
 
+      console.log('[Records] Successfully created record with pool length:', `${record.poolLength}m`);
       res.json(record);
     } catch (error) {
-      console.error('Error creating record:', error);
+      console.error('[Records] Error creating record:', error);
       res.status(500).json({ message: "記録の作成に失敗しました" });
     }
   });
 
-  // Update record
-  app.put("/api/records/:id", requireAuth, requireCoach, async (req, res) => {
+  // Update record update endpoint with validation
+  app.put("/api/records/:id", requireAuth, requireCoach, validatePoolLengthMiddleware, async (req, res) => {
     try {
       const { id } = req.params;
-      const { style, distance, time, date, isCompetition, poolLength } = req.body;
+      const {
+        style,
+        distance,
+        time,
+        date,
+        isCompetition,
+        poolLength,
+        competitionId
+      } = req.body;
+
+      console.log('[Records] Updating record:', {
+        id,
+        style,
+        distance,
+        poolLength: `${poolLength}m`,
+        isCompetition
+      });
 
       const [record] = await db
         .update(swimRecords)
@@ -640,19 +697,22 @@ export function registerRoutes(app: Express) {
           distance,
           time,
           date: new Date(date),
-          isCompetition,
+          isCompetition: isCompetition || false,
           poolLength,
+          competitionId: competitionId || null
         })
         .where(eq(swimRecords.id, parseInt(id)))
         .returning();
 
       if (!record) {
+        console.error('[Records] Record not found:', id);
         return res.status(404).json({ message: "記録が見つかりません" });
       }
 
+      console.log('[Records] Successfully updated record with pool length:', `${record.poolLength}m`);
       res.json(record);
     } catch (error) {
-      console.error('Error updating record:', error);
+      console.error('[Records] Error updating record:', error);
       res.status(500).json({ message: "記録の更新に失敗しました" });
     }
   });
@@ -738,5 +798,136 @@ export function registerRoutes(app: Express) {
   //   }
   // });
 
-  return app;
+  // Add pool length validation middleware to record creation/update endpoints
+  app.post("/api/records", requireAuth, validatePoolLengthMiddleware, async (req, res) => {
+    try {
+      console.log('[Records] Creating new record with pool length:', req.body.poolLength);
+      const [record] = await db
+        .insert(swimRecords)
+        .values({
+          ...req.body,
+          studentId: req.body.studentId || req.user!.id,
+          poolLength: Number(req.body.poolLength)
+        })
+        .returning();
+
+      console.log('[Records] Record created successfully:', {
+        id: record.id,
+        poolLength: record.poolLength
+      });
+      
+      res.json(record);
+    } catch (error) {
+      console.error('[Records] Error creating record:', error);
+      res.status(500).json({ message: "記録の作成に失敗しました" });
+    }
+  });
+
+  app.put("/api/records/:id", requireAuth, validatePoolLengthMiddleware, async (req, res) => {
+    try {
+      const { id } = req.params;
+      console.log(`[Records] Updating record ${id} with pool length:`, req.body.poolLength);
+
+      const [record] = await db
+        .update(swimRecords)
+        .set({
+          ...req.body,
+          poolLength: Number(req.body.poolLength)
+        })
+        .where(eq(swimRecords.id, parseInt(id)))
+        .returning();
+
+      if (!record) {
+        return res.status(404).json({ message: "記録が見つかりません" });
+      }
+
+      console.log('[Records] Record updated successfully:', {
+        id: record.id,
+        poolLength: record.poolLength
+      });
+
+      res.json(record);
+    } catch (error) {
+      console.error('[Records] Error updating record:', error);
+      res.status(500).json({ message: "記録の更新に失敗しました" });
+    }
+  });
+
+  // Enhanced record creation endpoint with pool length validation
+  app.post("/api/records", requireAuth, validatePoolLengthMiddleware, async (req, res) => {
+    try {
+      console.log('[Records] Creating new record:', {
+        ...req.body,
+        poolLength: `${req.body.poolLength}m`,
+        timestamp: new Date().toISOString()
+      });
+
+      const [record] = await db
+        .insert(swimRecords)
+        .values({
+          studentId: req.body.studentId,
+          style: req.body.style,
+          distance: req.body.distance,
+          time: req.body.time,
+          date: new Date(req.body.date),
+          isCompetition: req.body.isCompetition,
+          poolLength: req.body.poolLength,
+          competitionId: req.body.competitionId || null
+        })
+        .returning();
+
+      console.log('[Records] Record created successfully:', {
+        id: record.id,
+        poolLength: `${record.poolLength}m`,
+        timestamp: new Date().toISOString()
+      });
+
+      res.json(record);
+    } catch (error) {
+      console.error('[Records] Error creating record:', error);
+      res.status(500).json({ message: "記録の作成に失敗しました" });
+    }
+  });
+
+  // Enhanced record update endpoint with pool length validation
+  app.put("/api/records/:id", requireAuth, validatePoolLengthMiddleware, async (req, res) => {
+    try {
+      const { id } = req.params;
+      console.log('[Records] Updating record:', {
+        id,
+        ...req.body,
+        poolLength: `${req.body.poolLength}m`,
+        timestamp: new Date().toISOString()
+      });
+
+      const [record] = await db
+        .update(swimRecords)
+        .set({
+          style: req.body.style,
+          distance: req.body.distance,
+          time: req.body.time,
+          date: new Date(req.body.date),
+          isCompetition: req.body.isCompetition,
+          poolLength: req.body.poolLength,
+          competitionId: req.body.competitionId || null
+        })
+        .where(eq(swimRecords.id, parseInt(id)))
+        .returning();
+
+      if (!record) {
+        return res.status(404).json({ message: "記録が見つかりません" });
+      }
+
+      console.log('[Records] Record updated successfully:', {
+        id: record.id,
+        poolLength: `${record.poolLength}m`,
+        timestamp: new Date().toISOString()
+      });
+
+      res.json(record);
+    } catch (error) {
+      console.error('[Records] Error updating record:', error);
+      res.status(500).json({ message: "記録の更新に失敗しました" });
+    }
+  });
 }

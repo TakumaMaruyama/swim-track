@@ -8,37 +8,39 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 (async () => {
-  registerRoutes(app);
-  const server = createServer(app);
+  try {
+    registerRoutes(app);
+    const server = createServer(app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+    // Enhanced error handling middleware
+    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      console.error('[Server Error]:', {
+        status: err.status || err.statusCode || 500,
+        message: err.message || "Internal Server Error",
+        stack: app.get("env") === "development" ? err.stack : undefined
+      });
 
-    res.status(status).json({ message });
-    throw err;
-  });
-
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
-
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client
-  const PORT = 5000;
-  server.listen(PORT, "0.0.0.0", () => {
-    const formattedTime = new Date().toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: true,
+      // Only send response if it hasn't been sent already
+      if (!res.headersSent) {
+        const status = err.status || err.statusCode || 500;
+        const message = err.message || "Internal Server Error";
+        res.status(status).json({ message });
+      }
     });
 
-    console.log(`${formattedTime} [express] serving on port ${PORT}`);
-  });
+    // Setup Vite or static serving based on environment
+    if (app.get("env") === "development") {
+      await setupVite(app, server);
+    } else {
+      serveStatic(app);
+    }
+
+    const PORT = Number(process.env.PORT || 5000);
+    server.listen(PORT, "0.0.0.0", () => {
+      console.log(`[Server] Running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('[Server] Startup error:', error);
+    process.exit(1);
+  }
 })();
