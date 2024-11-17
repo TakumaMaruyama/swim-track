@@ -130,9 +130,14 @@ export default function Athletes() {
       // Force immediate refresh
       await mutateRecords();
       
-      // Add a delay before second refresh to ensure data is updated
-      await new Promise(resolve => setTimeout(resolve, 500));
-      await mutateRecords();
+      // Add a longer delay for second refresh to ensure data is updated
+      setTimeout(async () => {
+        await mutateRecords();
+        // Force a third refresh after another delay
+        setTimeout(async () => {
+          await mutateRecords();
+        }, 500);
+      }, 1000);
 
       toast({
         title: "追加成功",
