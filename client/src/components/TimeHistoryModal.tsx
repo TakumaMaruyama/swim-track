@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, TrendingUp, Trash2, Edit2 } from "lucide-react";
+import { Trophy, TrendingUp, Trash2, Edit2, Medal } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
 import type { ExtendedSwimRecord } from "../hooks/use-swim-records";
@@ -249,46 +249,44 @@ export function TimeHistoryModal({
                       poolLength={parseInt(poolLength)}
                     />
 
-                    <div className="space-y-3 mt-4">
+                    <div className="space-y-4 mt-6">
                       {records.map((record) => {
                         const competitionName = getCompetitionName(record.competitionId);
+                        const isCompetitionRecord = record.isCompetition || competitionName;
+
                         return (
                           <div
                             key={record.id}
-                            className="p-3 rounded-lg flex flex-col gap-2 md:flex-row md:justify-between md:items-center bg-muted/50"
+                            className={`p-4 rounded-lg ${isCompetitionRecord ? 'bg-primary/5 border border-primary/10' : 'bg-muted/50'} space-y-4`}
                           >
-                            <div className="flex flex-col gap-2">
-                              <span className="text-xl font-bold">{record.time}</span>
-                              <div className="flex flex-wrap gap-2">
-                                {record.time === personalBests[key] && (
-                                  <Badge variant="secondary" className="flex items-center gap-1">
-                                    <Trophy className="h-3 w-3" />
-                                    自己ベスト
-                                  </Badge>
-                                )}
-                                {record.isCompetition && (
-                                  <Badge className="flex items-center gap-1">
-                                    <TrendingUp className="h-3 w-3" />
-                                    {competitionName ? competitionName : '大会記録'}
-                                  </Badge>
-                                )}
-                                {competitionName && (
-                                  <div className="text-sm font-medium text-primary">
+                            <div className="flex flex-col gap-4">
+                              {competitionName && (
+                                <div className="flex items-center gap-2">
+                                  <Medal className="h-6 w-6 text-primary" />
+                                  <h4 className="text-2xl font-bold text-primary tracking-tight">
                                     {competitionName}
-                                  </div>
-                                )}
+                                  </h4>
+                                </div>
+                              )}
+                              <div className="flex flex-col gap-2">
+                                <div className="flex items-baseline gap-3">
+                                  <span className="text-xl font-bold tracking-tight">{record.time}</span>
+                                  {record.time === personalBests[key] && (
+                                    <Badge variant="secondary" className="h-6">
+                                      <Trophy className="h-4 w-4 mr-1" />
+                                      自己ベスト
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                  {formatDate(record.date)}
+                                </div>
                               </div>
                             </div>
-                            <div className="flex flex-col items-start md:items-end gap-1">
-                              <div className="text-sm text-muted-foreground">
-                                {formatDate(record.date)}
-                              </div>
-                              <div className="text-sm text-muted-foreground">
-                                {record.poolLength}mプール
-                              </div>
-                            </div>
+
+                            {/* Actions Section */}
                             {user?.role === 'coach' && (
-                              <div className="flex gap-2 justify-end md:justify-start">
+                              <div className="flex gap-2 justify-end">
                                 <Button
                                   variant="ghost"
                                   size="icon"
