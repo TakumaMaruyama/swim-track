@@ -1,11 +1,27 @@
-import React from 'react';
+// Import groups organized by type
+import { useEffect, useState } from 'react';
+
+// External libraries
+import { AlertCircle, Edit2, Plus, Power, History, Trash2 } from "lucide-react";
+
+// Internal hooks
 import { useAthletes } from '../hooks/use-athletes';
 import { useSwimRecords } from '../hooks/use-swim-records';
+import { useUser } from '../hooks/use-user';
+import { useToast } from '@/hooks/use-toast';
+
+// Internal components
+import { PageHeader } from '../components/PageHeader';
+import { EditAthleteForm } from '../components/EditAthleteForm';
+import { EditRecordForm } from '../components/EditRecordForm';
+import { TimeHistoryModal } from '../components/TimeHistoryModal';
+
+// UI Components
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Edit2, Plus, Power, History, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,48 +32,79 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { EditAthleteForm } from '../components/EditAthleteForm';
-import { EditRecordForm } from '../components/EditRecordForm';
-import { TimeHistoryModal } from '../components/TimeHistoryModal';
-import { useUser } from '../hooks/use-user';
-import { useToast } from '@/hooks/use-toast';
-import { PageHeader } from '../components/PageHeader';
-import { Badge } from "@/components/ui/badge";
 
+// Types
+import type { User } from "db/schema";
+import type { ExtendedSwimRecord } from "../hooks/use-swim-records";
+
+interface LatestPerformance extends Omit<ExtendedSwimRecord, 'date'> {
+  date: string | null;
+}
+
+interface ViewingHistoryState {
+  athleteId: number | null;
+  athleteName: string;
+}
+
+interface EditingRecordState {
+  id: number | null;
+  studentId: number | null;
+}
+
+/**
+ * Athletes page component that displays a list of athletes and their records
+ * Allows coaches to manage athletes and their performance records
+ */
 export default function Athletes() {
   const { user } = useUser();
   const { toast } = useToast();
   const { athletes, isLoading: athletesLoading, error: athletesError, mutate: mutateAthletes } = useAthletes();
   const { records, isLoading: recordsLoading, error: recordsError, mutate: mutateRecords } = useSwimRecords();
-  const [editingAthlete, setEditingAthlete] = React.useState<number | null>(null);
-  const [deletingAthlete, setDeletingAthlete] = React.useState<number | null>(null);
-  const [editingRecord, setEditingRecord] = React.useState<{id: number | null, studentId: number | null}>({
+  
+  // State management
+  const [editingAthlete, setEditingAthlete] = useState<number | null>(null);
+  const [deletingAthlete, setDeletingAthlete] = useState<number | null>(null);
+  const [editingRecord, setEditingRecord] = useState<EditingRecordState>({
     id: null,
     studentId: null
   });
-  const [viewingHistory, setViewingHistory] = React.useState<{
-    athleteId: number | null;
-    athleteName: string;
-  }>({ athleteId: null, athleteName: '' });
+  const [viewingHistory, setViewingHistory] = useState<ViewingHistoryState>({
+    athleteId: null,
+    athleteName: ''
+  });
 
-  const getLatestPerformance = (studentId: number) => {
+  /**
+   * Gets the latest performance record for a given athlete
+   */
+  const getLatestPerformance = (studentId: number): LatestPerformance | null => {
     if (!records) return null;
     const studentRecords = records.filter(record => record.studentId === studentId);
     if (studentRecords.length === 0) return null;
     
-    return studentRecords.sort((a, b) => {
+    const latestRecord = studentRecords.sort((a, b) => {
       const dateA = new Date(a.date || '').getTime();
       const dateB = new Date(b.date || '').getTime();
       return dateB - dateA;
     })[0];
+
+    return {
+      ...latestRecord,
+      date: latestRecord.date ? new Date(latestRecord.date).toISOString() : null
+    };
   };
 
-  const getAthleteRecords = (studentId: number) => {
+  /**
+   * Gets all records for a given athlete
+   */
+  const getAthleteRecords = (studentId: number): ExtendedSwimRecord[] => {
     if (!records) return [];
     return records.filter(record => record.studentId === studentId);
   };
 
-  const handleToggleStatus = async (athleteId: number, currentStatus: boolean) => {
+  /**
+   * Handles toggling athlete's active status
+   */
+  const handleToggleStatus = async (athleteId: number, currentStatus: boolean): Promise<void> => {
     try {
       const response = await fetch(`/api/athletes/${athleteId}/status`, {
         method: 'PATCH',
@@ -78,7 +125,6 @@ export default function Athletes() {
         description: `選手のステータスが${!currentStatus ? '有効' : '無効'}になりました`,
       });
     } catch (error) {
-      console.error('Error updating athlete status:', error);
       toast({
         variant: "destructive",
         title: "エラー",
@@ -87,7 +133,10 @@ export default function Athletes() {
     }
   };
 
-  const handleEdit = async (athleteId: number, data: { username: string }) => {
+  /**
+   * Handles editing athlete information
+   */
+  const handleEdit = async (athleteId: number, data: { username: string }): Promise<void> => {
     try {
       const response = await fetch(`/api/athletes/${athleteId}`, {
         method: 'PUT',
@@ -104,19 +153,15 @@ export default function Athletes() {
 
       await mutateAthletes();
     } catch (error) {
-      console.error('Error updating athlete:', error);
       throw error;
     }
   };
 
-  const handleCreateRecord = async (data: any) => {
+  /**
+   * Handles creating a new record
+   */
+  const handleCreateRecord = async (data: Record<string, any>): Promise<void> => {
     try {
-      // Add debug logging
-      console.log('[Records] Creating record:', {
-        ...data,
-        poolLength: Number(data.poolLength)
-      });
-      
       const response = await fetch('/api/records', {
         method: 'POST',
         headers: {
@@ -133,23 +178,13 @@ export default function Athletes() {
         throw new Error('Failed to create record');
       }
 
-      // Force immediate refresh with revalidation
-      await mutateRecords(undefined, { revalidate: true });
+      await mutateRecords();
       
-      // Add multiple delayed refreshes to ensure data is updated
-      setTimeout(async () => {
-        await mutateRecords(undefined, { revalidate: true });
-        setTimeout(async () => {
-          await mutateRecords(undefined, { revalidate: true });
-        }, 1000);
-      }, 1000);
-
       toast({
         title: "追加成功",
         description: "新しい記録が追加されました",
       });
     } catch (error) {
-      console.error('[Records] Error creating record:', error);
       toast({
         variant: "destructive",
         title: "エラー",
@@ -159,7 +194,10 @@ export default function Athletes() {
     }
   };
 
-  const handleEditRecord = async (recordId: number, data: any) => {
+  /**
+   * Handles editing an existing record
+   */
+  const handleEditRecord = async (recordId: number, data: Record<string, any>): Promise<void> => {
     try {
       const response = await fetch(`/api/records/${recordId}`, {
         method: 'PUT',
@@ -183,7 +221,6 @@ export default function Athletes() {
         description: "記録が更新されました",
       });
     } catch (error) {
-      console.error('Error updating record:', error);
       toast({
         variant: "destructive",
         title: "エラー",
@@ -193,7 +230,10 @@ export default function Athletes() {
     }
   };
 
-  const handleDelete = async (athleteId: number) => {
+  /**
+   * Handles deleting an athlete and their records
+   */
+  const handleDelete = async (athleteId: number): Promise<void> => {
     try {
       const response = await fetch(`/api/athletes/${athleteId}`, {
         method: 'DELETE',
@@ -214,7 +254,6 @@ export default function Athletes() {
         description: "選手と関連する記録が削除されました",
       });
     } catch (error) {
-      console.error('Error deleting athlete:', error);
       toast({
         variant: "destructive",
         title: "エラー",
@@ -223,6 +262,7 @@ export default function Athletes() {
     }
   };
 
+  // Loading state
   if (athletesLoading || recordsLoading) {
     return (
       <>
@@ -236,6 +276,7 @@ export default function Athletes() {
     );
   }
 
+  // Error state
   if (athletesError || recordsError) {
     return (
       <>

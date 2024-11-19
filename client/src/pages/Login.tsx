@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+// Import groups organized by type
+import { useEffect } from 'react';
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -30,6 +31,9 @@ import {
   AlertDescription 
 } from "@/components/ui/alert";
 
+/**
+ * Login page component that handles user authentication
+ */
 export default function Login() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -39,7 +43,7 @@ export default function Login() {
     isLoading: isAuthChecking,
     error: authError 
   } = useUser();
-  
+
   const form = useForm({
     resolver: zodResolver(insertUserSchema),
     defaultValues: {
@@ -48,6 +52,7 @@ export default function Login() {
     },
   });
 
+  // Redirect to home if already authenticated
   useEffect(() => {
     let mounted = true;
     
@@ -60,6 +65,9 @@ export default function Login() {
     };
   }, [isAuthChecking, isAuthenticated]);
 
+  /**
+   * Handles form submission for login
+   */
   async function onSubmit(values: { username: string; password: string }) {
     try {
       const result = await login(values);
@@ -73,6 +81,7 @@ export default function Login() {
         return;
       }
 
+      // Handle validation errors
       if (result.errors) {
         Object.entries(result.errors).forEach(([field, messages]) => {
           form.setError(field as "username" | "password", {
@@ -96,6 +105,7 @@ export default function Login() {
     }
   }
 
+  // Display loading state during authentication check
   if (isAuthChecking) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
