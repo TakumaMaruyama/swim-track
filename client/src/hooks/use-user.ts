@@ -63,7 +63,6 @@ export function useUser() {
 
     try {
       setAuthState({ isLoading: true, error: null });
-
       const response = await fetch("/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -109,7 +108,6 @@ export function useUser() {
 
     try {
       setAuthState({ isLoading: true, error: null });
-
       const response = await fetch("/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -184,56 +182,14 @@ export function useUser() {
     }
   }, [authState.isLoading, mutate]);
 
-  /**
-   * Handles account deletion
-   * @returns Result of account deletion attempt
-   */
-  const deleteAccount = useCallback(async (): Promise<AuthResult> => {
-    if (authState.isLoading) {
-      return { ok: false, message: "削除処理中です" };
-    }
-
-    try {
-      setAuthState({ isLoading: true, error: null });
-      const response = await fetch("/api/user", {
-        method: "DELETE",
-        credentials: "include",
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        const error: AuthError = { 
-          message: data.message || "アカウントの削除に失敗しました",
-          field: "network"
-        };
-        setAuthState({ isLoading: false, error });
-        return { ok: false, ...error };
-      }
-
-      await mutate(undefined, false);
-      return { ok: true, message: data.message };
-    } catch (error) {
-      const authError: AuthError = { 
-        message: "サーバーとの通信に失敗しました",
-        field: "network"
-      };
-      setAuthState({ isLoading: false, error: authError });
-      return { ok: false, ...authError };
-    } finally {
-      setAuthState(prev => ({ ...prev, isLoading: false }));
-    }
-  }, [authState.isLoading, mutate]);
-
   return {
     user: data,
     isLoading: swrLoading || authState.isLoading,
-    isLoginPending: authState.isLoading,
+    isAuthChecking: swrLoading,
     isAuthenticated: !!data,
     error: authState.error || (swrError ? { message: "認証に失敗しました" } : null),
     register,
     login,
     logout,
-    deleteAccount,
   };
 }

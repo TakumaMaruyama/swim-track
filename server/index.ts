@@ -22,24 +22,27 @@ app.use(express.urlencoded({ extended: false }));
     registerRoutes(app);
     const server = createServer(app);
 
-    // Enhanced error handling middleware
+    // Enhanced error handling middleware with standardized format
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || err.statusCode || 500;
-      const message = err.message || "サーバーエラーが発生しました";
+      const errorResponse = {
+        message: err.message || "サーバーエラーが発生しました",
+        code: err.code || 'INTERNAL_ERROR'
+      };
       
-      // Development logging only
-      if (app.get("env") === "development") {
-        console.error('Server error:', {
+      // Development logging only for critical errors
+      if (app.get("env") === "development" && status >= 500) {
+        console.error('[Server Error]', {
           status,
-          message,
+          ...errorResponse,
           stack: err.stack
         });
       }
 
       if (!res.headersSent) {
-        res.status(status).json({ 
-          message,
-          ...(app.get("env") === "development" ? { stack: err.stack } : {})
+        res.status(status).json({
+          ...errorResponse,
+          ...(app.get("env") === "development" && status >= 500 ? { stack: err.stack } : {})
         });
       }
     });
@@ -54,11 +57,11 @@ app.use(express.urlencoded({ extended: false }));
     const PORT = Number(process.env.PORT || 5000);
     server.listen(PORT, "0.0.0.0", () => {
       if (app.get("env") === "development") {
-        console.log(`Development server running on port ${PORT}`);
+        console.log(`[Server] Development server running on port ${PORT}`);
       }
     });
   } catch (error) {
-    console.error('Server startup error:', error);
+    console.error('[Server] Startup error:', error);
     process.exit(1);
   }
 })();

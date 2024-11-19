@@ -1,5 +1,3 @@
-// This combined code updates auth.ts to clean up unnecessary logs, improve error handling patterns, add better JSDoc documentation, and organize imports. 
-
 // External libraries
 import passport from "passport";
 import { IVerifyOptions, Strategy as LocalStrategy } from "passport-local";
@@ -144,9 +142,6 @@ export function setupAuth(app: Express) {
         const now = Date.now();
         const attempts = loginAttempts.get(ipKey) || { count: 0, lastAttempt: 0 };
 
-        // Add delay to prevent timing attacks
-        await new Promise(resolve => setTimeout(resolve, Math.random() * 100));
-
         const [user] = await db
           .select()
           .from(users)
@@ -159,6 +154,12 @@ export function setupAuth(app: Express) {
             lastAttempt: now,
             lockoutUntil: attempts.count + 1 >= MAX_ATTEMPTS ? now + LOCKOUT_TIME : undefined
           });
+          
+          // Log failed login attempt
+          if (attempts.count + 1 >= MAX_ATTEMPTS) {
+            console.warn('[Auth] Account locked due to multiple failed attempts:', { username });
+          }
+          
           return done(null, false, { 
             message: "ユーザー名またはパスワードが正しくありません" 
           });
@@ -171,6 +172,12 @@ export function setupAuth(app: Express) {
             lastAttempt: now,
             lockoutUntil: attempts.count + 1 >= MAX_ATTEMPTS ? now + LOCKOUT_TIME : undefined
           });
+          
+          // Log failed login attempt
+          if (attempts.count + 1 >= MAX_ATTEMPTS) {
+            console.warn('[Auth] Account locked due to multiple failed attempts:', { username });
+          }
+          
           return done(null, false, { 
             message: "ユーザー名またはパスワードが正しくありません"
           });
@@ -184,6 +191,7 @@ export function setupAuth(app: Express) {
 
         return done(null, user);
       } catch (err) {
+        console.error('[Auth] Authentication error:', err);
         return done(err);
       }
     })
@@ -207,6 +215,7 @@ export function setupAuth(app: Express) {
 
       done(null, user);
     } catch (err) {
+      console.error('[Auth] Deserialization error:', err);
       done(err);
     }
   });
@@ -258,6 +267,7 @@ export function setupAuth(app: Express) {
         });
       });
     } catch (error) {
+      console.error('[Auth] Registration error:', error);
       next(error);
     }
   });
