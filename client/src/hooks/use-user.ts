@@ -1,10 +1,18 @@
+/**
+ * Hook for managing user authentication state and operations
+ * Provides login, register, logout, and account deletion functionality
+ */
+
+// External libraries
 import useSWR from "swr";
-import type { User, InsertUser } from "db/schema";
 import { useCallback, useState } from "react";
+
+// Types
+import type { User, InsertUser } from "db/schema";
 
 interface AuthError {
   message: string;
-  field?: string;
+  field?: "credentials" | "network" | "username" | "password";
   errors?: Record<string, string[]>;
 }
 
@@ -16,11 +24,15 @@ interface AuthState {
 interface AuthResult {
   ok: boolean;
   message?: string;
-  field?: string;
+  field?: AuthError['field'];
   errors?: Record<string, string[]>;
   user?: User;
 }
 
+/**
+ * Custom hook for managing user authentication
+ * @returns Authentication state and methods
+ */
 export function useUser() {
   const [authState, setAuthState] = useState<AuthState>({
     isLoading: false,
@@ -36,21 +48,23 @@ export function useUser() {
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
     shouldRetryOnError: false,
-    refreshInterval: 300000,
+    refreshInterval: 300000, // 5 minutes
     onError: () => {
-      console.log('[Auth] Session validation failed, clearing user data');
       mutate(undefined, false);
     }
   });
 
+  /**
+   * Registers a new user
+   * @param user User registration data
+   * @returns Result of registration attempt
+   */
   const register = useCallback(async (user: InsertUser): Promise<AuthResult> => {
     if (authState.isLoading) {
-      console.log('[Auth] Registration already in progress');
       return { ok: false, message: "登録処理中です" };
     }
 
     try {
-      console.log('[Auth] Starting registration attempt');
       setAuthState({ isLoading: true, error: null });
 
       const response = await fetch("/register", {
@@ -63,8 +77,7 @@ export function useUser() {
       const data = await response.json();
 
       if (!response.ok) {
-        console.log('[Auth] Registration failed:', data.message);
-        const error = {
+        const error: AuthError = {
           message: data.message || "登録に失敗しました",
           field: data.field,
           errors: data.errors,
@@ -76,33 +89,34 @@ export function useUser() {
         return { ok: false, ...error };
       }
 
-      console.log('[Auth] Registration successful');
       await mutate();
       return { ok: true, user: data.user };
-    } catch (e: any) {
-      console.error('[Auth] Registration error:', e);
-      const error = {
+    } catch (error) {
+      const authError: AuthError = {
         message: "サーバーとの通信に失敗しました",
         field: "network",
       };
       setAuthState({
         isLoading: false,
-        error
+        error: authError
       });
-      return { ok: false, ...error };
+      return { ok: false, ...authError };
     } finally {
       setAuthState(prev => ({ ...prev, isLoading: false }));
     }
   }, [authState.isLoading, mutate]);
 
+  /**
+   * Authenticates a user
+   * @param user User login credentials
+   * @returns Result of login attempt
+   */
   const login = useCallback(async (user: InsertUser): Promise<AuthResult> => {
     if (authState.isLoading) {
-      console.log('[Auth] Login already in progress');
       return { ok: false, message: "ログイン処理中です" };
     }
 
     try {
-      console.log('[Auth] Starting login attempt');
       setAuthState({ isLoading: true, error: null });
 
       const response = await fetch("/login", {
@@ -115,8 +129,7 @@ export function useUser() {
       const data = await response.json();
 
       if (!response.ok) {
-        console.log('[Auth] Login failed:', data.message);
-        const error = {
+        const error: AuthError = {
           message: data.message || "ログインに失敗しました",
           field: data.field,
           errors: data.errors,
@@ -128,32 +141,33 @@ export function useUser() {
         return { ok: false, ...error };
       }
 
-      console.log('[Auth] Login successful');
       await mutate();
       return { ok: true, user: data.user };
-    } catch (e: any) {
-      console.error('[Auth] Login error:', e);
-      const error = {
+    } catch (error) {
+      const authError: AuthError = {
         message: "サーバーとの通信に失敗しました",
         field: "network",
       };
       setAuthState({
         isLoading: false,
-        error
+        error: authError
       });
-      return { ok: false, ...error };
+      return { ok: false, ...authError };
     } finally {
       setAuthState(prev => ({ ...prev, isLoading: false }));
     }
   }, [authState.isLoading, mutate]);
 
+  /**
+   * Logs out the current user
+   * @returns Result of logout attempt
+   */
   const logout = useCallback(async (): Promise<AuthResult> => {
     if (authState.isLoading) {
       return { ok: false, message: "ログアウト処理中です" };
     }
 
     try {
-      console.log('[Auth] Starting logout');
       setAuthState({ isLoading: true, error: null });
       const response = await fetch("/logout", {
         method: "POST",
@@ -163,7 +177,7 @@ export function useUser() {
       const data = await response.json();
 
       if (!response.ok) {
-        const error = { message: data.message || "ログアウトに失敗しました" };
+        const error: AuthError = { message: data.message || "ログアウトに失敗しました" };
         setAuthState({
           isLoading: false,
           error
@@ -173,19 +187,25 @@ export function useUser() {
 
       await mutate(undefined, false);
       return { ok: true };
-    } catch (e: any) {
-      console.error('[Auth] Logout error:', e);
-      const error = { message: "サーバーとの通信に失敗しました" };
+    } catch (error) {
+      const authError: AuthError = { 
+        message: "サーバーとの通信に失敗しました",
+        field: "network"
+      };
       setAuthState({
         isLoading: false,
-        error
+        error: authError
       });
-      return { ok: false, ...error };
+      return { ok: false, ...authError };
     } finally {
       setAuthState(prev => ({ ...prev, isLoading: false }));
     }
   }, [authState.isLoading, mutate]);
 
+  /**
+   * Deletes the current user's account
+   * @returns Result of account deletion attempt
+   */
   const deleteAccount = useCallback(async (): Promise<AuthResult> => {
     if (authState.isLoading) {
       return { ok: false, message: "削除処理中です" };
@@ -201,7 +221,10 @@ export function useUser() {
       const data = await response.json();
 
       if (!response.ok) {
-        const error = { message: data.message || "アカウントの削除に失敗しました" };
+        const error: AuthError = { 
+          message: data.message || "アカウントの削除に失敗しました",
+          field: "network"
+        };
         setAuthState({
           isLoading: false,
           error
@@ -212,13 +235,15 @@ export function useUser() {
       await mutate(undefined, false);
       return { ok: true, message: data.message };
     } catch (error) {
-      console.error('Error deleting account:', error);
-      const errorMessage = { message: "サーバーとの通信に失敗しました" };
+      const authError: AuthError = { 
+        message: "サーバーとの通信に失敗しました",
+        field: "network"
+      };
       setAuthState({
         isLoading: false,
-        error: errorMessage
+        error: authError
       });
-      return { ok: false, ...errorMessage };
+      return { ok: false, ...authError };
     } finally {
       setAuthState(prev => ({ ...prev, isLoading: false }));
     }
