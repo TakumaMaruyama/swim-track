@@ -25,6 +25,24 @@ const LOCKOUT_TIME = 15 * 60 * 1000; // 15 minutes
 const ATTEMPT_RESET_TIME = 30 * 60 * 1000; // 30 minutes
 
 /**
+ * Interface for login attempt tracking
+ */
+interface LoginAttempt {
+  count: number;
+  lastAttempt: number;
+  lastSuccess?: number;
+  lockoutUntil?: number;
+}
+
+/**
+ * Interface for login check result
+ */
+interface LoginCheck {
+  allowed: boolean;
+  message?: string;
+}
+
+/**
  * Crypto utility functions for password hashing and comparison
  */
 const crypto = {
@@ -73,7 +91,7 @@ declare global {
  * Sets up authentication middleware and routes
  * @param app Express application instance
  */
-export function setupAuth(app: Express) {
+export function setupAuth(app: Express): void {
   const MemoryStore = createMemoryStore(session);
   const sessionSettings: session.SessionOptions = {
     secret: process.env.REPL_ID || "secure-session-secret",
@@ -96,19 +114,14 @@ export function setupAuth(app: Express) {
   app.use(passport.session());
 
   // Rate limiting configuration
-  const loginAttempts = new Map<string, { 
-    count: number; 
-    lastAttempt: number;
-    lastSuccess?: number;
-    lockoutUntil?: number;
-  }>();
+  const loginAttempts = new Map<string, LoginAttempt>();
 
   /**
    * Checks login attempts for rate limiting
    * @param username Username to check
    * @returns Object containing allowed status and optional message
    */
-  const checkLoginAttempts = (username: string): { allowed: boolean; message?: string } => {
+  const checkLoginAttempts = (username: string): LoginCheck => {
     const now = Date.now();
     const key = username.toLowerCase();
     const attempts = loginAttempts.get(key) || { count: 0, lastAttempt: 0 };
@@ -131,7 +144,7 @@ export function setupAuth(app: Express) {
 
   // Configure passport local strategy
   passport.use(
-    new LocalStrategy(async (username, password, done) => {
+    new LocalStrategy(async (username: string, password: string, done) => {
       try {
         const loginCheck = checkLoginAttempts(username);
         if (!loginCheck.allowed) {
@@ -148,39 +161,28 @@ export function setupAuth(app: Express) {
           .where(eq(users.username, username))
           .limit(1);
 
-        if (!user?.password) {
-          loginAttempts.set(ipKey, {
+        const handleFailedAttempt = () => {
+          const newAttempts = {
             count: attempts.count + 1,
             lastAttempt: now,
             lockoutUntil: attempts.count + 1 >= MAX_ATTEMPTS ? now + LOCKOUT_TIME : undefined
-          });
-          
-          // Log failed login attempt
-          if (attempts.count + 1 >= MAX_ATTEMPTS) {
-            console.warn('[Auth] Account locked due to multiple failed attempts:', { username });
+          };
+          loginAttempts.set(ipKey, newAttempts);
+
+          if (newAttempts.lockoutUntil) {
+            console.warn('[Auth] Account locked:', { username });
           }
-          
-          return done(null, false, { 
-            message: "ユーザー名またはパスワードが正しくありません" 
-          });
+        };
+
+        if (!user?.password) {
+          handleFailedAttempt();
+          return done(null, false, { message: "ユーザー名またはパスワードが正しくありません" });
         }
 
         const isMatch = await crypto.compare(password, user.password);
         if (!isMatch) {
-          loginAttempts.set(ipKey, {
-            count: attempts.count + 1,
-            lastAttempt: now,
-            lockoutUntil: attempts.count + 1 >= MAX_ATTEMPTS ? now + LOCKOUT_TIME : undefined
-          });
-          
-          // Log failed login attempt
-          if (attempts.count + 1 >= MAX_ATTEMPTS) {
-            console.warn('[Auth] Account locked due to multiple failed attempts:', { username });
-          }
-          
-          return done(null, false, { 
-            message: "ユーザー名またはパスワードが正しくありません"
-          });
+          handleFailedAttempt();
+          return done(null, false, { message: "ユーザー名またはパスワードが正しくありません" });
         }
 
         loginAttempts.set(ipKey, {
@@ -191,7 +193,7 @@ export function setupAuth(app: Express) {
 
         return done(null, user);
       } catch (err) {
-        console.error('[Auth] Authentication error:', err);
+        console.error('[Auth] Critical error:', err);
         return done(err);
       }
     })
@@ -220,16 +222,15 @@ export function setupAuth(app: Express) {
     }
   });
 
+  // Authentication routes
   app.post("/register", async (req, res, next) => {
     try {
       const result = insertUserSchema.safeParse(req.body);
       if (!result.success) {
-        return res
-          .status(400)
-          .json({ 
-            message: "入力が無効です", 
-            errors: result.error.flatten().fieldErrors 
-          });
+        return res.status(400).json({ 
+          message: "入力が無効です", 
+          errors: result.error.flatten().fieldErrors 
+        });
       }
 
       const { username, password, role } = result.data;
@@ -275,12 +276,10 @@ export function setupAuth(app: Express) {
   app.post("/login", (req, res, next) => {
     const result = insertUserSchema.safeParse(req.body);
     if (!result.success) {
-      return res
-        .status(400)
-        .json({ 
-          message: "入力が無効です", 
-          errors: result.error.flatten().fieldErrors 
-        });
+      return res.status(400).json({ 
+        message: "入力が無効です", 
+        errors: result.error.flatten().fieldErrors 
+      });
     }
 
     passport.authenticate("local", (err: any, user: Express.User | false, info: IVerifyOptions) => {

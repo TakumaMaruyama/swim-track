@@ -49,7 +49,7 @@ export default function Login() {
   const { 
     login, 
     isAuthenticated, 
-    isLoading: isAuthChecking,
+    isAuthChecking,
     error: authError 
   } = useUser();
 
@@ -63,22 +63,16 @@ export default function Login() {
 
   // Handle authentication state changes
   useEffect(() => {
-    let mounted = true;
-    
-    if (!isAuthChecking && isAuthenticated && mounted) {
+    if (!isAuthChecking && isAuthenticated) {
       window.location.replace('/');
     }
-
-    return () => {
-      mounted = false;
-    };
   }, [isAuthChecking, isAuthenticated]);
 
   /**
    * Handles form submission for login
    * @param values Login form values
    */
-  const onSubmit = async (values: LoginFormValues) => {
+  const onSubmit = async (values: LoginFormValues): Promise<void> => {
     try {
       const result = await login(values);
       
