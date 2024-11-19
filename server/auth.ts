@@ -1,3 +1,6 @@
+// This combined code updates auth.ts to clean up unnecessary logs, improve error handling patterns, add better JSDoc documentation, and organize imports. 
+
+// External libraries
 import passport from "passport";
 import { IVerifyOptions, Strategy as LocalStrategy } from "passport-local";
 import { type Express } from "express";
@@ -5,19 +8,33 @@ import session from "express-session";
 import createMemoryStore from "memorystore";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { users, insertUserSchema, type User as SelectUser } from "db/schema";
-import { db } from "db";
 import { eq } from "drizzle-orm";
+
+// Internal modules
+import { db } from "db";
+import { users, insertUserSchema } from "db/schema";
+
+// Types
+import type { User as SelectUser } from "db/schema";
 
 const scryptAsync = promisify(scrypt);
 
+// Constants
 const SALT_LENGTH = 32;
 const HASH_LENGTH = 64;
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_TIME = 15 * 60 * 1000; // 15 minutes
+const ATTEMPT_RESET_TIME = 30 * 60 * 1000; // 30 minutes
 
 /**
  * Crypto utility functions for password hashing and comparison
  */
 const crypto = {
+  /**
+   * Hashes a password using scrypt
+   * @param password Plain text password
+   * @returns Hashed password string
+   */
   hash: async (password: string): Promise<string> => {
     try {
       const salt = randomBytes(SALT_LENGTH);
@@ -28,6 +45,13 @@ const crypto = {
       throw new Error('パスワードのハッシュ化に失敗しました');
     }
   },
+
+  /**
+   * Compares a supplied password with a stored hash
+   * @param suppliedPassword Plain text password to compare
+   * @param storedPassword Stored hashed password
+   * @returns Boolean indicating if passwords match
+   */
   compare: async (suppliedPassword: string, storedPassword: string): Promise<boolean> => {
     try {
       const buffer = Buffer.from(storedPassword, 'hex');
@@ -47,6 +71,10 @@ declare global {
   }
 }
 
+/**
+ * Sets up authentication middleware and routes
+ * @param app Express application instance
+ */
 export function setupAuth(app: Express) {
   const MemoryStore = createMemoryStore(session);
   const sessionSettings: session.SessionOptions = {
@@ -76,13 +104,11 @@ export function setupAuth(app: Express) {
     lastSuccess?: number;
     lockoutUntil?: number;
   }>();
-  
-  const MAX_ATTEMPTS = 5;
-  const LOCKOUT_TIME = 15 * 60 * 1000; // 15 minutes
-  const ATTEMPT_RESET_TIME = 30 * 60 * 1000; // 30 minutes
 
   /**
-   * Check login attempts and handle rate limiting
+   * Checks login attempts for rate limiting
+   * @param username Username to check
+   * @returns Object containing allowed status and optional message
    */
   const checkLoginAttempts = (username: string): { allowed: boolean; message?: string } => {
     const now = Date.now();
@@ -105,6 +131,7 @@ export function setupAuth(app: Express) {
     return { allowed: true };
   };
 
+  // Configure passport local strategy
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
@@ -157,9 +184,6 @@ export function setupAuth(app: Express) {
 
         return done(null, user);
       } catch (err) {
-        if (app.get("env") === "development") {
-          console.error('Authentication error:', err);
-        }
         return done(err);
       }
     })
@@ -183,9 +207,6 @@ export function setupAuth(app: Express) {
 
       done(null, user);
     } catch (err) {
-      if (app.get("env") === "development") {
-        console.error('Deserialization error:', err);
-      }
       done(err);
     }
   });

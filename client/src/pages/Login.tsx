@@ -1,12 +1,13 @@
-// Import groups organized by type
+// External libraries
 import { useEffect } from 'react';
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader2, Home, AlertCircle } from "lucide-react";
+
+// Internal hooks and components
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
-import { insertUserSchema } from "db/schema";
-import { Loader2, Home, AlertCircle } from "lucide-react";
 
 // UI Components
 import {
@@ -31,8 +32,16 @@ import {
   AlertDescription 
 } from "@/components/ui/alert";
 
+// Types
+import { insertUserSchema } from "db/schema";
+import type { z } from "zod";
+
+type LoginFormValues = z.infer<typeof insertUserSchema>;
+
 /**
- * Login page component that handles user authentication
+ * Login page component
+ * Handles user authentication and navigation
+ * @returns JSX.Element
  */
 export default function Login() {
   const [, navigate] = useLocation();
@@ -44,7 +53,7 @@ export default function Login() {
     error: authError 
   } = useUser();
 
-  const form = useForm({
+  const form = useForm<LoginFormValues>({
     resolver: zodResolver(insertUserSchema),
     defaultValues: {
       username: "",
@@ -52,7 +61,7 @@ export default function Login() {
     },
   });
 
-  // Redirect to home if already authenticated
+  // Handle authentication state changes
   useEffect(() => {
     let mounted = true;
     
@@ -67,8 +76,9 @@ export default function Login() {
 
   /**
    * Handles form submission for login
+   * @param values Login form values
    */
-  async function onSubmit(values: { username: string; password: string }) {
+  const onSubmit = async (values: LoginFormValues) => {
     try {
       const result = await login(values);
       
@@ -84,7 +94,7 @@ export default function Login() {
       // Handle validation errors
       if (result.errors) {
         Object.entries(result.errors).forEach(([field, messages]) => {
-          form.setError(field as "username" | "password", {
+          form.setError(field as keyof LoginFormValues, {
             type: "manual",
             message: messages[0],
           });
@@ -103,7 +113,7 @@ export default function Login() {
         description: "予期せぬエラーが発生しました",
       });
     }
-  }
+  };
 
   // Display loading state during authentication check
   if (isAuthChecking) {
