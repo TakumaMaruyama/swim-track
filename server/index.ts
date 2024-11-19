@@ -25,18 +25,17 @@ app.use(express.urlencoded({ extended: false }));
     // Enhanced error handling middleware
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || err.statusCode || 500;
-      const message = err.message || "Internal Server Error";
+      const message = err.message || "サーバーエラーが発生しました";
       
-      // Only log errors in development
+      // Development logging only
       if (app.get("env") === "development") {
-        console.error('[Server Error]:', {
+        console.error('Server error:', {
           status,
           message,
           stack: err.stack
         });
       }
 
-      // Only send response if it hasn't been sent already
       if (!res.headersSent) {
         res.status(status).json({ 
           message,
@@ -55,11 +54,11 @@ app.use(express.urlencoded({ extended: false }));
     const PORT = Number(process.env.PORT || 5000);
     server.listen(PORT, "0.0.0.0", () => {
       if (app.get("env") === "development") {
-        console.log(`[Server] Development server running on port ${PORT}`);
+        console.log(`Development server running on port ${PORT}`);
       }
     });
   } catch (error) {
-    console.error('[Server] Startup error:', error);
+    console.error('Server startup error:', error);
     process.exit(1);
   }
 })();

@@ -69,7 +69,7 @@ export function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Enhanced rate limiting
+  // Rate limiting configuration
   const loginAttempts = new Map<string, { 
     count: number; 
     lastAttempt: number;
@@ -157,6 +157,9 @@ export function setupAuth(app: Express) {
 
         return done(null, user);
       } catch (err) {
+        if (app.get("env") === "development") {
+          console.error('Authentication error:', err);
+        }
         return done(err);
       }
     })
@@ -180,6 +183,9 @@ export function setupAuth(app: Express) {
 
       done(null, user);
     } catch (err) {
+      if (app.get("env") === "development") {
+        console.error('Deserialization error:', err);
+      }
       done(err);
     }
   });
