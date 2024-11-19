@@ -14,19 +14,21 @@ const scryptAsync = promisify(scrypt);
 const SALT_LENGTH = 32;
 const HASH_LENGTH = 64;
 
+/**
+ * Crypto utility functions for password hashing and comparison
+ */
 const crypto = {
-  hash: async (password: string) => {
+  hash: async (password: string): Promise<string> => {
     try {
       const salt = randomBytes(SALT_LENGTH);
       const hash = (await scryptAsync(password, salt, HASH_LENGTH)) as Buffer;
       const hashedPassword = Buffer.concat([hash, salt]);
       return hashedPassword.toString('hex');
     } catch (error) {
-      console.error('Password hashing error:', error);
       throw new Error('パスワードのハッシュ化に失敗しました');
     }
   },
-  compare: async (suppliedPassword: string, storedPassword: string) => {
+  compare: async (suppliedPassword: string, storedPassword: string): Promise<boolean> => {
     try {
       const buffer = Buffer.from(storedPassword, 'hex');
       const hash = buffer.subarray(0, HASH_LENGTH);
@@ -34,7 +36,6 @@ const crypto = {
       const suppliedHash = (await scryptAsync(suppliedPassword, salt, HASH_LENGTH)) as Buffer;
       return timingSafeEqual(hash, suppliedHash);
     } catch (error) {
-      console.error('Password comparison error:', error);
       return false;
     }
   },
@@ -49,14 +50,17 @@ declare global {
 export function setupAuth(app: Express) {
   const MemoryStore = createMemoryStore(session);
   const sessionSettings: session.SessionOptions = {
-    secret: process.env.REPL_ID || "porygon-supremacy",
-    resave: true,
-    saveUninitialized: true,
+    secret: process.env.REPL_ID || "secure-session-secret",
+    resave: false,
+    saveUninitialized: false,
     rolling: true,
+    store: new MemoryStore({
+      checkPeriod: 86400000 // 24 hours
+    }),
     cookie: {
-      maxAge: 24 * 60 * 60 * 1000,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
       httpOnly: true,
-      secure: 'auto',
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax'
     }
   };
@@ -65,7 +69,7 @@ export function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Enhanced rate limiting with more sophisticated tracking
+  // Enhanced rate limiting
   const loginAttempts = new Map<string, { 
     count: number; 
     lastAttempt: number;
@@ -77,18 +81,19 @@ export function setupAuth(app: Express) {
   const LOCKOUT_TIME = 15 * 60 * 1000; // 15 minutes
   const ATTEMPT_RESET_TIME = 30 * 60 * 1000; // 30 minutes
 
+  /**
+   * Check login attempts and handle rate limiting
+   */
   const checkLoginAttempts = (username: string): { allowed: boolean; message?: string } => {
     const now = Date.now();
     const key = username.toLowerCase();
     const attempts = loginAttempts.get(key) || { count: 0, lastAttempt: 0 };
 
-    // Reset attempts if enough time has passed since last attempt
     if (now - attempts.lastAttempt > ATTEMPT_RESET_TIME) {
       loginAttempts.delete(key);
       return { allowed: true };
     }
 
-    // Check if user is in lockout period
     if (attempts.lockoutUntil && now < attempts.lockoutUntil) {
       const remainingTime = Math.ceil((attempts.lockoutUntil - now) / 60000);
       return {
@@ -128,7 +133,7 @@ export function setupAuth(app: Express) {
             lockoutUntil: attempts.count + 1 >= MAX_ATTEMPTS ? now + LOCKOUT_TIME : undefined
           });
           return done(null, false, { 
-            message: "ユーザー名またはパスワードが正しくありません。" 
+            message: "ユーザー名またはパスワードが正しくありません" 
           });
         }
 
@@ -140,11 +145,10 @@ export function setupAuth(app: Express) {
             lockoutUntil: attempts.count + 1 >= MAX_ATTEMPTS ? now + LOCKOUT_TIME : undefined
           });
           return done(null, false, { 
-            message: "ユーザー名またはパスワードが正しくありません。"
+            message: "ユーザー名またはパスワードが正しくありません"
           });
         }
 
-        // Reset attempts on successful login
         loginAttempts.set(ipKey, {
           count: 0,
           lastAttempt: now,
@@ -153,7 +157,6 @@ export function setupAuth(app: Express) {
 
         return done(null, user);
       } catch (err) {
-        console.error('Authentication error:', err);
         return done(err);
       }
     })
@@ -172,22 +175,19 @@ export function setupAuth(app: Express) {
         .limit(1);
       
       if (!user) {
-        return done(new Error("ユーザーが見つかりません"));
+        return done(null, false);
       }
 
       done(null, user);
     } catch (err) {
-      console.error('Deserialization error:', err);
       done(err);
     }
   });
 
   app.post("/register", async (req, res, next) => {
     try {
-      console.log('[Auth] Processing registration request');
       const result = insertUserSchema.safeParse(req.body);
       if (!result.success) {
-        console.log('[Auth] Registration validation failed:', result.error);
         return res
           .status(400)
           .json({ 
@@ -198,7 +198,6 @@ export function setupAuth(app: Express) {
 
       const { username, password, role } = result.data;
 
-      // Check if user already exists
       const [existingUser] = await db
         .select()
         .from(users)
@@ -206,7 +205,6 @@ export function setupAuth(app: Express) {
         .limit(1);
 
       if (existingUser) {
-        console.log('[Auth] Registration failed: username already exists');
         return res.status(400).json({ 
           message: "このユーザー名は既に使用されています",
           field: "username"
@@ -214,7 +212,6 @@ export function setupAuth(app: Express) {
       }
 
       const hashedPassword = await crypto.hash(password);
-
       const [newUser] = await db
         .insert(users)
         .values({
@@ -224,10 +221,8 @@ export function setupAuth(app: Express) {
         })
         .returning();
 
-      console.log('[Auth] Registration successful');
       req.login(newUser, (err) => {
         if (err) {
-          console.error('[Auth] Login after registration failed:', err);
           return next(err);
         }
         return res.json({
@@ -236,13 +231,11 @@ export function setupAuth(app: Express) {
         });
       });
     } catch (error) {
-      console.error('Registration error:', error);
       next(error);
     }
   });
 
   app.post("/login", (req, res, next) => {
-    console.log('[Auth] Processing login request');
     const result = insertUserSchema.safeParse(req.body);
     if (!result.success) {
       return res
@@ -253,13 +246,11 @@ export function setupAuth(app: Express) {
         });
     }
 
-    const cb = (err: any, user: Express.User, info: IVerifyOptions) => {
+    passport.authenticate("local", (err: any, user: Express.User | false, info: IVerifyOptions) => {
       if (err) {
-        console.error("[Auth] Login error:", err);
         return next(err);
       }
       if (!user) {
-        console.log('[Auth] Login failed:', info.message);
         return res.status(401).json({
           message: info.message ?? "ログインに失敗しました",
           field: "credentials"
@@ -268,25 +259,20 @@ export function setupAuth(app: Express) {
 
       req.logIn(user, (err) => {
         if (err) {
-          console.error("[Auth] Session error:", err);
           return next(err);
         }
-        console.log('[Auth] Login successful, session established');
         return res.json({
           message: "ログインしました",
           user: { id: user.id, username: user.username, role: user.role },
         });
       });
-    };
-    
-    passport.authenticate("local", cb)(req, res, next);
+    })(req, res, next);
   });
 
   app.post("/logout", (req, res) => {
     const username = req.user?.username;
     req.logout((err) => {
       if (err) {
-        console.error('[Auth] Logout error:', err);
         return res.status(500).json({ message: "ログアウトに失敗しました" });
       }
       if (username) {
@@ -294,22 +280,18 @@ export function setupAuth(app: Express) {
       }
       req.session.destroy((err) => {
         if (err) {
-          console.error('[Auth] Session destruction error:', err);
           return res.status(500).json({ message: "セッションの削除に失敗しました" });
         }
         res.clearCookie('connect.sid');
-        console.log('[Auth] Logout successful');
         res.json({ message: "ログアウトしました" });
       });
     });
   });
 
   app.get("/api/user", (req, res) => {
-    if (req.isAuthenticated()) {
-      console.log('[Auth] User session validated');
-      return res.json(req.user);
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "認証が必要です" });
     }
-    console.log('[Auth] No valid session found');
-    res.status(401).json({ message: "認証が必要です" });
+    res.json(req.user);
   });
 }

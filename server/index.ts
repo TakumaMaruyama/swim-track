@@ -6,10 +6,12 @@ import cors from 'cors';
 
 const app = express();
 
-// Add CORS middleware before other middleware
+// Enhanced CORS configuration
 app.use(cors({
   origin: true,
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use(express.json());
@@ -22,17 +24,24 @@ app.use(express.urlencoded({ extended: false }));
 
     // Enhanced error handling middleware
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-      console.error('[Server Error]:', {
-        status: err.status || err.statusCode || 500,
-        message: err.message || "Internal Server Error",
-        stack: app.get("env") === "development" ? err.stack : undefined
-      });
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
+      
+      // Only log errors in development
+      if (app.get("env") === "development") {
+        console.error('[Server Error]:', {
+          status,
+          message,
+          stack: err.stack
+        });
+      }
 
       // Only send response if it hasn't been sent already
       if (!res.headersSent) {
-        const status = err.status || err.statusCode || 500;
-        const message = err.message || "Internal Server Error";
-        res.status(status).json({ message });
+        res.status(status).json({ 
+          message,
+          ...(app.get("env") === "development" ? { stack: err.stack } : {})
+        });
       }
     });
 
@@ -45,7 +54,9 @@ app.use(express.urlencoded({ extended: false }));
 
     const PORT = Number(process.env.PORT || 5000);
     server.listen(PORT, "0.0.0.0", () => {
-      console.log(`[Server] Running on port ${PORT}`);
+      if (app.get("env") === "development") {
+        console.log(`[Server] Development server running on port ${PORT}`);
+      }
     });
   } catch (error) {
     console.error('[Server] Startup error:', error);
