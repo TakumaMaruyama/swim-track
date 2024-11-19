@@ -5,20 +5,20 @@ import { useCallback, useState } from "react";
 // Types
 import type { User, InsertUser } from "db/schema";
 
-/**
- * Type definitions for authentication related states and responses
- */
+/** Authentication error interface */
 interface AuthError {
   message: string;
   field?: "credentials" | "network" | "username" | "password";
   errors?: Record<string, string[]>;
 }
 
+/** Authentication state interface */
 interface AuthState {
   isLoading: boolean;
   error: AuthError | null;
 }
 
+/** Authentication result interface */
 interface AuthResult {
   ok: boolean;
   message?: string;
@@ -29,8 +29,7 @@ interface AuthResult {
 
 /**
  * Custom hook for managing user authentication state and operations
- * Provides login, register, logout, and account management functionality
- * @returns Authentication state and methods
+ * Provides login, register, and logout functionality
  */
 export function useUser() {
   const [authState, setAuthState] = useState<AuthState>({

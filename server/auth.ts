@@ -24,9 +24,7 @@ const MAX_ATTEMPTS = 5;
 const LOCKOUT_TIME = 15 * 60 * 1000; // 15 minutes
 const ATTEMPT_RESET_TIME = 30 * 60 * 1000; // 30 minutes
 
-/**
- * Interface for login attempt tracking
- */
+/** Interface for login attempt tracking */
 interface LoginAttempt {
   count: number;
   lastAttempt: number;
@@ -34,17 +32,13 @@ interface LoginAttempt {
   lockoutUntil?: number;
 }
 
-/**
- * Interface for login check result
- */
+/** Interface for login check result */
 interface LoginCheck {
   allowed: boolean;
-  message?: string;
+  message: string;
 }
 
-/**
- * Crypto utility functions for password hashing and comparison
- */
+/** Crypto utility functions for password hashing and comparison */
 const crypto = {
   /**
    * Hashes a password using scrypt
@@ -119,7 +113,7 @@ export function setupAuth(app: Express): void {
   /**
    * Checks login attempts for rate limiting
    * @param username Username to check
-   * @returns Object containing allowed status and optional message
+   * @returns Object containing allowed status and message
    */
   const checkLoginAttempts = (username: string): LoginCheck => {
     const now = Date.now();
@@ -128,7 +122,7 @@ export function setupAuth(app: Express): void {
 
     if (now - attempts.lastAttempt > ATTEMPT_RESET_TIME) {
       loginAttempts.delete(key);
-      return { allowed: true };
+      return { allowed: true, message: '' };
     }
 
     if (attempts.lockoutUntil && now < attempts.lockoutUntil) {
@@ -139,7 +133,7 @@ export function setupAuth(app: Express): void {
       };
     }
 
-    return { allowed: true };
+    return { allowed: true, message: '' };
   };
 
   // Configure passport local strategy
@@ -168,10 +162,6 @@ export function setupAuth(app: Express): void {
             lockoutUntil: attempts.count + 1 >= MAX_ATTEMPTS ? now + LOCKOUT_TIME : undefined
           };
           loginAttempts.set(ipKey, newAttempts);
-
-          if (newAttempts.lockoutUntil) {
-            console.warn('[Auth] Account locked:', { username });
-          }
         };
 
         if (!user?.password) {
@@ -268,7 +258,6 @@ export function setupAuth(app: Express): void {
         });
       });
     } catch (error) {
-      console.error('[Auth] Registration error:', error);
       next(error);
     }
   });

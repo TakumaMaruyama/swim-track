@@ -1,8 +1,18 @@
+// External libraries
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
-import { setupVite, serveStatic } from "./vite";
 import { createServer } from "http";
 import cors from 'cors';
+
+// Internal modules
+import { registerRoutes } from "./routes";
+import { setupVite, serveStatic } from "./vite";
+
+// Types
+interface ServerError extends Error {
+  status?: number;
+  statusCode?: number;
+  code?: string;
+}
 
 const app = express();
 
@@ -23,7 +33,7 @@ app.use(express.urlencoded({ extended: false }));
     const server = createServer(app);
 
     // Enhanced error handling middleware with standardized format
-    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    app.use((err: ServerError, _req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || err.statusCode || 500;
       const errorResponse = {
         message: err.message || "サーバーエラーが発生しました",
@@ -31,19 +41,16 @@ app.use(express.urlencoded({ extended: false }));
       };
       
       // Development logging only for critical errors
-      if (app.get("env") === "development" && status >= 500) {
-        console.error('[Server Error]', {
+      if (status >= 500) {
+        console.error('[Server] Critical error:', {
           status,
           ...errorResponse,
-          stack: err.stack
+          stack: app.get("env") === "development" ? err.stack : undefined
         });
       }
 
       if (!res.headersSent) {
-        res.status(status).json({
-          ...errorResponse,
-          ...(app.get("env") === "development" && status >= 500 ? { stack: err.stack } : {})
-        });
+        res.status(status).json(errorResponse);
       }
     });
 
@@ -56,12 +63,10 @@ app.use(express.urlencoded({ extended: false }));
 
     const PORT = Number(process.env.PORT || 5000);
     server.listen(PORT, "0.0.0.0", () => {
-      if (app.get("env") === "development") {
-        console.log(`[Server] Development server running on port ${PORT}`);
-      }
+      console.log(`[Server] Server running on port ${PORT}`);
     });
   } catch (error) {
-    console.error('[Server] Startup error:', error);
+    console.error('[Server] Fatal startup error:', error);
     process.exit(1);
   }
 })();
