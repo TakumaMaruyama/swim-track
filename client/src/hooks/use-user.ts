@@ -1,8 +1,3 @@
-/**
- * Hook for managing user authentication state and operations
- * Provides login, register, logout, and account deletion functionality
- */
-
 // External libraries
 import useSWR from "swr";
 import { useCallback, useState } from "react";
@@ -10,6 +5,9 @@ import { useCallback, useState } from "react";
 // Types
 import type { User, InsertUser } from "db/schema";
 
+/**
+ * Type definitions for authentication related states and responses
+ */
 interface AuthError {
   message: string;
   field?: "credentials" | "network" | "username" | "password";
@@ -30,7 +28,8 @@ interface AuthResult {
 }
 
 /**
- * Custom hook for managing user authentication
+ * Custom hook for managing user authentication state and operations
+ * Provides login, register, logout, and account management functionality
  * @returns Authentication state and methods
  */
 export function useUser() {
@@ -49,13 +48,11 @@ export function useUser() {
     revalidateOnReconnect: true,
     shouldRetryOnError: false,
     refreshInterval: 300000, // 5 minutes
-    onError: () => {
-      mutate(undefined, false);
-    }
+    onError: () => mutate(undefined, false)
   });
 
   /**
-   * Registers a new user
+   * Handles user registration
    * @param user User registration data
    * @returns Result of registration attempt
    */
@@ -82,10 +79,7 @@ export function useUser() {
           field: data.field,
           errors: data.errors,
         };
-        setAuthState({
-          isLoading: false,
-          error
-        });
+        setAuthState({ isLoading: false, error });
         return { ok: false, ...error };
       }
 
@@ -96,10 +90,7 @@ export function useUser() {
         message: "サーバーとの通信に失敗しました",
         field: "network",
       };
-      setAuthState({
-        isLoading: false,
-        error: authError
-      });
+      setAuthState({ isLoading: false, error: authError });
       return { ok: false, ...authError };
     } finally {
       setAuthState(prev => ({ ...prev, isLoading: false }));
@@ -107,7 +98,7 @@ export function useUser() {
   }, [authState.isLoading, mutate]);
 
   /**
-   * Authenticates a user
+   * Handles user login
    * @param user User login credentials
    * @returns Result of login attempt
    */
@@ -134,10 +125,7 @@ export function useUser() {
           field: data.field,
           errors: data.errors,
         };
-        setAuthState({
-          isLoading: false,
-          error
-        });
+        setAuthState({ isLoading: false, error });
         return { ok: false, ...error };
       }
 
@@ -148,10 +136,7 @@ export function useUser() {
         message: "サーバーとの通信に失敗しました",
         field: "network",
       };
-      setAuthState({
-        isLoading: false,
-        error: authError
-      });
+      setAuthState({ isLoading: false, error: authError });
       return { ok: false, ...authError };
     } finally {
       setAuthState(prev => ({ ...prev, isLoading: false }));
@@ -159,7 +144,7 @@ export function useUser() {
   }, [authState.isLoading, mutate]);
 
   /**
-   * Logs out the current user
+   * Handles user logout
    * @returns Result of logout attempt
    */
   const logout = useCallback(async (): Promise<AuthResult> => {
@@ -177,11 +162,11 @@ export function useUser() {
       const data = await response.json();
 
       if (!response.ok) {
-        const error: AuthError = { message: data.message || "ログアウトに失敗しました" };
-        setAuthState({
-          isLoading: false,
-          error
-        });
+        const error: AuthError = { 
+          message: data.message || "ログアウトに失敗しました",
+          field: "network"
+        };
+        setAuthState({ isLoading: false, error });
         return { ok: false, ...error };
       }
 
@@ -192,10 +177,7 @@ export function useUser() {
         message: "サーバーとの通信に失敗しました",
         field: "network"
       };
-      setAuthState({
-        isLoading: false,
-        error: authError
-      });
+      setAuthState({ isLoading: false, error: authError });
       return { ok: false, ...authError };
     } finally {
       setAuthState(prev => ({ ...prev, isLoading: false }));
@@ -203,7 +185,7 @@ export function useUser() {
   }, [authState.isLoading, mutate]);
 
   /**
-   * Deletes the current user's account
+   * Handles account deletion
    * @returns Result of account deletion attempt
    */
   const deleteAccount = useCallback(async (): Promise<AuthResult> => {
@@ -225,10 +207,7 @@ export function useUser() {
           message: data.message || "アカウントの削除に失敗しました",
           field: "network"
         };
-        setAuthState({
-          isLoading: false,
-          error
-        });
+        setAuthState({ isLoading: false, error });
         return { ok: false, ...error };
       }
 
@@ -239,10 +218,7 @@ export function useUser() {
         message: "サーバーとの通信に失敗しました",
         field: "network"
       };
-      setAuthState({
-        isLoading: false,
-        error: authError
-      });
+      setAuthState({ isLoading: false, error: authError });
       return { ok: false, ...authError };
     } finally {
       setAuthState(prev => ({ ...prev, isLoading: false }));

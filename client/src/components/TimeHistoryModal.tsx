@@ -1,4 +1,8 @@
-import React from 'react';
+// React and external libraries
+import React, { useMemo } from 'react';
+import useSWR from "swr";
+
+// UI Components
 import {
   Dialog,
   DialogContent,
@@ -26,41 +30,65 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, TrendingUp, Trash2, Edit2, Medal } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { useUser } from "../hooks/use-user";
-import type { ExtendedSwimRecord } from "../hooks/use-swim-records";
+
+// Icons
+import { Trophy, Edit2, Trash2, Medal } from "lucide-react";
+
+// Internal components
 import { TimeProgressChart } from './TimeProgressChart';
 import { EditRecordForm } from './EditRecordForm';
-import useSWR from "swr";
+
+// Hooks
+import { useToast } from "@/hooks/use-toast";
+import { useUser } from "../hooks/use-user";
+
+// Types
+import type { ExtendedSwimRecord } from "../hooks/use-swim-records";
 import type { Competition } from "db/schema";
 
-type TimeHistoryModalProps = {
+/**
+ * Interface for TimeHistoryModal props
+ */
+interface TimeHistoryModalProps {
   isOpen: boolean;
   onClose: () => void;
   records: ExtendedSwimRecord[];
   athleteName: string;
   onRecordDeleted?: () => void;
   onRecordUpdated?: () => void;
-};
+}
 
-type GroupedRecords = {
+/**
+ * Interface for grouped records
+ */
+interface GroupedRecords {
   [key: string]: ExtendedSwimRecord[];
-};
+}
 
-const swimStyles = [
+// Constants
+const SWIM_STYLES = [
   "自由形",
   "背泳ぎ",
   "平泳ぎ",
   "バタフライ",
   "個人メドレー"
-];
+] as const;
 
-const formatDate = (date: string | Date | null) => {
+/**
+ * Formats a date string to localized format
+ * @param date Date to format
+ * @returns Formatted date string
+ */
+const formatDate = (date: string | Date | null): string => {
   if (!date) return '';
   return new Date(date).toLocaleDateString('ja-JP');
 };
 
+/**
+ * TimeHistoryModal Component
+ * Displays detailed swimming record history for an athlete
+ * Includes time progression charts and record management
+ */
 export function TimeHistoryModal({ 
   isOpen, 
   onClose, 
@@ -77,7 +105,10 @@ export function TimeHistoryModal({
   const [editingRecord, setEditingRecord] = React.useState<number | null>(null);
   const { data: competitions } = useSWR<Competition[]>("/api/competitions");
 
-  const groupedAndFilteredRecords: GroupedRecords = React.useMemo(() => {
+  /**
+   * Groups and filters records based on current filters
+   */
+  const groupedAndFilteredRecords: GroupedRecords = useMemo(() => {
     const filtered = records.filter(record => 
       styleFilter === "all" || record.style === styleFilter
     );
@@ -109,7 +140,10 @@ export function TimeHistoryModal({
     }, {} as GroupedRecords);
   }, [records, styleFilter, sortBy]);
 
-  const personalBests = React.useMemo(() => {
+  /**
+   * Calculates personal best times for each event
+   */
+  const personalBests = useMemo(() => {
     const bests: { [key: string]: string } = {};
     Object.entries(groupedAndFilteredRecords).forEach(([key, records]) => {
       bests[key] = records.reduce((best, record) => 
@@ -119,6 +153,9 @@ export function TimeHistoryModal({
     return bests;
   }, [groupedAndFilteredRecords]);
 
+  /**
+   * Handles record deletion
+   */
   const handleDelete = async (recordId: number) => {
     try {
       const response = await fetch(`/api/records/${recordId}`, {
@@ -127,7 +164,7 @@ export function TimeHistoryModal({
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete record');
+        throw new Error('記録の削除に失敗しました');
       }
 
       toast({
@@ -139,7 +176,6 @@ export function TimeHistoryModal({
         onRecordDeleted();
       }
     } catch (error) {
-      console.error('Error deleting record:', error);
       toast({
         variant: "destructive",
         title: "エラー",
@@ -150,6 +186,9 @@ export function TimeHistoryModal({
     }
   };
 
+  /**
+   * Handles record updates
+   */
   const handleEdit = async (recordId: number, data: any) => {
     try {
       const response = await fetch(`/api/records/${recordId}`, {
@@ -162,7 +201,7 @@ export function TimeHistoryModal({
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update record');
+        throw new Error('記録の更新に失敗しました');
       }
 
       toast({
@@ -174,7 +213,6 @@ export function TimeHistoryModal({
         onRecordUpdated();
       }
     } catch (error) {
-      console.error('Error updating record:', error);
       toast({
         variant: "destructive",
         title: "エラー",
@@ -184,7 +222,10 @@ export function TimeHistoryModal({
     }
   };
 
-  const getCompetitionName = (competitionId: number | null) => {
+  /**
+   * Gets competition name from ID
+   */
+  const getCompetitionName = (competitionId: number | null): string | null => {
     if (!competitionId || !competitions) return null;
     const competition = competitions.find(c => c.id === competitionId);
     return competition ? competition.name : null;
@@ -210,7 +251,7 @@ export function TimeHistoryModal({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">すべての種目</SelectItem>
-                {swimStyles.map(style => (
+                {SWIM_STYLES.map(style => (
                   <SelectItem key={style} value={style}>{style}</SelectItem>
                 ))}
               </SelectContent>
