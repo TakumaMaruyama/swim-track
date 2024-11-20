@@ -40,12 +40,7 @@ interface LoginCheck {
 
 /** Crypto utility functions for password hashing and comparison */
 const crypto = {
-  /**
-   * Hashes a password using scrypt
-   * @param password Plain text password
-   * @returns Hashed password string
-   */
-  hash: async (password: string): Promise<string> => {
+  async hash(password: string): Promise<string> {
     try {
       const salt = randomBytes(SALT_LENGTH);
       const hash = (await scryptAsync(password, salt, HASH_LENGTH)) as Buffer;
@@ -56,13 +51,7 @@ const crypto = {
     }
   },
 
-  /**
-   * Compares a supplied password with a stored hash
-   * @param suppliedPassword Plain text password to compare
-   * @param storedPassword Stored hashed password
-   * @returns Boolean indicating if passwords match
-   */
-  compare: async (suppliedPassword: string, storedPassword: string): Promise<boolean> => {
+  async compare(suppliedPassword: string, storedPassword: string): Promise<boolean> {
     try {
       const buffer = Buffer.from(storedPassword, 'hex');
       const hash = buffer.subarray(0, HASH_LENGTH);
@@ -183,7 +172,7 @@ export function setupAuth(app: Express): void {
 
         return done(null, user);
       } catch (err) {
-        console.error('[Auth] Critical error:', err);
+        console.error('Authentication error:', err);
         return done(err);
       }
     })
@@ -207,7 +196,7 @@ export function setupAuth(app: Express): void {
 
       done(null, user);
     } catch (err) {
-      console.error('[Auth] Deserialization error:', err);
+      console.error('User deserialization error:', err);
       done(err);
     }
   });
