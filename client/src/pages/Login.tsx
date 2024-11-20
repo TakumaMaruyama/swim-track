@@ -1,10 +1,11 @@
+// External libraries
 import { useEffect } from 'react';
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Home, AlertCircle } from "lucide-react";
 
-// Internal hooks and components
+// Internal hooks
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
 
@@ -35,13 +36,23 @@ import {
 import { insertUserSchema } from "db/schema";
 import type { z } from "zod";
 
+/** Login form values type */
 type LoginFormValues = z.infer<typeof insertUserSchema>;
 
 /**
- * Login page component
- * Handles user authentication and navigation
+ * Login Page Component
+ * Handles user authentication and login functionality
+ * 
+ * Features:
+ * - User login with validation
+ * - Error handling and display
+ * - Navigation after successful login
+ * - Loading states during authentication
+ * - Registration redirect option
+ * 
+ * @returns {JSX.Element} Login page component
  */
-export default function Login() {
+export default function Login(): JSX.Element {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { 
@@ -59,6 +70,7 @@ export default function Login() {
     },
   });
 
+  // Handle redirect on successful authentication
   useEffect(() => {
     if (!isAuthChecking && isAuthenticated) {
       window.location.replace('/');
@@ -67,9 +79,11 @@ export default function Login() {
 
   /**
    * Handles form submission for login
-   * @param values Login form values
+   * Processes login attempt and manages error states
+   * 
+   * @param {LoginFormValues} values - Form values containing username and password
    */
-  const onSubmit = async (values: LoginFormValues) => {
+  const onSubmit = async (values: LoginFormValues): Promise<void> => {
     try {
       const result = await login(values);
       
@@ -106,7 +120,7 @@ export default function Login() {
     }
   };
 
-  // Display loading state during authentication check
+  // Show loading state during authentication check
   if (isAuthChecking) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
