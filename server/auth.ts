@@ -54,19 +54,20 @@ interface AuthLog {
 }
 
 /** 
- * Utility function for structured logging
- * Only logs critical events and errors
+ * Structured logging function with filtered output
+ * Only logs critical events and authentication state changes
  */
 function logAuth({ level, event, status, username, message, error, context }: AuthLog): void {
-  // Skip debug level logs in production
+  // Skip debug logs in production
   if (level === LogLevel.DEBUG && process.env.NODE_ENV === 'production') {
     return;
   }
 
-  // Only log critical events and errors
+  // Only log critical events, errors, and authentication state changes
   if (level === LogLevel.ERROR || 
-      (level === LogLevel.INFO && status === 'success' && 
-       (event === 'login' || event === 'logout'))) {
+      (level === LogLevel.INFO && 
+       ((event === 'login' && status === 'success') || 
+        (event === 'logout' && status === 'success')))) {
     console.log('[Auth]', {
       timestamp: new Date().toISOString(),
       level,
