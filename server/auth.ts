@@ -43,8 +43,7 @@ function logAuth(level: LogLevel, operation: string, message: string, context?: 
   // Only log errors and critical events
   const shouldLog = 
     level === LogLevel.ERROR || 
-    context?.critical === true ||
-    operation === 'session_error';
+    context?.critical === true;
 
   if (shouldLog) {
     console.log({
