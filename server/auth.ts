@@ -44,19 +44,14 @@ interface AuthLog {
   context?: Record<string, unknown>;
 }
 
-/** Interface for login check result */
-interface LoginCheck {
-  allowed: boolean;
-  message: string;
-}
-
 /** 
  * Utility function for structured logging
  * Only logs critical events and errors
  */
 function logAuth({ event, status, username, message, error, context }: AuthLog): void {
   // Only log critical events and errors
-  if (status === 'failure' || event === 'error') {
+  if (status === 'failure' || event === 'error' || 
+      (status === 'success' && (event === 'login' || event === 'logout'))) {
     console.error('[Auth]', { event, status, username, message, error, context });
   }
 }
@@ -141,7 +136,7 @@ export function setupAuth(app: Express): void {
    * @param username Username to check
    * @returns LoginCheck result
    */
-  const checkLoginAttempts = (username: string): LoginCheck => {
+  const checkLoginAttempts = (username: string): { allowed: boolean; message: string } => {
     const now = Date.now();
     const key = username.toLowerCase();
     const attempts = loginAttempts.get(key) || { count: 0, lastAttempt: 0 };
@@ -197,13 +192,15 @@ export function setupAuth(app: Express): void {
           };
           loginAttempts.set(ipKey, newAttempts);
           
-          logAuth({ 
-            event: 'login',
-            status: 'failure',
-            username,
-            message: 'Authentication failed',
-            context: { reason, attempts: newAttempts.count }
-          });
+          if (newAttempts.count >= AUTH_CONSTANTS.MAX_ATTEMPTS) {
+            logAuth({ 
+              event: 'login',
+              status: 'failure',
+              username,
+              message: 'Account locked due to too many failed attempts',
+              context: { reason, attempts: newAttempts.count }
+            });
+          }
         };
 
         if (!user?.password) {
@@ -221,6 +218,13 @@ export function setupAuth(app: Express): void {
           count: 0,
           lastAttempt: now,
           lastSuccess: now
+        });
+
+        logAuth({ 
+          event: 'login',
+          status: 'success',
+          username,
+          message: 'Login successful'
         });
 
         return done(null, user);
@@ -388,6 +392,14 @@ export function setupAuth(app: Express): void {
           });
           return res.status(500).json({ message: "セッションの削除に失敗しました" });
         }
+
+        logAuth({
+          event: 'logout',
+          status: 'success',
+          username,
+          message: 'Logout successful'
+        });
+
         res.clearCookie('connect.sid');
         res.json({ message: "ログアウトしました" });
       });
