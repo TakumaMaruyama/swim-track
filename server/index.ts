@@ -40,9 +40,10 @@ app.use(express.urlencoded({ extended: false }));
         code: err.code || 'INTERNAL_ERROR'
       };
       
-      // Development logging only for critical errors
+      // Only log critical errors (500+)
       if (status >= 500) {
-        console.error('[Server] Critical error:', {
+        console.error('[Server]', {
+          type: 'error',
           status,
           ...errorResponse,
           stack: app.get("env") === "development" ? err.stack : undefined
@@ -63,10 +64,17 @@ app.use(express.urlencoded({ extended: false }));
 
     const PORT = Number(process.env.PORT || 5000);
     server.listen(PORT, "0.0.0.0", () => {
-      console.log(`[Server] Server running on port ${PORT}`);
+      console.log('[Server]', { 
+        event: 'startup',
+        message: `Server running on port ${PORT}` 
+      });
     });
   } catch (error) {
-    console.error('[Server] Fatal startup error:', error);
+    console.error('[Server]', { 
+      type: 'fatal_error',
+      message: 'Fatal startup error',
+      error 
+    });
     process.exit(1);
   }
 })();

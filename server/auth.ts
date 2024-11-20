@@ -55,21 +55,18 @@ interface LoginCheck {
  */
 function logAuth({ event, username, message, error, context }: AuthLog): void {
   // Only log critical events and errors
+  const logData = {
+    event,
+    message,
+    ...(username && { username }),
+    ...(error && { error }),
+    ...(context && context)
+  };
+
   if (event === 'error') {
-    console.error('[Auth]', {
-      event,
-      message,
-      username,
-      error,
-      ...context
-    });
+    console.error('[Auth]', logData);
   } else if (['login_failure', 'login_success', 'register'].includes(event)) {
-    console.log('[Auth]', {
-      event,
-      message,
-      username,
-      ...context
-    });
+    console.log('[Auth]', logData);
   }
 }
 
