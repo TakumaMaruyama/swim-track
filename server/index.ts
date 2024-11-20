@@ -18,19 +18,13 @@ interface ServerError extends Error {
 enum LogLevel {
   ERROR = 'error',
   WARN = 'warn',
-  INFO = 'info',
-  DEBUG = 'debug'
+  INFO = 'info'
 }
 
 /**
  * Structured logging function
  */
 function logServer(level: LogLevel, message: string, context?: Record<string, unknown>) {
-  // Skip debug logs in production
-  if (level === LogLevel.DEBUG && process.env.NODE_ENV === 'production') {
-    return;
-  }
-
   console.log('[Server]', {
     timestamp: new Date().toISOString(),
     level,

@@ -116,7 +116,7 @@ export default function Athletes() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update athlete status');
+        throw new Error('選手のステータス更新に失敗しました');
       }
 
       await mutateAthletes();
@@ -148,7 +148,7 @@ export default function Athletes() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update athlete');
+        throw new Error('選手情報の更新に失敗しました');
       }
 
       await mutateAthletes();
@@ -175,7 +175,7 @@ export default function Athletes() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create record');
+        throw new Error('記録の作成に失敗しました');
       }
 
       await mutateRecords();
@@ -212,7 +212,7 @@ export default function Athletes() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update record');
+        throw new Error('記録の更新に失敗しました');
       }
 
       await mutateRecords();
@@ -241,7 +241,7 @@ export default function Athletes() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete athlete');
+        throw new Error('選手の削除に失敗しました');
       }
 
       await Promise.all([
