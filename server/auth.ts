@@ -40,6 +40,7 @@ interface AuthLog {
   username?: string;
   message: string;
   error?: unknown;
+  context?: Record<string, unknown>;
 }
 
 /** Interface for login check result */
@@ -52,12 +53,23 @@ interface LoginCheck {
  * Utility function for structured logging
  * Only logs critical events and errors
  */
-function logAuth({ event, username, message, error }: AuthLog): void {
+function logAuth({ event, username, message, error, context }: AuthLog): void {
   // Only log critical events and errors
-  if (event === 'error' || event === 'login_failure') {
-    console.error(`[Auth] ${message}${username ? ` (${username})` : ''}`);
-  } else if (event === 'login_success' || event === 'register') {
-    console.log(`[Auth] ${message}${username ? ` (${username})` : ''}`);
+  if (event === 'error') {
+    console.error('[Auth]', {
+      event,
+      message,
+      username,
+      error,
+      ...context
+    });
+  } else if (['login_failure', 'login_success', 'register'].includes(event)) {
+    console.log('[Auth]', {
+      event,
+      message,
+      username,
+      ...context
+    });
   }
 }
 
@@ -73,7 +85,8 @@ const crypto = {
       logAuth({ 
         event: 'error', 
         message: 'Password hashing failed', 
-        error 
+        error,
+        context: { operation: 'hash' }
       });
       throw new Error('パスワードのハッシュ化に失敗しました');
     }
@@ -90,7 +103,8 @@ const crypto = {
       logAuth({ 
         event: 'error', 
         message: 'Password comparison failed', 
-        error 
+        error,
+        context: { operation: 'compare' }
       });
       return false;
     }
@@ -167,7 +181,8 @@ export function setupAuth(app: Express): void {
           logAuth({ 
             event: 'login_failure', 
             username, 
-            message: loginCheck.message 
+            message: loginCheck.message,
+            context: { reason: 'rate_limit' }
           });
           return done(null, false, { message: loginCheck.message });
         }
@@ -182,7 +197,7 @@ export function setupAuth(app: Express): void {
           .where(eq(users.username, username))
           .limit(1);
 
-        const handleFailedAttempt = () => {
+        const handleFailedAttempt = (reason: string) => {
           const newAttempts = {
             count: attempts.count + 1,
             lastAttempt: now,
@@ -190,26 +205,23 @@ export function setupAuth(app: Express): void {
               now + AUTH_CONSTANTS.LOCKOUT_TIME : undefined
           };
           loginAttempts.set(ipKey, newAttempts);
-        };
-
-        if (!user?.password) {
-          handleFailedAttempt();
+          
           logAuth({ 
             event: 'login_failure', 
             username, 
-            message: 'Invalid credentials' 
+            message: 'Authentication failed',
+            context: { reason, attempts: newAttempts.count }
           });
+        };
+
+        if (!user?.password) {
+          handleFailedAttempt('invalid_user');
           return done(null, false, { message: "ユーザー名またはパスワードが正しくありません" });
         }
 
         const isMatch = await crypto.compare(password, user.password);
         if (!isMatch) {
-          handleFailedAttempt();
-          logAuth({ 
-            event: 'login_failure', 
-            username, 
-            message: 'Invalid password' 
-          });
+          handleFailedAttempt('invalid_password');
           return done(null, false, { message: "ユーザー名またはパスワードが正しくありません" });
         }
 
@@ -222,7 +234,7 @@ export function setupAuth(app: Express): void {
         logAuth({ 
           event: 'login_success', 
           username, 
-          message: 'Login successful' 
+          message: 'Authentication successful'
         });
         return done(null, user);
       } catch (err) {
@@ -230,7 +242,8 @@ export function setupAuth(app: Express): void {
           event: 'error', 
           username, 
           message: 'Authentication error', 
-          error: err 
+          error: err,
+          context: { operation: 'authenticate' }
         });
         return done(err);
       }
@@ -258,7 +271,8 @@ export function setupAuth(app: Express): void {
       logAuth({ 
         event: 'error', 
         message: 'User deserialization error', 
-        error: err 
+        error: err,
+        context: { userId: id }
       });
       done(err);
     }
@@ -287,7 +301,7 @@ export function setupAuth(app: Express): void {
         logAuth({ 
           event: 'register', 
           username, 
-          message: 'Registration failed - Username already exists' 
+          message: 'Registration failed - Username already exists'
         });
         return res.status(400).json({ 
           message: "このユーザー名は既に使用されています",
@@ -308,7 +322,8 @@ export function setupAuth(app: Express): void {
       logAuth({ 
         event: 'register', 
         username, 
-        message: 'Registration successful' 
+        message: 'Registration successful',
+        context: { role }
       });
 
       req.login(newUser, (err) => {
@@ -324,7 +339,8 @@ export function setupAuth(app: Express): void {
       logAuth({ 
         event: 'error', 
         message: 'Registration error', 
-        error 
+        error,
+        context: { username: req.body?.username }
       });
       next(error);
     }
@@ -370,7 +386,7 @@ export function setupAuth(app: Express): void {
           event: 'error', 
           username, 
           message: 'Logout error', 
-          error: err 
+          error: err
         });
         return res.status(500).json({ message: "ログアウトに失敗しました" });
       }
@@ -380,7 +396,7 @@ export function setupAuth(app: Express): void {
         logAuth({ 
           event: 'logout', 
           username, 
-          message: 'Logout successful' 
+          message: 'Logout successful'
         });
       }
       
@@ -390,7 +406,7 @@ export function setupAuth(app: Express): void {
             event: 'error', 
             username, 
             message: 'Session destruction error', 
-            error: err 
+            error: err
           });
           return res.status(500).json({ message: "セッションの削除に失敗しました" });
         }
