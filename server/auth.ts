@@ -28,8 +28,7 @@ const AUTH_CONSTANTS = {
 enum LogLevel {
   ERROR = 'error',
   WARN = 'warn',
-  INFO = 'info',
-  DEBUG = 'debug'
+  INFO = 'info'
 }
 
 const scryptAsync = promisify(scrypt);
@@ -58,12 +57,7 @@ interface AuthLog {
  * Only logs critical events and authentication state changes
  */
 function logAuth({ level, event, status, username, message, error, context }: AuthLog): void {
-  // Skip debug logs in production
-  if (level === LogLevel.DEBUG && process.env.NODE_ENV === 'production') {
-    return;
-  }
-
-  // Only log critical events, errors, and authentication state changes
+  // Only log critical errors and authentication state changes
   if (level === LogLevel.ERROR || 
       (level === LogLevel.INFO && 
        ((event === 'login' && status === 'success') || 
@@ -73,7 +67,7 @@ function logAuth({ level, event, status, username, message, error, context }: Au
       level,
       event,
       status,
-      username,
+      ...(username && { username }),
       message,
       ...(error && { error: error instanceof Error ? error.message : String(error) }),
       ...(context && { context })
