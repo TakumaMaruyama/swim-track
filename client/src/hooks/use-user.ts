@@ -52,6 +52,7 @@ export function useUser() {
   /**
    * Handles user registration
    * @param user - User registration data
+   * @returns Promise<AuthResult> - Result of the registration attempt
    */
   const register = useCallback(async (user: InsertUser): Promise<AuthResult> => {
     if (authState.isLoading) {
@@ -96,6 +97,7 @@ export function useUser() {
   /**
    * Handles user login
    * @param user - User login credentials
+   * @returns Promise<AuthResult> - Result of the login attempt
    */
   const login = useCallback(async (user: InsertUser): Promise<AuthResult> => {
     if (authState.isLoading) {
@@ -139,6 +141,7 @@ export function useUser() {
 
   /**
    * Handles user logout
+   * @returns Promise<AuthResult> - Result of the logout attempt
    */
   const logout = useCallback(async (): Promise<AuthResult> => {
     if (authState.isLoading) {
