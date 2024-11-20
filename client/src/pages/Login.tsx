@@ -41,7 +41,6 @@ type LoginFormValues = z.infer<typeof insertUserSchema>;
 /**
  * Login page component
  * Handles user authentication and navigation
- * @returns JSX.Element
  */
 export default function Login() {
   const [, navigate] = useLocation();
@@ -72,7 +71,7 @@ export default function Login() {
    * Handles form submission for login
    * @param values Login form values
    */
-  const onSubmit = async (values: LoginFormValues): Promise<void> => {
+  const onSubmit = async (values: LoginFormValues) => {
     try {
       const result = await login(values);
       

@@ -48,16 +48,17 @@ interface LoginCheck {
   message: string;
 }
 
-/** Utility function for structured logging */
+/** 
+ * Utility function for structured logging
+ * Only logs critical events and errors
+ */
 function logAuth({ event, username, message, error }: AuthLog): void {
-  const log = {
-    timestamp: new Date().toISOString(),
-    event,
-    ...(username && { username }),
-    message,
-    ...(error && { error: error instanceof Error ? error.message : String(error) })
-  };
-  console.log(`[Auth] ${JSON.stringify(log)}`);
+  // Only log critical events and errors
+  if (event === 'error' || event === 'login_failure') {
+    console.error(`[Auth] ${message}${username ? ` (${username})` : ''}`);
+  } else if (event === 'login_success' || event === 'register') {
+    console.log(`[Auth] ${message}${username ? ` (${username})` : ''}`);
+  }
 }
 
 /** Crypto utility functions */
@@ -286,7 +287,7 @@ export function setupAuth(app: Express): void {
         logAuth({ 
           event: 'register', 
           username, 
-          message: 'Username already exists' 
+          message: 'Registration failed - Username already exists' 
         });
         return res.status(400).json({ 
           message: "このユーザー名は既に使用されています",
@@ -373,6 +374,7 @@ export function setupAuth(app: Express): void {
         });
         return res.status(500).json({ message: "ログアウトに失敗しました" });
       }
+      
       if (username) {
         loginAttempts.delete(username.toLowerCase());
         logAuth({ 
@@ -381,6 +383,7 @@ export function setupAuth(app: Express): void {
           message: 'Logout successful' 
         });
       }
+      
       req.session.destroy((err) => {
         if (err) {
           logAuth({ 
