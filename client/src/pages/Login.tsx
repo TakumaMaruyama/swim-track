@@ -6,6 +6,7 @@ import { Loader2, Home, AlertCircle } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
+import { LogLevel } from "../types/auth";
 
 import {
   Form,
@@ -34,6 +35,28 @@ import type { z } from "zod";
 
 /** Login form values type */
 type LoginFormValues = z.infer<typeof insertUserSchema>;
+
+/**
+ * Structured logging function with filtered output
+ * Only logs critical events and errors
+ */
+function logLogin(level: LogLevel, operation: string, message: string, context?: Record<string, unknown>): void {
+  // Only log errors and critical events
+  const shouldLog = 
+    level === LogLevel.ERROR || 
+    context?.critical === true;
+
+  if (shouldLog) {
+    console.log({
+      timestamp: new Date().toISOString(),
+      system: 'Login',
+      level,
+      operation,
+      message,
+      ...(context && { context })
+    });
+  }
+}
 
 /**
  * Login Page Component
@@ -69,6 +92,7 @@ export default function Login(): JSX.Element {
   // Handle redirect on successful authentication
   useEffect(() => {
     if (!isAuthChecking && isAuthenticated) {
+      logLogin(LogLevel.INFO, 'navigation', 'Redirecting authenticated user', { critical: true });
       window.location.replace('/');
     }
   }, [isAuthChecking, isAuthenticated]);
@@ -84,6 +108,11 @@ export default function Login(): JSX.Element {
       const result = await login(values);
       
       if (result.ok) {
+        logLogin(LogLevel.INFO, 'login', 'Login successful', { 
+          username: values.username,
+          critical: true 
+        });
+        
         toast({
           title: "ログイン成功",
           description: "ダッシュボードに移動します",
@@ -108,6 +137,11 @@ export default function Login(): JSX.Element {
         });
       }
     } catch (error) {
+      logLogin(LogLevel.ERROR, 'login', 'Login failed', {
+        error: error instanceof Error ? error.message : String(error),
+        username: values.username
+      });
+      
       toast({
         variant: "destructive",
         title: "エラー",
