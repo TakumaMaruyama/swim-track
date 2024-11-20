@@ -26,7 +26,17 @@ interface AuthResult {
 
 /**
  * Custom hook for managing user authentication state and operations
- * Provides login, register, and logout functionality
+ * Provides login, register, and logout functionality with proper error handling
+ * 
+ * @returns {Object} Authentication state and operations
+ * @property {User | undefined} user - Current authenticated user
+ * @property {boolean} isLoading - Loading state for authentication operations
+ * @property {boolean} isAuthChecking - Initial auth state check loading
+ * @property {boolean} isAuthenticated - Whether user is authenticated
+ * @property {AuthError | null} error - Current authentication error
+ * @property {Function} register - User registration function
+ * @property {Function} login - User login function
+ * @property {Function} logout - User logout function
  */
 export function useUser() {
   const [authState, setAuthState] = useState<AuthState>({
@@ -48,9 +58,9 @@ export function useUser() {
   });
 
   /**
-   * Handles user registration
-   * @param user User registration data
-   * @returns Result of registration attempt
+   * Handles user registration with proper error handling and state management
+   * @param {InsertUser} user - User registration data
+   * @returns {Promise<AuthResult>} Result of registration attempt
    */
   const register = useCallback(async (user: InsertUser): Promise<AuthResult> => {
     if (authState.isLoading) {
@@ -93,9 +103,9 @@ export function useUser() {
   }, [authState.isLoading, mutate]);
 
   /**
-   * Handles user login
-   * @param user User login credentials
-   * @returns Result of login attempt
+   * Handles user login with proper error handling and state management
+   * @param {InsertUser} user - User login credentials
+   * @returns {Promise<AuthResult>} Result of login attempt
    */
   const login = useCallback(async (user: InsertUser): Promise<AuthResult> => {
     if (authState.isLoading) {
@@ -138,8 +148,8 @@ export function useUser() {
   }, [authState.isLoading, mutate]);
 
   /**
-   * Handles user logout
-   * @returns Result of logout attempt
+   * Handles user logout with proper error handling and state management
+   * @returns {Promise<AuthResult>} Result of logout attempt
    */
   const logout = useCallback(async (): Promise<AuthResult> => {
     if (authState.isLoading) {

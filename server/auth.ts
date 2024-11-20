@@ -24,11 +24,13 @@ const AUTH_CONSTANTS = {
   ATTEMPT_RESET_TIME: 30 * 60 * 1000, // 30 minutes
 } as const;
 
-/** Log levels enum */
+/** Log levels enum for standardized logging */
 enum LogLevel {
   ERROR = 'error',
   WARN = 'warn',
-  INFO = 'info'
+  INFO = 'info',
+  DEBUG = 'debug', // Added DEBUG level
+  TRACE = 'trace' // Added TRACE level
 }
 
 const scryptAsync = promisify(scrypt);
@@ -54,7 +56,7 @@ interface AuthLog {
 
 /** 
  * Structured logging function with filtered output
- * Only logs critical events and authentication state changes
+ * Only logs critical errors, security events, and important state changes
  */
 function logAuth({ level, event, status, username, message, error, context }: AuthLog): void {
   // Only log critical errors, security events, and important state changes
