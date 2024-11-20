@@ -6,6 +6,7 @@ import cors from 'cors';
 // Internal modules
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic } from "./vite";
+import { LogLevel } from "../client/src/types/auth";
 
 // Types
 interface ServerError extends Error {
@@ -14,24 +15,23 @@ interface ServerError extends Error {
   code?: string;
 }
 
-/** Log levels enum */
-enum LogLevel {
-  ERROR = 'error',
-  WARN = 'warn',
-  INFO = 'info'
-}
-
 /**
  * Structured logging function with filtered output
  */
 function logServer(level: LogLevel, operation: string, message: string, context?: Record<string, unknown>): void {
-  console.log('[Server]', {
-    timestamp: new Date().toISOString(),
-    level,
-    operation,
-    message,
-    ...context
-  });
+  const shouldLog = 
+    level === LogLevel.ERROR || 
+    (context?.critical === true);
+
+  if (shouldLog) {
+    console.log('[Server]', {
+      timestamp: new Date().toISOString(),
+      level,
+      operation,
+      message,
+      ...context
+    });
+  }
 }
 
 const app = express();
@@ -66,7 +66,8 @@ app.use(express.urlencoded({ extended: false }));
           status,
           code: errorResponse.code,
           message: errorResponse.message,
-          stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+          stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+          critical: true
         });
       }
 
@@ -84,11 +85,15 @@ app.use(express.urlencoded({ extended: false }));
 
     const PORT = Number(process.env.PORT || 5000);
     server.listen(PORT, "0.0.0.0", () => {
-      logServer(LogLevel.INFO, 'startup', 'Server started', { port: PORT });
+      logServer(LogLevel.INFO, 'startup', 'Server started', { 
+        port: PORT,
+        critical: true 
+      });
     });
   } catch (error) {
     logServer(LogLevel.ERROR, 'fatal', 'Server startup failed', {
-      error: error instanceof Error ? error.message : String(error)
+      error: error instanceof Error ? error.message : String(error),
+      critical: true
     });
     process.exit(1);
   }

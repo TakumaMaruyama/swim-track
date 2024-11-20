@@ -14,6 +14,7 @@ import { users, insertUserSchema } from "db/schema";
 
 // Types
 import type { User as SelectUser } from "db/schema";
+import { LogLevel } from "../client/src/types/auth";
 
 /** Constants for authentication configuration */
 const AUTH_CONSTANTS = {
@@ -23,13 +24,6 @@ const AUTH_CONSTANTS = {
   LOCKOUT_TIME: 15 * 60 * 1000, // 15 minutes
   ATTEMPT_RESET_TIME: 30 * 60 * 1000, // 30 minutes
 } as const;
-
-/** Log levels enum for standardized logging */
-enum LogLevel {
-  ERROR = 'error',
-  WARN = 'warn',
-  INFO = 'info'
-}
 
 const scryptAsync = promisify(scrypt);
 
@@ -41,37 +35,21 @@ interface LoginAttempt {
   lockoutUntil?: number;
 }
 
-/** Interface for structured auth logging */
-interface AuthLog {
-  level: LogLevel;
-  operation: 'login' | 'logout' | 'register' | 'validation' | 'error';
-  status: 'success' | 'failure';
-  username?: string;
-  message: string;
-  error?: unknown;
-  context?: Record<string, unknown>;
-}
-
 /** 
  * Structured logging function
  * Only logs critical errors and important state changes
  */
-function logAuth({ level, operation, status, username, message, error, context }: AuthLog): void {
-  // Only log critical errors and important state changes
+function logAuth(level: LogLevel, operation: string, message: string, context?: Record<string, unknown>): void {
   const shouldLog = 
     level === LogLevel.ERROR || 
-    (status === 'success' && (operation === 'login' || operation === 'logout' || operation === 'register')) ||
-    (level === LogLevel.WARN && context?.critical === true);
+    (context?.critical === true);
 
   if (shouldLog) {
     console.log('[Auth]', {
       timestamp: new Date().toISOString(),
       level,
       operation,
-      status,
-      ...(username && { username }),
       message,
-      ...(error && { error: error instanceof Error ? error.message : String(error) }),
       ...(context && { context })
     });
   }
@@ -86,14 +64,7 @@ const crypto = {
       const hashedPassword = Buffer.concat([hash, salt]);
       return hashedPassword.toString('hex');
     } catch (error) {
-      logAuth({ 
-        level: LogLevel.ERROR,
-        operation: 'error',
-        status: 'failure',
-        message: 'パスワードのハッシュ化に失敗しました',
-        error,
-        context: { operation: 'hash' }
-      });
+      logAuth(LogLevel.ERROR, 'hash', 'パスワードのハッシュ化に失敗しました', { error });
       throw new Error('パスワードのハッシュ化に失敗しました');
     }
   },
@@ -106,14 +77,7 @@ const crypto = {
       const suppliedHash = (await scryptAsync(suppliedPassword, salt, AUTH_CONSTANTS.HASH_LENGTH)) as Buffer;
       return timingSafeEqual(hash, suppliedHash);
     } catch (error) {
-      logAuth({ 
-        level: LogLevel.ERROR,
-        operation: 'error',
-        status: 'failure',
-        message: 'パスワード検証に失敗しました',
-        error,
-        context: { operation: 'compare' }
-      });
+      logAuth(LogLevel.ERROR, 'compare', 'パスワード検証に失敗しました', { error });
       return false;
     }
   },
@@ -186,13 +150,10 @@ export function setupAuth(app: Express): void {
       try {
         const loginCheck = checkLoginAttempts(username);
         if (!loginCheck.allowed) {
-          logAuth({ 
-            level: LogLevel.WARN,
-            operation: 'login',
-            status: 'failure',
+          logAuth(LogLevel.WARN, 'login', loginCheck.message, {
             username,
-            message: loginCheck.message,
-            context: { reason: 'rate_limit', critical: true }
+            reason: 'rate_limit',
+            critical: true
           });
           return done(null, false, { message: loginCheck.message });
         }
@@ -217,13 +178,11 @@ export function setupAuth(app: Express): void {
           loginAttempts.set(ipKey, newAttempts);
           
           if (newAttempts.count >= AUTH_CONSTANTS.MAX_ATTEMPTS) {
-            logAuth({ 
-              level: LogLevel.WARN,
-              operation: 'login',
-              status: 'failure',
+            logAuth(LogLevel.WARN, 'login', 'アカウントがロックされました', {
               username,
-              message: 'アカウントがロックされました',
-              context: { reason, attempts: newAttempts.count, critical: true }
+              reason,
+              attempts: newAttempts.count,
+              critical: true
             });
           }
         };
@@ -245,24 +204,16 @@ export function setupAuth(app: Express): void {
           lastSuccess: now
         });
 
-        logAuth({ 
-          level: LogLevel.INFO,
-          operation: 'login',
-          status: 'success',
+        logAuth(LogLevel.INFO, 'login', 'ログインに成功しました', {
           username,
-          message: 'ログインに成功しました'
+          critical: true
         });
 
         return done(null, user);
       } catch (err) {
-        logAuth({ 
-          level: LogLevel.ERROR,
-          operation: 'error',
-          status: 'failure',
+        logAuth(LogLevel.ERROR, 'authenticate', '認証エラーが発生しました', { 
           username,
-          message: '認証エラーが発生しました',
-          error: err,
-          context: { operation: 'authenticate' }
+          error: err
         });
         return done(err);
       }
@@ -311,13 +262,9 @@ export function setupAuth(app: Express): void {
         .limit(1);
 
       if (existingUser) {
-        logAuth({ 
-          level: LogLevel.WARN,
-          operation: 'register',
-          status: 'failure',
+        logAuth(LogLevel.WARN, 'register', 'ユーザー名が既に使用されています', {
           username,
-          message: 'ユーザー名が既に使用されています',
-          context: { reason: 'duplicate_username' }
+          critical: true
         });
         return res.status(400).json({ 
           message: "このユーザー名は既に使用されています",
@@ -335,13 +282,10 @@ export function setupAuth(app: Express): void {
         })
         .returning();
 
-      logAuth({ 
-        level: LogLevel.INFO,
-        operation: 'register',
-        status: 'success',
+      logAuth(LogLevel.INFO, 'register', '登録が完了しました', {
         username,
-        message: '登録が完了しました',
-        context: { role }
+        role,
+        critical: true
       });
 
       req.login(newUser, (err) => {
@@ -354,13 +298,9 @@ export function setupAuth(app: Express): void {
         });
       });
     } catch (error) {
-      logAuth({ 
-        level: LogLevel.ERROR,
-        operation: 'error',
-        status: 'failure',
-        message: '登録中にエラーが発生しました',
-        error,
-        context: { username: req.body?.username }
+      logAuth(LogLevel.ERROR, 'register', '登録中にエラーが発生しました', {
+        username: req.body?.username,
+        error
       });
       next(error);
     }
@@ -402,12 +342,8 @@ export function setupAuth(app: Express): void {
     const username = req.user?.username;
     req.logout((err) => {
       if (err) {
-        logAuth({ 
-          level: LogLevel.ERROR,
-          operation: 'error',
-          status: 'failure',
+        logAuth(LogLevel.ERROR, 'logout', 'ログアウト中にエラーが発生しました', {
           username,
-          message: 'ログアウト中にエラーが発生しました',
           error: err
         });
         return res.status(500).json({ message: "ログアウトに失敗しました" });
@@ -415,23 +351,16 @@ export function setupAuth(app: Express): void {
       
       req.session.destroy((err) => {
         if (err) {
-          logAuth({ 
-            level: LogLevel.ERROR,
-            operation: 'error',
-            status: 'failure',
+          logAuth(LogLevel.ERROR, 'logout', 'セッションの削除に失敗しました', {
             username,
-            message: 'セッションの削除に失敗しました',
             error: err
           });
           return res.status(500).json({ message: "セッションの削除に失敗しました" });
         }
 
-        logAuth({
-          level: LogLevel.INFO,
-          operation: 'logout',
-          status: 'success',
+        logAuth(LogLevel.INFO, 'logout', 'ログアウトが完了しました', {
           username,
-          message: 'ログアウトが完了しました'
+          critical: true
         });
 
         res.clearCookie('connect.sid');
