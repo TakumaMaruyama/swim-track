@@ -22,20 +22,38 @@ type PoolLength = typeof POOL_LENGTHS[number];
 // Use absolute path in persistent storage directory
 const UPLOAD_DIR = path.join(process.env.HOME || process.cwd(), "storage/uploads");
 
-// Update initialization to be more robust with proper permissions
+/** Log levels enum for standardized logging */
+enum LogLevel {
+  ERROR = 'error',
+  WARN = 'warn',
+  INFO = 'info'
+}
+
+/**
+ * Structured logging function for server operations
+ */
+function logServer(level: LogLevel, operation: string, message: string, context?: Record<string, unknown>) {
+  console.log('[Server]', {
+    timestamp: new Date().toISOString(),
+    level,
+    operation,
+    message,
+    ...context
+  });
+}
+
+// Initialize upload directory with proper error handling
 const initializeUploadDirectory = async () => {
   try {
     await fs.access(UPLOAD_DIR);
-    console.log('Storage directory exists:', UPLOAD_DIR);
+    logServer(LogLevel.INFO, 'storage', 'Storage directory exists', { path: UPLOAD_DIR });
   } catch {
-    console.log('Creating storage directory:', UPLOAD_DIR);
     try {
       await fs.mkdir(UPLOAD_DIR, { recursive: true });
-      // Set directory permissions to ensure persistence
       await fs.chmod(UPLOAD_DIR, 0o777);
-      console.log('Storage directory created successfully with full permissions');
+      logServer(LogLevel.INFO, 'storage', 'Storage directory created', { path: UPLOAD_DIR });
     } catch (error) {
-      console.error('Failed to create storage directory:', error);
+      logServer(LogLevel.ERROR, 'storage', 'Failed to create storage directory', { error });
       throw error;
     }
   }
@@ -48,7 +66,7 @@ const storage = multer.diskStorage({
       await initializeUploadDirectory();
       cb(null, UPLOAD_DIR);
     } catch (error) {
-      console.error('Storage destination error:', error);
+      logServer(LogLevel.ERROR, 'storage', 'Storage destination error', { error });
       cb(error as Error, UPLOAD_DIR);
     }
   },
@@ -79,8 +97,7 @@ const validatePoolLengthMiddleware = (req: any, res: any, next: any) => {
   const poolLength = Number(req.body.poolLength);
   
   if (!validatePoolLength(poolLength)) {
-    console.error('[Records] Validation Error:', {
-      type: 'pool_length',
+    logServer(LogLevel.WARN, 'validation', 'Invalid pool length', {
       value: poolLength,
       allowed: POOL_LENGTHS.join(', ')
     });
@@ -98,7 +115,9 @@ const validatePoolLengthMiddleware = (req: any, res: any, next: any) => {
 
 export function registerRoutes(app: Express) {
   // Initialize upload directory during route registration
-  initializeUploadDirectory().catch(console.error);
+  initializeUploadDirectory().catch(error => 
+    logServer(LogLevel.ERROR, 'init', 'Failed to initialize upload directory', { error })
+  );
   
   setupAuth(app);
 
@@ -137,7 +156,7 @@ export function registerRoutes(app: Express) {
       try {
         await fs.access(filePath);
       } catch (error) {
-        console.error('[Documents] File Access Error:', {
+        logServer(LogLevel.ERROR, 'documents', 'File access error', {
           id,
           path: filePath,
           error: error instanceof Error ? error.message : String(error)
@@ -151,7 +170,7 @@ export function registerRoutes(app: Express) {
       const fileStream = createReadStream(filePath);
       
       fileStream.on('error', (error) => {
-        console.error('[Documents] Streaming Error:', {
+        logServer(LogLevel.ERROR, 'documents', 'Streaming error', {
           id,
           path: filePath,
           error: error instanceof Error ? error.message : String(error)
@@ -163,7 +182,7 @@ export function registerRoutes(app: Express) {
 
       fileStream.pipe(res);
     } catch (error) {
-      console.error('[Documents] Download Error:', {
+      logServer(LogLevel.ERROR, 'documents', 'Download error', {
         id: req.params.id,
         error: error instanceof Error ? error.message : String(error)
       });
@@ -180,7 +199,6 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ message: "ファイルが選択されていません" });
       }
 
-      // Verify file was saved successfully
       const filePath = path.join(UPLOAD_DIR, req.file.filename);
       try {
         await fs.access(filePath);
@@ -200,10 +218,10 @@ export function registerRoutes(app: Express) {
         })
         .returning();
 
-      console.log('Document uploaded successfully:', document.id);
+      logServer(LogLevel.INFO, 'documents', 'Document uploaded successfully', { id: document.id });
       res.json(document);
     } catch (error) {
-      console.error('Document upload error:', error);
+      logServer(LogLevel.ERROR, 'documents', 'Upload error', { error });
       res.status(500).json({ message: "ドキュメントのアップロードに失敗しました" });
     }
   });
@@ -223,25 +241,23 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ message: "ドキュメントが見つかりません" });
       }
 
-      // Only remove database entry, keep files for persistence
       await db
         .delete(documents)
         .where(eq(documents.id, parseInt(id)));
 
       res.json({ message: "ドキュメントが削除されました" });
     } catch (error) {
-      console.error('Document deletion error:', error);
+      logServer(LogLevel.ERROR, 'documents', 'Deletion error', { error });
       res.status(500).json({ message: "ドキュメントの削除に失敗しました" });
     }
   });
 
-  // Add password update endpoint
+  // Password update endpoint with enhanced error handling
   app.put("/api/users/:id/password", requireAuth, requireCoach, async (req, res) => {
     try {
       const { id } = req.params;
       const { password } = req.body;
       
-      // Hash the new password
       const hashedPassword = await hashPassword(password);
       
       const [user] = await db
@@ -256,15 +272,14 @@ export function registerRoutes(app: Express) {
 
       res.json({ message: "パスワードが更新されました" });
     } catch (error) {
-      console.error('Error updating password:', error);
+      logServer(LogLevel.ERROR, 'users', 'Password update error', { error });
       res.status(500).json({ message: "パスワードの更新に失敗しました" });
     }
   });
 
-  // Update the /api/users/passwords endpoint to get both students and coaches
+  // User passwords endpoint with standardized logging
   app.get("/api/users/passwords", requireAuth, requireCoach, async (req, res) => {
     try {
-      console.log('[Auth] Fetching user passwords list');
       const usersList = await db
         .select({
           id: users.id,
@@ -277,12 +292,12 @@ export function registerRoutes(app: Express) {
 
       res.json(usersList);
     } catch (error) {
-      console.error('Error fetching user list:', error);
+      logServer(LogLevel.ERROR, 'users', 'Failed to fetch user list', { error });
       res.status(500).json({ message: "ユーザー情報の取得に失敗しました" });
     }
   });
 
-  // Categories API endpoints with error handling
+  // Categories API endpoints with standardized error handling
   app.get("/api/categories", requireAuth, async (req, res) => {
     try {
       const allCategories = await db
@@ -292,7 +307,7 @@ export function registerRoutes(app: Express) {
       
       res.json(allCategories);
     } catch (error) {
-      console.error('Error fetching categories:', error);
+      logServer(LogLevel.ERROR, 'categories', 'Failed to fetch categories', { error });
       res.status(500).json({ message: "カテゴリーの取得に失敗しました" });
     }
   });
@@ -316,7 +331,7 @@ export function registerRoutes(app: Express) {
 
       res.json(category);
     } catch (error) {
-      console.error('Error creating category:', error);
+      logServer(LogLevel.ERROR, 'categories', 'Failed to create category', { error });
       res.status(500).json({ message: "カテゴリーの作成に失敗しました" });
     }
   });
@@ -325,7 +340,6 @@ export function registerRoutes(app: Express) {
     try {
       const { id } = req.params;
 
-      // Update documents to remove category reference
       await db
         .update(documents)
         .set({ categoryId: null })
@@ -342,12 +356,12 @@ export function registerRoutes(app: Express) {
 
       res.json({ message: "カテゴリーが削除されました" });
     } catch (error) {
-      console.error('Error deleting category:', error);
+      logServer(LogLevel.ERROR, 'categories', 'Failed to delete category', { error });
       res.status(500).json({ message: "カテゴリーの削除に失敗しました" });
     }
   });
 
-  // Documents listing with categories
+  // Documents listing with standardized error handling
   app.get("/api/documents", requireAuth, async (req, res) => {
     try {
       const docs = await db
@@ -369,12 +383,12 @@ export function registerRoutes(app: Express) {
 
       res.json(docs);
     } catch (error) {
-      console.error('Error fetching documents:', error);
+      logServer(LogLevel.ERROR, 'documents', 'Failed to fetch documents', { error });
       res.status(500).json({ message: "ドキュメントの取得に失敗しました" });
     }
   });
 
-  // Competition Management API endpoints
+  // Competition Management API endpoints with standardized error handling
   app.get("/api/competitions", requireAuth, async (req, res) => {
     try {
       const allCompetitions = await db
@@ -383,7 +397,7 @@ export function registerRoutes(app: Express) {
         .orderBy(desc(competitions.date));
       res.json(allCompetitions);
     } catch (error) {
-      console.error('Error fetching competitions:', error);
+      logServer(LogLevel.ERROR, 'competitions', 'Failed to fetch competitions', { error });
       res.status(500).json({ message: "大会情報の取得に失敗しました" });
     }
   });
@@ -401,7 +415,7 @@ export function registerRoutes(app: Express) {
         .returning();
       res.json(competition);
     } catch (error) {
-      console.error('Error creating competition:', error);
+      logServer(LogLevel.ERROR, 'competitions', 'Failed to create competition', { error });
       res.status(500).json({ message: "大会の作成に失敗しました" });
     }
   });
@@ -427,7 +441,7 @@ export function registerRoutes(app: Express) {
 
       res.json(competition);
     } catch (error) {
-      console.error('Error updating competition:', error);
+      logServer(LogLevel.ERROR, 'competitions', 'Failed to update competition', { error });
       res.status(500).json({ message: "大会の更新に失敗しました" });
     }
   });
@@ -447,12 +461,12 @@ export function registerRoutes(app: Express) {
 
       res.json({ message: "大会を削除しました" });
     } catch (error) {
-      console.error('Error deleting competition:', error);
+      logServer(LogLevel.ERROR, 'competitions', 'Failed to delete competition', { error });
       res.status(500).json({ message: "大会の削除に失敗しました" });
     }
   });
 
-  // Athletes API
+  // Athletes API with standardized error handling
   app.get("/api/athletes", requireAuth, async (req, res) => {
     try {
       const { isActive } = req.query;
@@ -461,7 +475,6 @@ export function registerRoutes(app: Express) {
         .from(users)
         .where(eq(users.role, "student"));
 
-      // Add optional isActive filter
       if (isActive !== undefined) {
         const filteredAthletes = await query.where(
           eq(users.isActive, isActive === 'true')
@@ -473,16 +486,16 @@ export function registerRoutes(app: Express) {
       const athletes = await query;
       res.json(athletes);
     } catch (error) {
+      logServer(LogLevel.ERROR, 'athletes', 'Failed to fetch athletes', { error });
       res.status(500).json({ message: "選手の取得に失敗しました" });
     }
   });
 
-  // Delete athlete and associated records
+  // Delete athlete with standardized error handling
   app.delete("/api/athletes/:id", requireAuth, requireCoach, async (req, res) => {
     const { id } = req.params;
     
     try {
-      // First verify the athlete exists and is a student
       const [athlete] = await db
         .select()
         .from(users)
@@ -496,91 +509,22 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ message: "選手が見つかりません" });
       }
 
-      // Delete associated records first
       await db
         .delete(swimRecords)
         .where(eq(swimRecords.studentId, parseInt(id)));
 
-      // Then delete the athlete
       await db
         .delete(users)
         .where(eq(users.id, parseInt(id)));
 
       res.json({ message: "選手と関連する記録が削除されました" });
     } catch (error) {
-      console.error('Error deleting athlete:', error);
+      logServer(LogLevel.ERROR, 'athletes', 'Failed to delete athlete', { error });
       res.status(500).json({ message: "選手の削除に失敗しました" });
     }
   });
 
-  // Update athlete status
-  app.patch("/api/athletes/:id/status", requireAuth, requireCoach, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { isActive } = req.body;
-
-      const [athlete] = await db
-        .update(users)
-        .set({ isActive })
-        .where(and(eq(users.id, parseInt(id)), eq(users.role, "student")))
-        .returning();
-
-      if (!athlete) {
-        return res.status(404).json({ message: "選手が見つかりません" });
-      }
-
-      res.json(athlete);
-    } catch (error) {
-      console.error('Error updating athlete status:', error);
-      res.status(500).json({ message: "ステータスの更新に失敗しました" });
-    }
-  });
-
-  // Update athlete
-  app.put("/api/athletes/:id", requireAuth, requireCoach, async (req, res) => {
-    const { id } = req.params;
-    const { username } = req.body;
-
-    try {
-      // Check if athlete exists and is a student
-      const [athlete] = await db
-        .select()
-        .from(users)
-        .where(and(eq(users.id, parseInt(id)), eq(users.role, "student")))
-        .limit(1);
-
-      if (!athlete) {
-        return res.status(404).json({ message: "選手が見つかりません" });
-      }
-
-      // Check if username is already taken by another user
-      if (username !== athlete.username) {
-        const [existingUser] = await db
-          .select()
-          .from(users)
-          .where(eq(users.username, username))
-          .limit(1);
-
-        if (existingUser) {
-          return res.status(400).json({ message: "このユーザー名は既に使用されています" });
-        }
-      }
-
-      // Update athlete
-      const [updatedAthlete] = await db
-        .update(users)
-        .set({ username })
-        .where(eq(users.id, parseInt(id)))
-        .returning();
-
-      res.json(updatedAthlete);
-    } catch (error) {
-      console.error('Error updating athlete:', error);
-      res.status(500).json({ message: "選手の更新に失敗しました" });
-    }
-  });
-
-  // Swim Records API
+  // Swim Records API with standardized error handling
   app.get("/api/records", requireAuth, async (req, res) => {
     try {
       const records = await db
@@ -600,6 +544,7 @@ export function registerRoutes(app: Express) {
         .orderBy(desc(swimRecords.date));
       res.json(records);
     } catch (error) {
+      logServer(LogLevel.ERROR, 'records', 'Failed to fetch records', { error });
       res.status(500).json({ message: "記録の取得に失敗しました" });
     }
   });
@@ -624,11 +569,12 @@ export function registerRoutes(app: Express) {
         .orderBy(desc(swimRecords.date));
       res.json(records);
     } catch (error) {
+      logServer(LogLevel.ERROR, 'records', 'Failed to fetch competition records', { error });
       res.status(500).json({ message: "大会記録の取得に失敗しました" });
     }
   });
 
-  // Create new record with enhanced pool length validation
+  // Create new record with enhanced pool length validation and standardized logging
   app.post("/api/records", requireAuth, validatePoolLengthMiddleware, async (req, res) => {
     try {
       const {
@@ -642,7 +588,7 @@ export function registerRoutes(app: Express) {
         studentId
       } = req.body;
 
-      console.log('[Records] Creating new record:', {
+      logServer(LogLevel.INFO, 'records', 'Creating new record', {
         style,
         distance,
         poolLength: `${poolLength}m`,
@@ -664,15 +610,18 @@ export function registerRoutes(app: Express) {
         })
         .returning();
 
-      console.log('[Records] Successfully created record with pool length:', `${record.poolLength}m`);
+      logServer(LogLevel.INFO, 'records', 'Record created successfully', {
+        id: record.id,
+        poolLength: `${record.poolLength}m`
+      });
       res.json(record);
     } catch (error) {
-      console.error('[Records] Error creating record:', error);
+      logServer(LogLevel.ERROR, 'records', 'Failed to create record', { error });
       res.status(500).json({ message: "記録の作成に失敗しました" });
     }
   });
 
-  // Update record update endpoint with validation
+  // Update record update endpoint with validation and standardized logging
   app.put("/api/records/:id", requireAuth, requireCoach, validatePoolLengthMiddleware, async (req, res) => {
     try {
       const { id } = req.params;
@@ -686,7 +635,7 @@ export function registerRoutes(app: Express) {
         competitionId
       } = req.body;
 
-      console.log('[Records] Updating record:', {
+      logServer(LogLevel.INFO, 'records', 'Updating record', {
         id,
         style,
         distance,
@@ -709,24 +658,26 @@ export function registerRoutes(app: Express) {
         .returning();
 
       if (!record) {
-        console.error('[Records] Record not found:', id);
+        logServer(LogLevel.WARN, 'records', 'Record not found', { id });
         return res.status(404).json({ message: "記録が見つかりません" });
       }
 
-      console.log('[Records] Successfully updated record with pool length:', `${record.poolLength}m`);
+      logServer(LogLevel.INFO, 'records', 'Record updated successfully', {
+        id: record.id,
+        poolLength: `${record.poolLength}m`
+      });
       res.json(record);
     } catch (error) {
-      console.error('[Records] Error updating record:', error);
+      logServer(LogLevel.ERROR, 'records', 'Failed to update record', { error });
       res.status(500).json({ message: "記録の更新に失敗しました" });
     }
   });
 
-  // Delete record
+  // Delete record with standardized error handling
   app.delete("/api/records/:id", requireAuth, requireCoach, async (req, res) => {
     try {
       const { id } = req.params;
       
-      // Check if record exists before deletion
       const [record] = await db
         .select()
         .from(swimRecords)
@@ -737,201 +688,78 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ message: "記録が見つかりません" });
       }
 
-      // Delete the record
       await db
         .delete(swimRecords)
         .where(eq(swimRecords.id, parseInt(id)));
 
       res.json({ message: "記録を削除しました" });
     } catch (error) {
-      console.error('Error deleting record:', error);
+      logServer(LogLevel.ERROR, 'records', 'Failed to delete record', { error });
       res.status(500).json({ message: "記録の削除に失敗しました" });
     }
   });
 
-  // Password management endpoints
-  // Update the /api/users/passwords endpoint
-  // app.get("/api/users/passwords", requireAuth, requireCoach, async (req, res) => {
-  //   try {
-  //     const students = await db
-  //       .select({
-  //         id: users.id,
-  //         username: users.username,
-  //         role: users.role,
-  //         isActive: users.isActive,
-  //       })
-  //       .from(users)
-  //       .where(eq(users.role, "student"))
-  //       .orderBy(users.username);
-  //
-  //     res.json(students);
-  //   } catch (error) {
-  //     console.error('Error fetching student list:', error);
-  //     res.status(500).json({ message: "学生情報の取得に失敗しました" });
-  //   }
-  // });
-  //
-  // // Add password update endpoint
-  // app.put("/api/users/:id/password", requireAuth, requireCoach, async (req, res) => {
-  //   try {
-  //     const { id } = req.params;
-  //     const { password } = req.body;
-  //
-  //     if (!password || password.length < 8) {
-  //       return res.status(400).json({ message: "パスワードは8文字以上である必要があります" });
-  //     }
-  //
-  //     // Hash the new password
-  //     const hashedPassword = await crypto.hash(password);
-  //
-  //     // Update the user's password
-  //     const [updatedUser] = await db
-  //       .update(users)
-  //       .set({ password: hashedPassword })
-  //       .where(eq(users.id, parseInt(id)))
-  //       .returning();
-  //
-  //     if (!updatedUser) {
-  //       return res.status(404).json({ message: "ユーザーが見つかりません" });
-  //     }
-  //
-  //     res.json({ message: "パスワードが更新されました" });
-  //   } catch (error) {
-  //     console.error('Error updating password:', error);
-  //     res.status(500).json({ message: "パスワードの更新に失敗しました" });
-  //   }
-  // });
-
-  // Add pool length validation middleware to record creation/update endpoints
-  app.post("/api/records", requireAuth, validatePoolLengthMiddleware, async (req, res) => {
-    try {
-      console.log('[Records] Creating new record with pool length:', req.body.poolLength);
-      const [record] = await db
-        .insert(swimRecords)
-        .values({
-          ...req.body,
-          studentId: req.body.studentId || req.user!.id,
-          poolLength: Number(req.body.poolLength)
-        })
-        .returning();
-
-      console.log('[Records] Record created successfully:', {
-        id: record.id,
-        poolLength: record.poolLength
-      });
-      
-      res.json(record);
-    } catch (error) {
-      console.error('[Records] Error creating record:', error);
-      res.status(500).json({ message: "記録の作成に失敗しました" });
-    }
-  });
-
-  app.put("/api/records/:id", requireAuth, validatePoolLengthMiddleware, async (req, res) => {
+  // Update athlete status with standardized error handling
+  app.patch("/api/athletes/:id/status", requireAuth, requireCoach, async (req, res) => {
     try {
       const { id } = req.params;
-      console.log(`[Records] Updating record ${id} with pool length:`, req.body.poolLength);
+      const { isActive } = req.body;
 
-      const [record] = await db
-        .update(swimRecords)
-        .set({
-          ...req.body,
-          poolLength: Number(req.body.poolLength)
-        })
-        .where(eq(swimRecords.id, parseInt(id)))
+      const [athlete] = await db
+        .update(users)
+        .set({ isActive })
+        .where(and(eq(users.id, parseInt(id)), eq(users.role, "student")))
         .returning();
 
-      if (!record) {
-        return res.status(404).json({ message: "記録が見つかりません" });
+      if (!athlete) {
+        return res.status(404).json({ message: "選手が見つかりません" });
       }
 
-      console.log('[Records] Record updated successfully:', {
-        id: record.id,
-        poolLength: record.poolLength
-      });
-
-      res.json(record);
+      res.json(athlete);
     } catch (error) {
-      console.error('[Records] Error updating record:', error);
-      res.status(500).json({ message: "記録の更新に失敗しました" });
+      logServer(LogLevel.ERROR, 'athletes', 'Failed to update athlete status', { error });
+      res.status(500).json({ message: "ステータスの更新に失敗しました" });
     }
   });
 
-  // Enhanced record creation endpoint with pool length validation
-  app.post("/api/records", requireAuth, validatePoolLengthMiddleware, async (req, res) => {
+  // Update athlete with standardized error handling
+  app.put("/api/athletes/:id", requireAuth, requireCoach, async (req, res) => {
+    const { id } = req.params;
+    const { username } = req.body;
+
     try {
-      console.log('[Records] Creating new record:', {
-        ...req.body,
-        poolLength: `${req.body.poolLength}m`,
-        timestamp: new Date().toISOString()
-      });
+      const [athlete] = await db
+        .select()
+        .from(users)
+        .where(and(eq(users.id, parseInt(id)), eq(users.role, "student")))
+        .limit(1);
 
-      const [record] = await db
-        .insert(swimRecords)
-        .values({
-          studentId: req.body.studentId,
-          style: req.body.style,
-          distance: req.body.distance,
-          time: req.body.time,
-          date: new Date(req.body.date),
-          isCompetition: req.body.isCompetition,
-          poolLength: req.body.poolLength,
-          competitionId: req.body.competitionId || null
-        })
-        .returning();
-
-      console.log('[Records] Record created successfully:', {
-        id: record.id,
-        poolLength: `${record.poolLength}m`,
-        timestamp: new Date().toISOString()
-      });
-
-      res.json(record);
-    } catch (error) {
-      console.error('[Records] Error creating record:', error);
-      res.status(500).json({ message: "記録の作成に失敗しました" });
-    }
-  });
-
-  // Enhanced record update endpoint with pool length validation
-  app.put("/api/records/:id", requireAuth, validatePoolLengthMiddleware, async (req, res) => {
-    try {
-      const { id } = req.params;
-      console.log('[Records] Updating record:', {
-        id,
-        ...req.body,
-        poolLength: `${req.body.poolLength}m`,
-        timestamp: new Date().toISOString()
-      });
-
-      const [record] = await db
-        .update(swimRecords)
-        .set({
-          style: req.body.style,
-          distance: req.body.distance,
-          time: req.body.time,
-          date: new Date(req.body.date),
-          isCompetition: req.body.isCompetition,
-          poolLength: req.body.poolLength,
-          competitionId: req.body.competitionId || null
-        })
-        .where(eq(swimRecords.id, parseInt(id)))
-        .returning();
-
-      if (!record) {
-        return res.status(404).json({ message: "記録が見つかりません" });
+      if (!athlete) {
+        return res.status(404).json({ message: "選手が見つかりません" });
       }
 
-      console.log('[Records] Record updated successfully:', {
-        id: record.id,
-        poolLength: `${record.poolLength}m`,
-        timestamp: new Date().toISOString()
-      });
+      if (username !== athlete.username) {
+        const [existingUser] = await db
+          .select()
+          .from(users)
+          .where(eq(users.username, username))
+          .limit(1);
 
-      res.json(record);
+        if (existingUser) {
+          return res.status(400).json({ message: "このユーザー名は既に使用されています" });
+        }
+      }
+
+      const [updatedAthlete] = await db
+        .update(users)
+        .set({ username })
+        .where(eq(users.id, parseInt(id)))
+        .returning();
+
+      res.json(updatedAthlete);
     } catch (error) {
-      console.error('[Records] Error updating record:', error);
-      res.status(500).json({ message: "記録の更新に失敗しました" });
+      logServer(LogLevel.ERROR, 'athletes', 'Failed to update athlete', { error });
+      res.status(500).json({ message: "選手の更新に失敗しました" });
     }
   });
 }
