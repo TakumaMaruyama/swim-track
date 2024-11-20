@@ -53,14 +53,14 @@ interface AuthLog {
 }
 
 /** 
- * Structured logging function with filtered output
+ * Structured logging function
  * Only logs critical errors and important state changes
  */
 function logAuth({ level, operation, status, username, message, error, context }: AuthLog): void {
   // Only log critical errors and important state changes
   const shouldLog = 
     level === LogLevel.ERROR || 
-    (level === LogLevel.INFO && status === 'success' && operation !== 'validation') ||
+    (status === 'success' && (operation === 'login' || operation === 'logout' || operation === 'register')) ||
     (level === LogLevel.WARN && context?.critical === true);
 
   if (shouldLog) {

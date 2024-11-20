@@ -31,14 +31,6 @@ interface AuthResult {
  * Provides login, register, and logout functionality with proper error handling
  * 
  * @returns {Object} Authentication state and methods
- * @property {User | undefined} user - Current authenticated user
- * @property {boolean} isLoading - Loading state for auth operations
- * @property {boolean} isAuthChecking - Initial auth state check
- * @property {boolean} isAuthenticated - Whether user is authenticated
- * @property {AuthError | null} error - Current auth error state
- * @property {Function} register - User registration method
- * @property {Function} login - User login method
- * @property {Function} logout - User logout method
  */
 export function useUser() {
   const [authState, setAuthState] = useState<AuthState>({
@@ -60,7 +52,7 @@ export function useUser() {
   });
 
   /**
-   * Handles user registration with proper error handling and state management
+   * Handles user registration
    * @param user - User registration data
    * @returns Promise<AuthResult>
    */
@@ -107,7 +99,7 @@ export function useUser() {
   }, [authState.isLoading, mutate]);
 
   /**
-   * Handles user login with proper error handling and state management
+   * Handles user login
    * @param user - User login credentials
    * @returns Promise<AuthResult>
    */
@@ -154,7 +146,7 @@ export function useUser() {
   }, [authState.isLoading, mutate]);
 
   /**
-   * Handles user logout with proper error handling and state management
+   * Handles user logout
    * @returns Promise<AuthResult>
    */
   const logout = useCallback(async (): Promise<AuthResult> => {
