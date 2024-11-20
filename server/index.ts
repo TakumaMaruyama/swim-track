@@ -14,6 +14,31 @@ interface ServerError extends Error {
   code?: string;
 }
 
+/** Log levels enum */
+enum LogLevel {
+  ERROR = 'error',
+  WARN = 'warn',
+  INFO = 'info',
+  DEBUG = 'debug'
+}
+
+/**
+ * Structured logging function
+ */
+function logServer(level: LogLevel, message: string, context?: Record<string, unknown>) {
+  // Skip debug logs in production
+  if (level === LogLevel.DEBUG && process.env.NODE_ENV === 'production') {
+    return;
+  }
+
+  console.log('[Server]', {
+    timestamp: new Date().toISOString(),
+    level,
+    message,
+    ...context
+  });
+}
+
 const app = express();
 
 // Enhanced CORS configuration
@@ -42,11 +67,17 @@ app.use(express.urlencoded({ extended: false }));
       
       // Only log critical errors (500+)
       if (status >= 500) {
-        console.error('[Server] Critical Error:', {
+        logServer(LogLevel.ERROR, 'Critical Error', {
           status,
           code: errorResponse.code,
           message: errorResponse.message,
           stack: app.get("env") === "development" ? err.stack : undefined
+        });
+      } else {
+        logServer(LogLevel.WARN, 'Client Error', {
+          status,
+          code: errorResponse.code,
+          message: errorResponse.message
         });
       }
 
@@ -64,10 +95,10 @@ app.use(express.urlencoded({ extended: false }));
 
     const PORT = Number(process.env.PORT || 5000);
     server.listen(PORT, "0.0.0.0", () => {
-      console.log('[Server] Started:', { port: PORT });
+      logServer(LogLevel.INFO, 'Server started', { port: PORT });
     });
   } catch (error) {
-    console.error('[Server] Fatal Error:', { 
+    logServer(LogLevel.ERROR, 'Fatal Error', {
       message: 'Server startup failed',
       error: error instanceof Error ? error.message : String(error)
     });
