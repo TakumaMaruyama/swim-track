@@ -1,34 +1,49 @@
+// External libraries
 import useSWR from "swr";
 import { useCallback, useState } from "react";
+
+// Types
 import type { User, InsertUser } from "db/schema";
+import { 
+  AuthError, 
+  AuthState, 
+  AuthResult,
+  LogLevel 
+} from "../types/auth";
 
-/** Authentication error interface */
-interface AuthError {
-  message: string;
-  field?: "credentials" | "network" | "username" | "password";
-  errors?: Record<string, string[]>;
-  context?: Record<string, unknown>;
-}
+/**
+ * Structured logging function with filtered output
+ * Only logs critical errors and important state changes
+ */
+function logAuth(level: LogLevel, operation: string, message: string, context?: Record<string, unknown>): void {
+  const shouldLog = 
+    level === LogLevel.ERROR || 
+    (context?.critical === true);
 
-/** Authentication state interface */
-interface AuthState {
-  isLoading: boolean;
-  error: AuthError | null;
-}
-
-/** Authentication result interface */
-interface AuthResult {
-  ok: boolean;
-  message?: string;
-  field?: AuthError['field'];
-  errors?: Record<string, string[]>;
-  user?: User;
-  context?: Record<string, unknown>;
+  if (shouldLog) {
+    console.log('[Auth]', {
+      timestamp: new Date().toISOString(),
+      level,
+      operation,
+      message,
+      ...(context && { context })
+    });
+  }
 }
 
 /**
  * Custom hook for managing user authentication state and operations
  * Provides login, register, and logout functionality with proper error handling
+ * 
+ * @returns {Object} Authentication state and methods
+ * @property {User | undefined} user - Current user data
+ * @property {boolean} isLoading - Loading state for auth operations
+ * @property {boolean} isAuthChecking - Initial auth state check
+ * @property {boolean} isAuthenticated - User authentication status
+ * @property {AuthError | null} error - Current auth error state
+ * @property {Function} register - User registration method
+ * @property {Function} login - User login method
+ * @property {Function} logout - User logout method
  */
 export function useUser() {
   const [authState, setAuthState] = useState<AuthState>({
@@ -77,9 +92,17 @@ export function useUser() {
           errors: data.errors
         };
         setAuthState({ isLoading: false, error });
+        logAuth(LogLevel.ERROR, 'register', error.message, {
+          username: user.username,
+          errors: error.errors
+        });
         return { ok: false, ...error };
       }
 
+      logAuth(LogLevel.INFO, 'register', '登録が完了しました', {
+        username: user.username,
+        critical: true
+      });
       await mutate();
       return { ok: true, user: data.user };
     } catch (error) {
@@ -88,6 +111,10 @@ export function useUser() {
         field: "network"
       };
       setAuthState({ isLoading: false, error: authError });
+      logAuth(LogLevel.ERROR, 'register', authError.message, {
+        username: user.username,
+        error: error instanceof Error ? error.message : String(error)
+      });
       return { ok: false, ...authError };
     } finally {
       setAuthState(prev => ({ ...prev, isLoading: false }));
@@ -122,9 +149,17 @@ export function useUser() {
           errors: data.errors
         };
         setAuthState({ isLoading: false, error });
+        logAuth(LogLevel.WARN, 'login', error.message, {
+          username: user.username,
+          critical: true
+        });
         return { ok: false, ...error };
       }
 
+      logAuth(LogLevel.INFO, 'login', 'ログインに成功しました', {
+        username: user.username,
+        critical: true
+      });
       await mutate();
       return { ok: true, user: data.user };
     } catch (error) {
@@ -133,6 +168,10 @@ export function useUser() {
         field: "network"
       };
       setAuthState({ isLoading: false, error: authError });
+      logAuth(LogLevel.ERROR, 'login', authError.message, {
+        username: user.username,
+        error: error instanceof Error ? error.message : String(error)
+      });
       return { ok: false, ...authError };
     } finally {
       setAuthState(prev => ({ ...prev, isLoading: false }));
@@ -163,9 +202,13 @@ export function useUser() {
           field: "network"
         };
         setAuthState({ isLoading: false, error });
+        logAuth(LogLevel.ERROR, 'logout', error.message);
         return { ok: false, ...error };
       }
 
+      logAuth(LogLevel.INFO, 'logout', 'ログアウトが完了しました', {
+        critical: true
+      });
       await mutate(undefined, false);
       return { ok: true };
     } catch (error) {
@@ -174,6 +217,9 @@ export function useUser() {
         field: "network"
       };
       setAuthState({ isLoading: false, error: authError });
+      logAuth(LogLevel.ERROR, 'logout', authError.message, {
+        error: error instanceof Error ? error.message : String(error)
+      });
       return { ok: false, ...authError };
     } finally {
       setAuthState(prev => ({ ...prev, isLoading: false }));

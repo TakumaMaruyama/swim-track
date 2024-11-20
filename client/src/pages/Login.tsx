@@ -1,15 +1,12 @@
-// External libraries
 import { useEffect } from 'react';
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Home, AlertCircle } from "lucide-react";
 
-// Internal hooks
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
 
-// UI Components
 import {
   Form,
   FormControl,
@@ -32,7 +29,6 @@ import {
   AlertDescription 
 } from "@/components/ui/alert";
 
-// Types
 import { insertUserSchema } from "db/schema";
 import type { z } from "zod";
 
