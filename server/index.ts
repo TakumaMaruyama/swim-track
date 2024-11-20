@@ -25,21 +25,13 @@ enum LogLevel {
  * Structured logging function with filtered output
  */
 function logServer(level: LogLevel, operation: string, message: string, context?: Record<string, unknown>): void {
-  // Only log critical errors and important state changes
-  const shouldLog = 
-    level === LogLevel.ERROR || 
-    (level === LogLevel.INFO && operation === 'startup') ||
-    (level === LogLevel.WARN && context?.critical === true);
-
-  if (shouldLog) {
-    console.log('[Server]', {
-      timestamp: new Date().toISOString(),
-      level,
-      operation,
-      message,
-      ...context
-    });
-  }
+  console.log('[Server]', {
+    timestamp: new Date().toISOString(),
+    level,
+    operation,
+    message,
+    ...context
+  });
 }
 
 const app = express();
