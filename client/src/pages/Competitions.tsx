@@ -75,7 +75,7 @@ export default function Competitions() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update record');
+        throw new Error('記録の更新に失敗しました');
       }
 
       await mutate();
@@ -84,7 +84,6 @@ export default function Competitions() {
         description: "大会記録が更新されました",
       });
     } catch (error) {
-      console.error('Error updating record:', error);
       toast({
         variant: "destructive",
         title: "エラー",
@@ -106,7 +105,7 @@ export default function Competitions() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create record');
+        throw new Error('記録の作成に失敗しました');
       }
 
       await mutate();
@@ -115,7 +114,6 @@ export default function Competitions() {
         description: "新しい大会記録が追加されました",
       });
     } catch (error) {
-      console.error('Error creating record:', error);
       toast({
         variant: "destructive",
         title: "エラー",
@@ -137,7 +135,7 @@ export default function Competitions() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete record');
+        throw new Error('記録の削除に失敗しました');
       }
 
       await mutate();
@@ -146,7 +144,6 @@ export default function Competitions() {
         description: "記録が削除されました",
       });
     } catch (error) {
-      console.error('Error deleting record:', error);
       toast({
         variant: "destructive",
         title: "エラー",

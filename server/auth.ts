@@ -57,11 +57,13 @@ interface AuthLog {
  * Only logs critical events and authentication state changes
  */
 function logAuth({ level, event, status, username, message, error, context }: AuthLog): void {
-  // Only log critical errors and authentication state changes
-  if (level === LogLevel.ERROR || 
-      (level === LogLevel.INFO && 
-       ((event === 'login' && status === 'success') || 
-        (event === 'logout' && status === 'success')))) {
+  // Only log critical errors and important auth events
+  const shouldLog = 
+    level === LogLevel.ERROR || 
+    (level === LogLevel.INFO && ['login', 'logout', 'register'].includes(event) && status === 'success') ||
+    (level === LogLevel.WARN && event === 'login' && status === 'failure' && context?.reason === 'rate_limit');
+
+  if (shouldLog) {
     console.log('[Auth]', {
       timestamp: new Date().toISOString(),
       level,
@@ -88,7 +90,7 @@ const crypto = {
         level: LogLevel.ERROR,
         event: 'error',
         status: 'failure',
-        message: 'Password hashing failed',
+        message: 'パスワードのハッシュ化に失敗しました',
         error,
         context: { operation: 'hash' }
       });
@@ -108,7 +110,7 @@ const crypto = {
         level: LogLevel.ERROR,
         event: 'error',
         status: 'failure',
-        message: 'Password comparison failed',
+        message: 'パスワード検証に失敗しました',
         error,
         context: { operation: 'compare' }
       });
@@ -220,7 +222,7 @@ export function setupAuth(app: Express): void {
               event: 'login',
               status: 'failure',
               username,
-              message: 'Account locked due to too many failed attempts',
+              message: 'アカウントがロックされました',
               context: { reason, attempts: newAttempts.count }
             });
           }
@@ -248,7 +250,7 @@ export function setupAuth(app: Express): void {
           event: 'login',
           status: 'success',
           username,
-          message: 'Login successful'
+          message: 'ログインに成功しました'
         });
 
         return done(null, user);
@@ -258,7 +260,7 @@ export function setupAuth(app: Express): void {
           event: 'error',
           status: 'failure',
           username,
-          message: 'Authentication error',
+          message: '認証エラーが発生しました',
           error: err,
           context: { operation: 'authenticate' }
         });
@@ -314,7 +316,8 @@ export function setupAuth(app: Express): void {
           event: 'register',
           status: 'failure',
           username,
-          message: 'Username already exists'
+          message: 'ユーザー名が既に使用されています',
+          context: { reason: 'duplicate_username' }
         });
         return res.status(400).json({ 
           message: "このユーザー名は既に使用されています",
@@ -337,7 +340,7 @@ export function setupAuth(app: Express): void {
         event: 'register',
         status: 'success',
         username,
-        message: 'Registration successful',
+        message: '登録が完了しました',
         context: { role }
       });
 
@@ -355,7 +358,7 @@ export function setupAuth(app: Express): void {
         level: LogLevel.ERROR,
         event: 'error',
         status: 'failure',
-        message: 'Registration error',
+        message: '登録中にエラーが発生しました',
         error,
         context: { username: req.body?.username }
       });
@@ -404,7 +407,7 @@ export function setupAuth(app: Express): void {
           event: 'error',
           status: 'failure',
           username,
-          message: 'Logout error',
+          message: 'ログアウト中にエラーが発生しました',
           error: err
         });
         return res.status(500).json({ message: "ログアウトに失敗しました" });
@@ -417,7 +420,7 @@ export function setupAuth(app: Express): void {
             event: 'error',
             status: 'failure',
             username,
-            message: 'Session destruction error',
+            message: 'セッションの削除に失敗しました',
             error: err
           });
           return res.status(500).json({ message: "セッションの削除に失敗しました" });
@@ -428,7 +431,7 @@ export function setupAuth(app: Express): void {
           event: 'logout',
           status: 'success',
           username,
-          message: 'Logout successful'
+          message: 'ログアウトが完了しました'
         });
 
         res.clearCookie('connect.sid');
