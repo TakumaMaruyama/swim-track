@@ -1,8 +1,5 @@
-// External libraries
 import useSWR from "swr";
 import { useCallback, useState } from "react";
-
-// Types
 import type { User, InsertUser } from "db/schema";
 
 /** Authentication error interface */

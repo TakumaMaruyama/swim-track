@@ -36,7 +36,8 @@ interface LoginAttempt {
 
 /** Interface for structured auth logging */
 interface AuthLog {
-  event: 'login_success' | 'login_failure' | 'logout' | 'register' | 'error';
+  event: 'login' | 'logout' | 'register' | 'error';
+  status: 'success' | 'failure';
   username?: string;
   message: string;
   error?: unknown;
@@ -53,20 +54,12 @@ interface LoginCheck {
  * Utility function for structured logging
  * Only logs critical events and errors
  */
-function logAuth({ event, username, message, error, context }: AuthLog): void {
+function logAuth({ event, status, username, message, error, context }: AuthLog): void {
   // Only log critical events and errors
-  const logData = {
-    event,
-    message,
-    ...(username && { username }),
-    ...(error && { error }),
-    ...(context && context)
-  };
-
-  if (event === 'error') {
-    console.error('[Auth]', logData);
-  } else if (['login_failure', 'login_success', 'register'].includes(event)) {
-    console.log('[Auth]', logData);
+  if (status === 'failure' || event === 'error') {
+    console.error('[Auth]', { event, status, username, message, error, context });
+  } else if (event !== 'error' && status === 'success') {
+    console.log('[Auth]', { event, status, username, message });
   }
 }
 
@@ -80,8 +73,9 @@ const crypto = {
       return hashedPassword.toString('hex');
     } catch (error) {
       logAuth({ 
-        event: 'error', 
-        message: 'Password hashing failed', 
+        event: 'error',
+        status: 'failure',
+        message: 'Password hashing failed',
         error,
         context: { operation: 'hash' }
       });
@@ -98,8 +92,9 @@ const crypto = {
       return timingSafeEqual(hash, suppliedHash);
     } catch (error) {
       logAuth({ 
-        event: 'error', 
-        message: 'Password comparison failed', 
+        event: 'error',
+        status: 'failure',
+        message: 'Password comparison failed',
         error,
         context: { operation: 'compare' }
       });
@@ -176,8 +171,9 @@ export function setupAuth(app: Express): void {
         const loginCheck = checkLoginAttempts(username);
         if (!loginCheck.allowed) {
           logAuth({ 
-            event: 'login_failure', 
-            username, 
+            event: 'login',
+            status: 'failure',
+            username,
             message: loginCheck.message,
             context: { reason: 'rate_limit' }
           });
@@ -204,8 +200,9 @@ export function setupAuth(app: Express): void {
           loginAttempts.set(ipKey, newAttempts);
           
           logAuth({ 
-            event: 'login_failure', 
-            username, 
+            event: 'login',
+            status: 'failure',
+            username,
             message: 'Authentication failed',
             context: { reason, attempts: newAttempts.count }
           });
@@ -229,16 +226,18 @@ export function setupAuth(app: Express): void {
         });
 
         logAuth({ 
-          event: 'login_success', 
-          username, 
+          event: 'login',
+          status: 'success',
+          username,
           message: 'Authentication successful'
         });
         return done(null, user);
       } catch (err) {
         logAuth({ 
-          event: 'error', 
-          username, 
-          message: 'Authentication error', 
+          event: 'error',
+          status: 'failure',
+          username,
+          message: 'Authentication error',
           error: err,
           context: { operation: 'authenticate' }
         });
@@ -265,12 +264,6 @@ export function setupAuth(app: Express): void {
 
       done(null, user);
     } catch (err) {
-      logAuth({ 
-        event: 'error', 
-        message: 'User deserialization error', 
-        error: err,
-        context: { userId: id }
-      });
       done(err);
     }
   });
@@ -296,9 +289,10 @@ export function setupAuth(app: Express): void {
 
       if (existingUser) {
         logAuth({ 
-          event: 'register', 
-          username, 
-          message: 'Registration failed - Username already exists'
+          event: 'register',
+          status: 'failure',
+          username,
+          message: 'Username already exists'
         });
         return res.status(400).json({ 
           message: "このユーザー名は既に使用されています",
@@ -317,8 +311,9 @@ export function setupAuth(app: Express): void {
         .returning();
 
       logAuth({ 
-        event: 'register', 
-        username, 
+        event: 'register',
+        status: 'success',
+        username,
         message: 'Registration successful',
         context: { role }
       });
@@ -334,8 +329,9 @@ export function setupAuth(app: Express): void {
       });
     } catch (error) {
       logAuth({ 
-        event: 'error', 
-        message: 'Registration error', 
+        event: 'error',
+        status: 'failure',
+        message: 'Registration error',
         error,
         context: { username: req.body?.username }
       });
@@ -380,9 +376,10 @@ export function setupAuth(app: Express): void {
     req.logout((err) => {
       if (err) {
         logAuth({ 
-          event: 'error', 
-          username, 
-          message: 'Logout error', 
+          event: 'error',
+          status: 'failure',
+          username,
+          message: 'Logout error',
           error: err
         });
         return res.status(500).json({ message: "ログアウトに失敗しました" });
@@ -391,8 +388,9 @@ export function setupAuth(app: Express): void {
       if (username) {
         loginAttempts.delete(username.toLowerCase());
         logAuth({ 
-          event: 'logout', 
-          username, 
+          event: 'logout',
+          status: 'success',
+          username,
           message: 'Logout successful'
         });
       }
@@ -400,9 +398,10 @@ export function setupAuth(app: Express): void {
       req.session.destroy((err) => {
         if (err) {
           logAuth({ 
-            event: 'error', 
-            username, 
-            message: 'Session destruction error', 
+            event: 'error',
+            status: 'failure',
+            username,
+            message: 'Session destruction error',
             error: err
           });
           return res.status(500).json({ message: "セッションの削除に失敗しました" });
