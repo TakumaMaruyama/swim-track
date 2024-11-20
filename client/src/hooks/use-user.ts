@@ -13,18 +13,22 @@ import {
 
 /**
  * Structured logging function with filtered output
- * Only logs critical errors and important state changes
+ * Only logs critical events and errors
  */
 function logAuth(level: LogLevel, operation: string, message: string, context?: Record<string, unknown>): void {
-  // Only log errors and critical events
+  // Only log errors and critical auth state changes
   const shouldLog = 
     level === LogLevel.ERROR || 
-    context?.critical === true;
+    (level === LogLevel.INFO && (
+      operation === 'login_success' ||
+      operation === 'logout_success' ||
+      operation === 'register_success'
+    ));
 
   if (shouldLog) {
     console.log({
       timestamp: new Date().toISOString(),
-      system: 'Client',
+      system: 'Auth',
       level,
       operation,
       message,
@@ -83,17 +87,13 @@ export function useUser() {
           errors: data.errors
         };
         setAuthState({ isLoading: false, error });
-        logAuth(LogLevel.ERROR, 'register', error.message, {
-          username: user.username,
+        logAuth(LogLevel.ERROR, 'register_error', error.message, {
           errors: error.errors
         });
         return { ok: false, ...error };
       }
 
-      logAuth(LogLevel.INFO, 'register', 'Registration successful', {
-        username: user.username,
-        critical: true
-      });
+      logAuth(LogLevel.INFO, 'register_success', 'Registration successful');
       await mutate();
       return { ok: true, user: data.user };
     } catch (error) {
@@ -102,8 +102,7 @@ export function useUser() {
         field: "network"
       };
       setAuthState({ isLoading: false, error: authError });
-      logAuth(LogLevel.ERROR, 'register', authError.message, {
-        username: user.username,
+      logAuth(LogLevel.ERROR, 'register_error', authError.message, {
         error: error instanceof Error ? error.message : String(error)
       });
       return { ok: false, ...authError };
@@ -139,17 +138,11 @@ export function useUser() {
           errors: data.errors
         };
         setAuthState({ isLoading: false, error });
-        logAuth(LogLevel.WARN, 'login', error.message, {
-          username: user.username,
-          critical: true
-        });
+        logAuth(LogLevel.ERROR, 'login_error', error.message);
         return { ok: false, ...error };
       }
 
-      logAuth(LogLevel.INFO, 'login', 'Login successful', {
-        username: user.username,
-        critical: true
-      });
+      logAuth(LogLevel.INFO, 'login_success', 'Login successful');
       await mutate();
       return { ok: true, user: data.user };
     } catch (error) {
@@ -158,8 +151,7 @@ export function useUser() {
         field: "network"
       };
       setAuthState({ isLoading: false, error: authError });
-      logAuth(LogLevel.ERROR, 'login', authError.message, {
-        username: user.username,
+      logAuth(LogLevel.ERROR, 'login_error', authError.message, {
         error: error instanceof Error ? error.message : String(error)
       });
       return { ok: false, ...authError };
@@ -191,13 +183,11 @@ export function useUser() {
           field: "network"
         };
         setAuthState({ isLoading: false, error });
-        logAuth(LogLevel.ERROR, 'logout', error.message);
+        logAuth(LogLevel.ERROR, 'logout_error', error.message);
         return { ok: false, ...error };
       }
 
-      logAuth(LogLevel.INFO, 'logout', 'Logout successful', {
-        critical: true
-      });
+      logAuth(LogLevel.INFO, 'logout_success', 'Logout successful');
       await mutate(undefined, false);
       return { ok: true };
     } catch (error) {
@@ -206,7 +196,7 @@ export function useUser() {
         field: "network"
       };
       setAuthState({ isLoading: false, error: authError });
-      logAuth(LogLevel.ERROR, 'logout', authError.message, {
+      logAuth(LogLevel.ERROR, 'logout_error', authError.message, {
         error: error instanceof Error ? error.message : String(error)
       });
       return { ok: false, ...authError };

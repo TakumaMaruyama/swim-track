@@ -41,10 +41,10 @@ type LoginFormValues = z.infer<typeof insertUserSchema>;
  * Only logs critical events and errors
  */
 function logLogin(level: LogLevel, operation: string, message: string, context?: Record<string, unknown>): void {
-  // Only log errors and critical events
+  // Only log critical auth events and errors
   const shouldLog = 
     level === LogLevel.ERROR || 
-    context?.critical === true;
+    (operation === 'navigation' && context?.critical === true);
 
   if (shouldLog) {
     console.log({
@@ -61,15 +61,6 @@ function logLogin(level: LogLevel, operation: string, message: string, context?:
 /**
  * Login Page Component
  * Handles user authentication and login functionality
- * 
- * Features:
- * - User login with validation
- * - Error handling and display
- * - Navigation after successful login
- * - Loading states during authentication
- * - Registration redirect option
- * 
- * @returns {JSX.Element} Login page component
  */
 export default function Login(): JSX.Element {
   const [, navigate] = useLocation();
@@ -99,20 +90,13 @@ export default function Login(): JSX.Element {
 
   /**
    * Handles form submission for login
-   * Processes login attempt and manages error states
-   * 
-   * @param {LoginFormValues} values - Form values containing username and password
+   * @param values - Form values containing username and password
    */
   const onSubmit = async (values: LoginFormValues): Promise<void> => {
     try {
       const result = await login(values);
       
       if (result.ok) {
-        logLogin(LogLevel.INFO, 'login', 'Login successful', { 
-          username: values.username,
-          critical: true 
-        });
-        
         toast({
           title: "ログイン成功",
           description: "ダッシュボードに移動します",
@@ -137,9 +121,8 @@ export default function Login(): JSX.Element {
         });
       }
     } catch (error) {
-      logLogin(LogLevel.ERROR, 'login', 'Login failed', {
-        error: error instanceof Error ? error.message : String(error),
-        username: values.username
+      logLogin(LogLevel.ERROR, 'login_error', 'Login failed', {
+        error: error instanceof Error ? error.message : String(error)
       });
       
       toast({
