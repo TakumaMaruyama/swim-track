@@ -74,18 +74,17 @@ const validatePoolLength = (value: number): value is PoolLength => {
   return POOL_LENGTHS.includes(value as PoolLength);
 };
 
-// Enhanced pool length validation with detailed logging
+// Enhanced pool length validation with minimal logging
 const validatePoolLengthMiddleware = (req: any, res: any, next: any) => {
   const poolLength = Number(req.body.poolLength);
-  console.log(`[Records] Validating pool length: ${poolLength}m`, {
-    body: req.body,
-    method: req.method,
-    path: req.path
-  });
   
   if (!validatePoolLength(poolLength)) {
-    const error = `Invalid pool length: ${poolLength}m. Must be one of: ${POOL_LENGTHS.join(', ')}m`;
-    console.error(`[Records] ${error}`);
+    console.error('[Records] Validation Error:', {
+      type: 'pool_length',
+      value: poolLength,
+      allowed: POOL_LENGTHS.join(', ')
+    });
+    
     return res.status(400).json({
       message: "無効なプール長です",
       errors: {
@@ -94,7 +93,6 @@ const validatePoolLengthMiddleware = (req: any, res: any, next: any) => {
     });
   }
 
-  console.log(`[Records] Pool length validation successful: ${poolLength}m`);
   next();
 };
 
@@ -123,7 +121,6 @@ export function registerRoutes(app: Express) {
   app.get("/api/documents/:id/download", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
-      console.log('Download request for document:', id);
 
       const [document] = await db
         .select()
@@ -132,29 +129,33 @@ export function registerRoutes(app: Express) {
         .limit(1);
 
       if (!document) {
-        console.log('Document not found:', id);
         return res.status(404).json({ message: "ドキュメントが見つかりません" });
       }
 
       const filePath = path.join(UPLOAD_DIR, document.filename);
-      console.log('Attempting to access file:', filePath);
 
       try {
         await fs.access(filePath);
       } catch (error) {
-        console.error(`File access error for ${filePath}:`, error);
+        console.error('[Documents] File Access Error:', {
+          id,
+          path: filePath,
+          error: error instanceof Error ? error.message : String(error)
+        });
         return res.status(404).json({ message: "ファイルが見つかりません" });
       }
 
-      // Set proper headers for download
       res.setHeader('Content-Type', document.mimeType);
       res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(document.filename)}"`);
       
-      // Stream the file with proper error handling
       const fileStream = createReadStream(filePath);
       
       fileStream.on('error', (error) => {
-        console.error(`File streaming error for ${filePath}:`, error);
+        console.error('[Documents] Streaming Error:', {
+          id,
+          path: filePath,
+          error: error instanceof Error ? error.message : String(error)
+        });
         if (!res.headersSent) {
           res.status(500).json({ message: "ファイルの読み込みに失敗しました" });
         }
@@ -162,7 +163,10 @@ export function registerRoutes(app: Express) {
 
       fileStream.pipe(res);
     } catch (error) {
-      console.error('Document download error:', error);
+      console.error('[Documents] Download Error:', {
+        id: req.params.id,
+        error: error instanceof Error ? error.message : String(error)
+      });
       if (!res.headersSent) {
         res.status(500).json({ message: "予期せぬエラーが発生しました" });
       }

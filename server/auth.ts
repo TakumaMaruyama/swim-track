@@ -58,9 +58,6 @@ function logAuth({ event, status, username, message, error, context }: AuthLog):
   // Only log critical events and errors
   if (status === 'failure' || event === 'error') {
     console.error('[Auth]', { event, status, username, message, error, context });
-  } else if (event === 'login' || event === 'logout') {
-    // Only log successful login/logout events
-    console.log('[Auth]', { event, status, username, message });
   }
 }
 
@@ -226,12 +223,6 @@ export function setupAuth(app: Express): void {
           lastSuccess: now
         });
 
-        logAuth({ 
-          event: 'login',
-          status: 'success',
-          username,
-          message: 'Authentication successful'
-        });
         return done(null, user);
       } catch (err) {
         logAuth({ 
@@ -384,16 +375,6 @@ export function setupAuth(app: Express): void {
           error: err
         });
         return res.status(500).json({ message: "ログアウトに失敗しました" });
-      }
-      
-      if (username) {
-        loginAttempts.delete(username.toLowerCase());
-        logAuth({ 
-          event: 'logout',
-          status: 'success',
-          username,
-          message: 'Logout successful'
-        });
       }
       
       req.session.destroy((err) => {
