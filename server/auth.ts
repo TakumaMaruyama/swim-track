@@ -15,14 +15,16 @@ import { users, insertUserSchema } from "db/schema";
 // Types
 import type { User as SelectUser } from "db/schema";
 
-const scryptAsync = promisify(scrypt);
+/** Constants for authentication configuration */
+const AUTH_CONSTANTS = {
+  SALT_LENGTH: 32,
+  HASH_LENGTH: 64,
+  MAX_ATTEMPTS: 5,
+  LOCKOUT_TIME: 15 * 60 * 1000, // 15 minutes
+  ATTEMPT_RESET_TIME: 30 * 60 * 1000, // 30 minutes
+} as const;
 
-// Constants
-const SALT_LENGTH = 32;
-const HASH_LENGTH = 64;
-const MAX_ATTEMPTS = 5;
-const LOCKOUT_TIME = 15 * 60 * 1000; // 15 minutes
-const ATTEMPT_RESET_TIME = 30 * 60 * 1000; // 30 minutes
+const scryptAsync = promisify(scrypt);
 
 /** Interface for login attempt tracking */
 interface LoginAttempt {
@@ -32,21 +34,46 @@ interface LoginAttempt {
   lockoutUntil?: number;
 }
 
+/** Interface for structured auth logging */
+interface AuthLog {
+  event: 'login_success' | 'login_failure' | 'logout' | 'register' | 'error';
+  username?: string;
+  message: string;
+  error?: unknown;
+}
+
 /** Interface for login check result */
 interface LoginCheck {
   allowed: boolean;
   message: string;
 }
 
-/** Crypto utility functions for password hashing and comparison */
+/** Utility function for structured logging */
+function logAuth({ event, username, message, error }: AuthLog): void {
+  const log = {
+    timestamp: new Date().toISOString(),
+    event,
+    ...(username && { username }),
+    message,
+    ...(error && { error: error instanceof Error ? error.message : String(error) })
+  };
+  console.log(`[Auth] ${JSON.stringify(log)}`);
+}
+
+/** Crypto utility functions */
 const crypto = {
   async hash(password: string): Promise<string> {
     try {
-      const salt = randomBytes(SALT_LENGTH);
-      const hash = (await scryptAsync(password, salt, HASH_LENGTH)) as Buffer;
+      const salt = randomBytes(AUTH_CONSTANTS.SALT_LENGTH);
+      const hash = (await scryptAsync(password, salt, AUTH_CONSTANTS.HASH_LENGTH)) as Buffer;
       const hashedPassword = Buffer.concat([hash, salt]);
       return hashedPassword.toString('hex');
     } catch (error) {
+      logAuth({ 
+        event: 'error', 
+        message: 'Password hashing failed', 
+        error 
+      });
       throw new Error('パスワードのハッシュ化に失敗しました');
     }
   },
@@ -54,11 +81,16 @@ const crypto = {
   async compare(suppliedPassword: string, storedPassword: string): Promise<boolean> {
     try {
       const buffer = Buffer.from(storedPassword, 'hex');
-      const hash = buffer.subarray(0, HASH_LENGTH);
-      const salt = buffer.subarray(HASH_LENGTH);
-      const suppliedHash = (await scryptAsync(suppliedPassword, salt, HASH_LENGTH)) as Buffer;
+      const hash = buffer.subarray(0, AUTH_CONSTANTS.HASH_LENGTH);
+      const salt = buffer.subarray(AUTH_CONSTANTS.HASH_LENGTH);
+      const suppliedHash = (await scryptAsync(suppliedPassword, salt, AUTH_CONSTANTS.HASH_LENGTH)) as Buffer;
       return timingSafeEqual(hash, suppliedHash);
     } catch (error) {
+      logAuth({ 
+        event: 'error', 
+        message: 'Password comparison failed', 
+        error 
+      });
       return false;
     }
   },
@@ -102,14 +134,14 @@ export function setupAuth(app: Express): void {
   /**
    * Checks login attempts for rate limiting
    * @param username Username to check
-   * @returns Object containing allowed status and message
+   * @returns LoginCheck result
    */
   const checkLoginAttempts = (username: string): LoginCheck => {
     const now = Date.now();
     const key = username.toLowerCase();
     const attempts = loginAttempts.get(key) || { count: 0, lastAttempt: 0 };
 
-    if (now - attempts.lastAttempt > ATTEMPT_RESET_TIME) {
+    if (now - attempts.lastAttempt > AUTH_CONSTANTS.ATTEMPT_RESET_TIME) {
       loginAttempts.delete(key);
       return { allowed: true, message: '' };
     }
@@ -131,6 +163,11 @@ export function setupAuth(app: Express): void {
       try {
         const loginCheck = checkLoginAttempts(username);
         if (!loginCheck.allowed) {
+          logAuth({ 
+            event: 'login_failure', 
+            username, 
+            message: loginCheck.message 
+          });
           return done(null, false, { message: loginCheck.message });
         }
 
@@ -148,19 +185,30 @@ export function setupAuth(app: Express): void {
           const newAttempts = {
             count: attempts.count + 1,
             lastAttempt: now,
-            lockoutUntil: attempts.count + 1 >= MAX_ATTEMPTS ? now + LOCKOUT_TIME : undefined
+            lockoutUntil: attempts.count + 1 >= AUTH_CONSTANTS.MAX_ATTEMPTS ? 
+              now + AUTH_CONSTANTS.LOCKOUT_TIME : undefined
           };
           loginAttempts.set(ipKey, newAttempts);
         };
 
         if (!user?.password) {
           handleFailedAttempt();
+          logAuth({ 
+            event: 'login_failure', 
+            username, 
+            message: 'Invalid credentials' 
+          });
           return done(null, false, { message: "ユーザー名またはパスワードが正しくありません" });
         }
 
         const isMatch = await crypto.compare(password, user.password);
         if (!isMatch) {
           handleFailedAttempt();
+          logAuth({ 
+            event: 'login_failure', 
+            username, 
+            message: 'Invalid password' 
+          });
           return done(null, false, { message: "ユーザー名またはパスワードが正しくありません" });
         }
 
@@ -170,9 +218,19 @@ export function setupAuth(app: Express): void {
           lastSuccess: now
         });
 
+        logAuth({ 
+          event: 'login_success', 
+          username, 
+          message: 'Login successful' 
+        });
         return done(null, user);
       } catch (err) {
-        console.error('Authentication error:', err);
+        logAuth({ 
+          event: 'error', 
+          username, 
+          message: 'Authentication error', 
+          error: err 
+        });
         return done(err);
       }
     })
@@ -196,7 +254,11 @@ export function setupAuth(app: Express): void {
 
       done(null, user);
     } catch (err) {
-      console.error('User deserialization error:', err);
+      logAuth({ 
+        event: 'error', 
+        message: 'User deserialization error', 
+        error: err 
+      });
       done(err);
     }
   });
@@ -221,6 +283,11 @@ export function setupAuth(app: Express): void {
         .limit(1);
 
       if (existingUser) {
+        logAuth({ 
+          event: 'register', 
+          username, 
+          message: 'Username already exists' 
+        });
         return res.status(400).json({ 
           message: "このユーザー名は既に使用されています",
           field: "username"
@@ -237,6 +304,12 @@ export function setupAuth(app: Express): void {
         })
         .returning();
 
+      logAuth({ 
+        event: 'register', 
+        username, 
+        message: 'Registration successful' 
+      });
+
       req.login(newUser, (err) => {
         if (err) {
           return next(err);
@@ -247,6 +320,11 @@ export function setupAuth(app: Express): void {
         });
       });
     } catch (error) {
+      logAuth({ 
+        event: 'error', 
+        message: 'Registration error', 
+        error 
+      });
       next(error);
     }
   });
@@ -287,13 +365,30 @@ export function setupAuth(app: Express): void {
     const username = req.user?.username;
     req.logout((err) => {
       if (err) {
+        logAuth({ 
+          event: 'error', 
+          username, 
+          message: 'Logout error', 
+          error: err 
+        });
         return res.status(500).json({ message: "ログアウトに失敗しました" });
       }
       if (username) {
         loginAttempts.delete(username.toLowerCase());
+        logAuth({ 
+          event: 'logout', 
+          username, 
+          message: 'Logout successful' 
+        });
       }
       req.session.destroy((err) => {
         if (err) {
+          logAuth({ 
+            event: 'error', 
+            username, 
+            message: 'Session destruction error', 
+            error: err 
+          });
           return res.status(500).json({ message: "セッションの削除に失敗しました" });
         }
         res.clearCookie('connect.sid');
