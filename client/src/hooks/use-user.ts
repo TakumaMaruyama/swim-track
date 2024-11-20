@@ -16,13 +16,15 @@ import {
  * Only logs critical errors and important state changes
  */
 function logAuth(level: LogLevel, operation: string, message: string, context?: Record<string, unknown>): void {
+  // Only log errors and critical events
   const shouldLog = 
     level === LogLevel.ERROR || 
-    (context?.critical === true);
+    context?.critical === true;
 
   if (shouldLog) {
-    console.log('[Auth]', {
+    console.log({
       timestamp: new Date().toISOString(),
+      system: 'Client',
       level,
       operation,
       message,
@@ -34,16 +36,6 @@ function logAuth(level: LogLevel, operation: string, message: string, context?: 
 /**
  * Custom hook for managing user authentication state and operations
  * Provides login, register, and logout functionality with proper error handling
- * 
- * @returns {Object} Authentication state and methods
- * @property {User | undefined} user - Current user data
- * @property {boolean} isLoading - Loading state for auth operations
- * @property {boolean} isAuthChecking - Initial auth state check
- * @property {boolean} isAuthenticated - User authentication status
- * @property {AuthError | null} error - Current auth error state
- * @property {Function} register - User registration method
- * @property {Function} login - User login method
- * @property {Function} logout - User logout method
  */
 export function useUser() {
   const [authState, setAuthState] = useState<AuthState>({
@@ -67,11 +59,10 @@ export function useUser() {
   /**
    * Handles user registration
    * @param user - User registration data
-   * @returns Promise<AuthResult> - Result of the registration attempt
    */
   const register = useCallback(async (user: InsertUser): Promise<AuthResult> => {
     if (authState.isLoading) {
-      return { ok: false, message: "登録処理中です" };
+      return { ok: false, message: "Registration in progress" };
     }
 
     try {
@@ -87,7 +78,7 @@ export function useUser() {
 
       if (!response.ok) {
         const error: AuthError = {
-          message: data.message || "登録に失敗しました",
+          message: data.message || "Registration failed",
           field: data.field,
           errors: data.errors
         };
@@ -99,7 +90,7 @@ export function useUser() {
         return { ok: false, ...error };
       }
 
-      logAuth(LogLevel.INFO, 'register', '登録が完了しました', {
+      logAuth(LogLevel.INFO, 'register', 'Registration successful', {
         username: user.username,
         critical: true
       });
@@ -107,7 +98,7 @@ export function useUser() {
       return { ok: true, user: data.user };
     } catch (error) {
       const authError: AuthError = {
-        message: "サーバーとの通信に失敗しました",
+        message: "Failed to communicate with server",
         field: "network"
       };
       setAuthState({ isLoading: false, error: authError });
@@ -124,11 +115,10 @@ export function useUser() {
   /**
    * Handles user login
    * @param user - User login credentials
-   * @returns Promise<AuthResult> - Result of the login attempt
    */
   const login = useCallback(async (user: InsertUser): Promise<AuthResult> => {
     if (authState.isLoading) {
-      return { ok: false, message: "ログイン処理中です" };
+      return { ok: false, message: "Login in progress" };
     }
 
     try {
@@ -144,7 +134,7 @@ export function useUser() {
 
       if (!response.ok) {
         const error: AuthError = {
-          message: data.message || "ログインに失敗しました",
+          message: data.message || "Login failed",
           field: data.field,
           errors: data.errors
         };
@@ -156,7 +146,7 @@ export function useUser() {
         return { ok: false, ...error };
       }
 
-      logAuth(LogLevel.INFO, 'login', 'ログインに成功しました', {
+      logAuth(LogLevel.INFO, 'login', 'Login successful', {
         username: user.username,
         critical: true
       });
@@ -164,7 +154,7 @@ export function useUser() {
       return { ok: true, user: data.user };
     } catch (error) {
       const authError: AuthError = {
-        message: "サーバーとの通信に失敗しました",
+        message: "Failed to communicate with server",
         field: "network"
       };
       setAuthState({ isLoading: false, error: authError });
@@ -180,11 +170,10 @@ export function useUser() {
 
   /**
    * Handles user logout
-   * @returns Promise<AuthResult> - Result of the logout attempt
    */
   const logout = useCallback(async (): Promise<AuthResult> => {
     if (authState.isLoading) {
-      return { ok: false, message: "ログアウト処理中です" };
+      return { ok: false, message: "Logout in progress" };
     }
 
     try {
@@ -198,7 +187,7 @@ export function useUser() {
 
       if (!response.ok) {
         const error: AuthError = {
-          message: data.message || "ログアウトに失敗しました",
+          message: data.message || "Logout failed",
           field: "network"
         };
         setAuthState({ isLoading: false, error });
@@ -206,14 +195,14 @@ export function useUser() {
         return { ok: false, ...error };
       }
 
-      logAuth(LogLevel.INFO, 'logout', 'ログアウトが完了しました', {
+      logAuth(LogLevel.INFO, 'logout', 'Logout successful', {
         critical: true
       });
       await mutate(undefined, false);
       return { ok: true };
     } catch (error) {
       const authError: AuthError = {
-        message: "サーバーとの通信に失敗しました",
+        message: "Failed to communicate with server",
         field: "network"
       };
       setAuthState({ isLoading: false, error: authError });
@@ -232,7 +221,7 @@ export function useUser() {
     isAuthChecking: swrLoading,
     isAuthenticated: !!data,
     error: authState.error || (swrError ? { 
-      message: "認証に失敗しました"
+      message: "Authentication failed"
     } : null),
     register,
     login,

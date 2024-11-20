@@ -17,15 +17,18 @@ interface ServerError extends Error {
 
 /**
  * Structured logging function with filtered output
+ * Only logs critical events and errors
  */
 function logServer(level: LogLevel, operation: string, message: string, context?: Record<string, unknown>): void {
+  // Only log errors and critical events
   const shouldLog = 
     level === LogLevel.ERROR || 
-    (context?.critical === true);
+    context?.critical === true;
 
   if (shouldLog) {
-    console.log('[Server]', {
+    console.log({
       timestamp: new Date().toISOString(),
+      system: 'Server',
       level,
       operation,
       message,
@@ -56,7 +59,7 @@ app.use(express.urlencoded({ extended: false }));
     app.use((err: ServerError, _req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || err.statusCode || 500;
       const errorResponse = {
-        message: err.message || "サーバーエラーが発生しました",
+        message: err.message || "Internal server error",
         code: err.code || 'INTERNAL_ERROR'
       };
       
@@ -87,6 +90,7 @@ app.use(express.urlencoded({ extended: false }));
     server.listen(PORT, "0.0.0.0", () => {
       logServer(LogLevel.INFO, 'startup', 'Server started', { 
         port: PORT,
+        environment: process.env.NODE_ENV,
         critical: true 
       });
     });

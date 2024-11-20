@@ -36,17 +36,20 @@ interface LoginAttempt {
 }
 
 /** 
- * Structured logging function
- * Only logs critical errors and important state changes
+ * Structured logging function with filtered output
+ * Only logs critical events and errors
  */
 function logAuth(level: LogLevel, operation: string, message: string, context?: Record<string, unknown>): void {
+  // Only log errors and critical events
   const shouldLog = 
     level === LogLevel.ERROR || 
-    (context?.critical === true);
+    context?.critical === true ||
+    operation === 'session_error';
 
   if (shouldLog) {
-    console.log('[Auth]', {
+    console.log({
       timestamp: new Date().toISOString(),
+      system: 'Auth',
       level,
       operation,
       message,
@@ -64,8 +67,8 @@ const crypto = {
       const hashedPassword = Buffer.concat([hash, salt]);
       return hashedPassword.toString('hex');
     } catch (error) {
-      logAuth(LogLevel.ERROR, 'hash', 'パスワードのハッシュ化に失敗しました', { error });
-      throw new Error('パスワードのハッシュ化に失敗しました');
+      logAuth(LogLevel.ERROR, 'hash', 'Password hashing failed', { error });
+      throw new Error('Password hashing failed');
     }
   },
 
@@ -77,7 +80,7 @@ const crypto = {
       const suppliedHash = (await scryptAsync(suppliedPassword, salt, AUTH_CONSTANTS.HASH_LENGTH)) as Buffer;
       return timingSafeEqual(hash, suppliedHash);
     } catch (error) {
-      logAuth(LogLevel.ERROR, 'compare', 'パスワード検証に失敗しました', { error });
+      logAuth(LogLevel.ERROR, 'compare', 'Password verification failed', { error });
       return false;
     }
   },
@@ -137,7 +140,7 @@ export function setupAuth(app: Express): void {
       const remainingTime = Math.ceil((attempts.lockoutUntil - now) / 60000);
       return {
         allowed: false,
-        message: `アカウントが一時的にロックされています。${remainingTime}分後に再試行してください。`
+        message: `Account temporarily locked. Please try again in ${remainingTime} minutes.`
       };
     }
 
@@ -150,7 +153,7 @@ export function setupAuth(app: Express): void {
       try {
         const loginCheck = checkLoginAttempts(username);
         if (!loginCheck.allowed) {
-          logAuth(LogLevel.WARN, 'login', loginCheck.message, {
+          logAuth(LogLevel.WARN, 'login_attempt', loginCheck.message, {
             username,
             reason: 'rate_limit',
             critical: true
@@ -178,7 +181,7 @@ export function setupAuth(app: Express): void {
           loginAttempts.set(ipKey, newAttempts);
           
           if (newAttempts.count >= AUTH_CONSTANTS.MAX_ATTEMPTS) {
-            logAuth(LogLevel.WARN, 'login', 'アカウントがロックされました', {
+            logAuth(LogLevel.WARN, 'account_locked', 'Account locked due to multiple failed attempts', {
               username,
               reason,
               attempts: newAttempts.count,
@@ -189,13 +192,13 @@ export function setupAuth(app: Express): void {
 
         if (!user?.password) {
           handleFailedAttempt('invalid_user');
-          return done(null, false, { message: "ユーザー名またはパスワードが正しくありません" });
+          return done(null, false, { message: "Invalid username or password" });
         }
 
         const isMatch = await crypto.compare(password, user.password);
         if (!isMatch) {
           handleFailedAttempt('invalid_password');
-          return done(null, false, { message: "ユーザー名またはパスワードが正しくありません" });
+          return done(null, false, { message: "Invalid username or password" });
         }
 
         loginAttempts.set(ipKey, {
@@ -204,14 +207,14 @@ export function setupAuth(app: Express): void {
           lastSuccess: now
         });
 
-        logAuth(LogLevel.INFO, 'login', 'ログインに成功しました', {
+        logAuth(LogLevel.INFO, 'login_success', 'Login successful', {
           username,
           critical: true
         });
 
         return done(null, user);
       } catch (err) {
-        logAuth(LogLevel.ERROR, 'authenticate', '認証エラーが発生しました', { 
+        logAuth(LogLevel.ERROR, 'auth_error', 'Authentication error occurred', { 
           username,
           error: err
         });
@@ -233,11 +236,16 @@ export function setupAuth(app: Express): void {
         .limit(1);
       
       if (!user) {
+        logAuth(LogLevel.WARN, 'session_error', 'Session user not found', { userId: id });
         return done(null, false);
       }
 
       done(null, user);
     } catch (err) {
+      logAuth(LogLevel.ERROR, 'session_error', 'Session deserialization failed', { 
+        userId: id,
+        error: err
+      });
       done(err);
     }
   });
@@ -248,7 +256,7 @@ export function setupAuth(app: Express): void {
       const result = insertUserSchema.safeParse(req.body);
       if (!result.success) {
         return res.status(400).json({ 
-          message: "入力が無効です", 
+          message: "Invalid input", 
           errors: result.error.flatten().fieldErrors 
         });
       }
@@ -262,12 +270,12 @@ export function setupAuth(app: Express): void {
         .limit(1);
 
       if (existingUser) {
-        logAuth(LogLevel.WARN, 'register', 'ユーザー名が既に使用されています', {
+        logAuth(LogLevel.WARN, 'register_error', 'Username already taken', {
           username,
           critical: true
         });
         return res.status(400).json({ 
-          message: "このユーザー名は既に使用されています",
+          message: "Username already taken",
           field: "username"
         });
       }
@@ -282,7 +290,7 @@ export function setupAuth(app: Express): void {
         })
         .returning();
 
-      logAuth(LogLevel.INFO, 'register', '登録が完了しました', {
+      logAuth(LogLevel.INFO, 'register_success', 'Registration successful', {
         username,
         role,
         critical: true
@@ -293,12 +301,12 @@ export function setupAuth(app: Express): void {
           return next(err);
         }
         return res.json({
-          message: "登録が完了しました",
+          message: "Registration successful",
           user: { id: newUser.id, username: newUser.username, role: newUser.role },
         });
       });
     } catch (error) {
-      logAuth(LogLevel.ERROR, 'register', '登録中にエラーが発生しました', {
+      logAuth(LogLevel.ERROR, 'register_error', 'Registration failed', {
         username: req.body?.username,
         error
       });
@@ -310,7 +318,7 @@ export function setupAuth(app: Express): void {
     const result = insertUserSchema.safeParse(req.body);
     if (!result.success) {
       return res.status(400).json({ 
-        message: "入力が無効です", 
+        message: "Invalid input", 
         errors: result.error.flatten().fieldErrors 
       });
     }
@@ -321,7 +329,7 @@ export function setupAuth(app: Express): void {
       }
       if (!user) {
         return res.status(401).json({
-          message: info.message ?? "ログインに失敗しました",
+          message: info.message ?? "Login failed",
           field: "credentials"
         });
       }
@@ -331,7 +339,7 @@ export function setupAuth(app: Express): void {
           return next(err);
         }
         return res.json({
-          message: "ログインしました",
+          message: "Login successful",
           user: { id: user.id, username: user.username, role: user.role },
         });
       });
@@ -342,36 +350,36 @@ export function setupAuth(app: Express): void {
     const username = req.user?.username;
     req.logout((err) => {
       if (err) {
-        logAuth(LogLevel.ERROR, 'logout', 'ログアウト中にエラーが発生しました', {
+        logAuth(LogLevel.ERROR, 'logout_error', 'Logout failed', {
           username,
           error: err
         });
-        return res.status(500).json({ message: "ログアウトに失敗しました" });
+        return res.status(500).json({ message: "Logout failed" });
       }
       
       req.session.destroy((err) => {
         if (err) {
-          logAuth(LogLevel.ERROR, 'logout', 'セッションの削除に失敗しました', {
+          logAuth(LogLevel.ERROR, 'session_error', 'Session destruction failed', {
             username,
             error: err
           });
-          return res.status(500).json({ message: "セッションの削除に失敗しました" });
+          return res.status(500).json({ message: "Session destruction failed" });
         }
 
-        logAuth(LogLevel.INFO, 'logout', 'ログアウトが完了しました', {
+        logAuth(LogLevel.INFO, 'logout_success', 'Logout successful', {
           username,
           critical: true
         });
 
         res.clearCookie('connect.sid');
-        res.json({ message: "ログアウトしました" });
+        res.json({ message: "Logged out successfully" });
       });
     });
   });
 
   app.get("/api/user", (req, res) => {
     if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "認証が必要です" });
+      return res.status(401).json({ message: "Authentication required" });
     }
     res.json(req.user);
   });
