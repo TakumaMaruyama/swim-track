@@ -28,9 +28,7 @@ const AUTH_CONSTANTS = {
 enum LogLevel {
   ERROR = 'error',
   WARN = 'warn',
-  INFO = 'info',
-  DEBUG = 'debug', // Added DEBUG level
-  TRACE = 'trace' // Added TRACE level
+  INFO = 'info'
 }
 
 const scryptAsync = promisify(scrypt);
@@ -46,7 +44,7 @@ interface LoginAttempt {
 /** Interface for structured auth logging */
 interface AuthLog {
   level: LogLevel;
-  event: 'login' | 'logout' | 'register' | 'validation' | 'error';
+  operation: 'login' | 'logout' | 'register' | 'validation' | 'error';
   status: 'success' | 'failure';
   username?: string;
   message: string;
@@ -56,23 +54,20 @@ interface AuthLog {
 
 /** 
  * Structured logging function with filtered output
- * Only logs critical errors, security events, and important state changes
+ * Only logs critical errors and important state changes
  */
-function logAuth({ level, event, status, username, message, error, context }: AuthLog): void {
-  // Only log critical errors, security events, and important state changes
+function logAuth({ level, operation, status, username, message, error, context }: AuthLog): void {
+  // Only log critical errors and important state changes
   const shouldLog = 
     level === LogLevel.ERROR || 
-    (level === LogLevel.INFO && ['login', 'logout', 'register'].includes(event) && status === 'success') ||
-    (level === LogLevel.WARN && (
-      (event === 'login' && status === 'failure' && context?.reason === 'rate_limit') ||
-      (event === 'validation' && status === 'failure' && context?.critical === true)
-    ));
+    (level === LogLevel.INFO && status === 'success') ||
+    (level === LogLevel.WARN && context?.critical === true);
 
   if (shouldLog) {
     console.log('[Auth]', {
       timestamp: new Date().toISOString(),
       level,
-      event,
+      operation,
       status,
       ...(username && { username }),
       message,
@@ -93,7 +88,7 @@ const crypto = {
     } catch (error) {
       logAuth({ 
         level: LogLevel.ERROR,
-        event: 'error',
+        operation: 'error',
         status: 'failure',
         message: 'パスワードのハッシュ化に失敗しました',
         error,
@@ -113,7 +108,7 @@ const crypto = {
     } catch (error) {
       logAuth({ 
         level: LogLevel.ERROR,
-        event: 'error',
+        operation: 'error',
         status: 'failure',
         message: 'パスワード検証に失敗しました',
         error,
@@ -193,7 +188,7 @@ export function setupAuth(app: Express): void {
         if (!loginCheck.allowed) {
           logAuth({ 
             level: LogLevel.WARN,
-            event: 'login',
+            operation: 'login',
             status: 'failure',
             username,
             message: loginCheck.message,
@@ -224,7 +219,7 @@ export function setupAuth(app: Express): void {
           if (newAttempts.count >= AUTH_CONSTANTS.MAX_ATTEMPTS) {
             logAuth({ 
               level: LogLevel.WARN,
-              event: 'login',
+              operation: 'login',
               status: 'failure',
               username,
               message: 'アカウントがロックされました',
@@ -252,7 +247,7 @@ export function setupAuth(app: Express): void {
 
         logAuth({ 
           level: LogLevel.INFO,
-          event: 'login',
+          operation: 'login',
           status: 'success',
           username,
           message: 'ログインに成功しました'
@@ -262,7 +257,7 @@ export function setupAuth(app: Express): void {
       } catch (err) {
         logAuth({ 
           level: LogLevel.ERROR,
-          event: 'error',
+          operation: 'error',
           status: 'failure',
           username,
           message: '認証エラーが発生しました',
@@ -318,7 +313,7 @@ export function setupAuth(app: Express): void {
       if (existingUser) {
         logAuth({ 
           level: LogLevel.WARN,
-          event: 'register',
+          operation: 'register',
           status: 'failure',
           username,
           message: 'ユーザー名が既に使用されています',
@@ -342,7 +337,7 @@ export function setupAuth(app: Express): void {
 
       logAuth({ 
         level: LogLevel.INFO,
-        event: 'register',
+        operation: 'register',
         status: 'success',
         username,
         message: '登録が完了しました',
@@ -361,7 +356,7 @@ export function setupAuth(app: Express): void {
     } catch (error) {
       logAuth({ 
         level: LogLevel.ERROR,
-        event: 'error',
+        operation: 'error',
         status: 'failure',
         message: '登録中にエラーが発生しました',
         error,
@@ -409,7 +404,7 @@ export function setupAuth(app: Express): void {
       if (err) {
         logAuth({ 
           level: LogLevel.ERROR,
-          event: 'error',
+          operation: 'error',
           status: 'failure',
           username,
           message: 'ログアウト中にエラーが発生しました',
@@ -422,7 +417,7 @@ export function setupAuth(app: Express): void {
         if (err) {
           logAuth({ 
             level: LogLevel.ERROR,
-            event: 'error',
+            operation: 'error',
             status: 'failure',
             username,
             message: 'セッションの削除に失敗しました',
@@ -433,7 +428,7 @@ export function setupAuth(app: Express): void {
 
         logAuth({
           level: LogLevel.INFO,
-          event: 'logout',
+          operation: 'logout',
           status: 'success',
           username,
           message: 'ログアウトが完了しました'

@@ -22,15 +22,24 @@ enum LogLevel {
 }
 
 /**
- * Structured logging function
+ * Structured logging function with filtered output
  */
-function logServer(level: LogLevel, message: string, context?: Record<string, unknown>) {
-  console.log('[Server]', {
-    timestamp: new Date().toISOString(),
-    level,
-    message,
-    ...context
-  });
+function logServer(level: LogLevel, operation: string, message: string, context?: Record<string, unknown>): void {
+  // Only log critical errors and important state changes
+  const shouldLog = 
+    level === LogLevel.ERROR || 
+    (level === LogLevel.INFO && operation === 'startup') ||
+    (level === LogLevel.WARN && context?.critical === true);
+
+  if (shouldLog) {
+    console.log('[Server]', {
+      timestamp: new Date().toISOString(),
+      level,
+      operation,
+      message,
+      ...context
+    });
+  }
 }
 
 const app = express();
@@ -61,17 +70,11 @@ app.use(express.urlencoded({ extended: false }));
       
       // Only log critical errors (500+)
       if (status >= 500) {
-        logServer(LogLevel.ERROR, 'Critical Error', {
+        logServer(LogLevel.ERROR, 'error', 'Critical server error', {
           status,
           code: errorResponse.code,
           message: errorResponse.message,
-          stack: app.get("env") === "development" ? err.stack : undefined
-        });
-      } else {
-        logServer(LogLevel.WARN, 'Client Error', {
-          status,
-          code: errorResponse.code,
-          message: errorResponse.message
+          stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
         });
       }
 
@@ -81,7 +84,7 @@ app.use(express.urlencoded({ extended: false }));
     });
 
     // Setup Vite or static serving based on environment
-    if (app.get("env") === "development") {
+    if (process.env.NODE_ENV === 'development') {
       await setupVite(app, server);
     } else {
       serveStatic(app);
@@ -89,11 +92,10 @@ app.use(express.urlencoded({ extended: false }));
 
     const PORT = Number(process.env.PORT || 5000);
     server.listen(PORT, "0.0.0.0", () => {
-      logServer(LogLevel.INFO, 'Server started', { port: PORT });
+      logServer(LogLevel.INFO, 'startup', 'Server started', { port: PORT });
     });
   } catch (error) {
-    logServer(LogLevel.ERROR, 'Fatal Error', {
-      message: 'Server startup failed',
+    logServer(LogLevel.ERROR, 'fatal', 'Server startup failed', {
       error: error instanceof Error ? error.message : String(error)
     });
     process.exit(1);

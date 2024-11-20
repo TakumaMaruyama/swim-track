@@ -7,6 +7,7 @@ interface AuthError {
   message: string;
   field?: "credentials" | "network" | "username" | "password";
   errors?: Record<string, string[]>;
+  context?: Record<string, unknown>;
 }
 
 /** Authentication state interface */
@@ -22,21 +23,12 @@ interface AuthResult {
   field?: AuthError['field'];
   errors?: Record<string, string[]>;
   user?: User;
+  context?: Record<string, unknown>;
 }
 
 /**
  * Custom hook for managing user authentication state and operations
  * Provides login, register, and logout functionality with proper error handling
- * 
- * @returns {Object} Authentication state and operations
- * @property {User | undefined} user - Current authenticated user
- * @property {boolean} isLoading - Loading state for authentication operations
- * @property {boolean} isAuthChecking - Initial auth state check loading
- * @property {boolean} isAuthenticated - Whether user is authenticated
- * @property {AuthError | null} error - Current authentication error
- * @property {Function} register - User registration function
- * @property {Function} login - User login function
- * @property {Function} logout - User logout function
  */
 export function useUser() {
   const [authState, setAuthState] = useState<AuthState>({
@@ -59,12 +51,10 @@ export function useUser() {
 
   /**
    * Handles user registration with proper error handling and state management
-   * @param {InsertUser} user - User registration data
-   * @returns {Promise<AuthResult>} Result of registration attempt
    */
   const register = useCallback(async (user: InsertUser): Promise<AuthResult> => {
     if (authState.isLoading) {
-      return { ok: false, message: "登録処理中です" };
+      return { ok: false, message: "登録処理中です", context: { operation: 'register' } };
     }
 
     try {
@@ -83,17 +73,19 @@ export function useUser() {
           message: data.message || "登録に失敗しました",
           field: data.field,
           errors: data.errors,
+          context: { operation: 'register', status: response.status }
         };
         setAuthState({ isLoading: false, error });
         return { ok: false, ...error };
       }
 
       await mutate();
-      return { ok: true, user: data.user };
+      return { ok: true, user: data.user, context: { operation: 'register' } };
     } catch (error) {
       const authError: AuthError = {
         message: "サーバーとの通信に失敗しました",
         field: "network",
+        context: { operation: 'register', error: error instanceof Error ? error.message : String(error) }
       };
       setAuthState({ isLoading: false, error: authError });
       return { ok: false, ...authError };
@@ -104,12 +96,10 @@ export function useUser() {
 
   /**
    * Handles user login with proper error handling and state management
-   * @param {InsertUser} user - User login credentials
-   * @returns {Promise<AuthResult>} Result of login attempt
    */
   const login = useCallback(async (user: InsertUser): Promise<AuthResult> => {
     if (authState.isLoading) {
-      return { ok: false, message: "ログイン処理中です" };
+      return { ok: false, message: "ログイン処理中です", context: { operation: 'login' } };
     }
 
     try {
@@ -128,17 +118,19 @@ export function useUser() {
           message: data.message || "ログインに失敗しました",
           field: data.field,
           errors: data.errors,
+          context: { operation: 'login', status: response.status }
         };
         setAuthState({ isLoading: false, error });
         return { ok: false, ...error };
       }
 
       await mutate();
-      return { ok: true, user: data.user };
+      return { ok: true, user: data.user, context: { operation: 'login' } };
     } catch (error) {
       const authError: AuthError = {
         message: "サーバーとの通信に失敗しました",
         field: "network",
+        context: { operation: 'login', error: error instanceof Error ? error.message : String(error) }
       };
       setAuthState({ isLoading: false, error: authError });
       return { ok: false, ...authError };
@@ -149,11 +141,10 @@ export function useUser() {
 
   /**
    * Handles user logout with proper error handling and state management
-   * @returns {Promise<AuthResult>} Result of logout attempt
    */
   const logout = useCallback(async (): Promise<AuthResult> => {
     if (authState.isLoading) {
-      return { ok: false, message: "ログアウト処理中です" };
+      return { ok: false, message: "ログアウト処理中です", context: { operation: 'logout' } };
     }
 
     try {
@@ -166,20 +157,22 @@ export function useUser() {
       const data = await response.json();
 
       if (!response.ok) {
-        const error: AuthError = { 
+        const error: AuthError = {
           message: data.message || "ログアウトに失敗しました",
-          field: "network"
+          field: "network",
+          context: { operation: 'logout', status: response.status }
         };
         setAuthState({ isLoading: false, error });
         return { ok: false, ...error };
       }
 
       await mutate(undefined, false);
-      return { ok: true };
+      return { ok: true, context: { operation: 'logout' } };
     } catch (error) {
-      const authError: AuthError = { 
+      const authError: AuthError = {
         message: "サーバーとの通信に失敗しました",
-        field: "network"
+        field: "network",
+        context: { operation: 'logout', error: error instanceof Error ? error.message : String(error) }
       };
       setAuthState({ isLoading: false, error: authError });
       return { ok: false, ...authError };
@@ -193,7 +186,10 @@ export function useUser() {
     isLoading: swrLoading || authState.isLoading,
     isAuthChecking: swrLoading,
     isAuthenticated: !!data,
-    error: authState.error || (swrError ? { message: "認証に失敗しました" } : null),
+    error: authState.error || (swrError ? { 
+      message: "認証に失敗しました",
+      context: { operation: 'auth_check', error: swrError }
+    } : null),
     register,
     login,
     logout,
