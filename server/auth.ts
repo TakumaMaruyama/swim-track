@@ -58,7 +58,8 @@ function logAuth({ event, status, username, message, error, context }: AuthLog):
   // Only log critical events and errors
   if (status === 'failure' || event === 'error') {
     console.error('[Auth]', { event, status, username, message, error, context });
-  } else if (event !== 'error' && status === 'success') {
+  } else if (event === 'login' || event === 'logout') {
+    // Only log successful login/logout events
     console.log('[Auth]', { event, status, username, message });
   }
 }
