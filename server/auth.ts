@@ -57,11 +57,14 @@ interface AuthLog {
  * Only logs critical events and authentication state changes
  */
 function logAuth({ level, event, status, username, message, error, context }: AuthLog): void {
-  // Only log critical errors and important auth events
+  // Only log critical errors, security events, and important state changes
   const shouldLog = 
     level === LogLevel.ERROR || 
     (level === LogLevel.INFO && ['login', 'logout', 'register'].includes(event) && status === 'success') ||
-    (level === LogLevel.WARN && event === 'login' && status === 'failure' && context?.reason === 'rate_limit');
+    (level === LogLevel.WARN && (
+      (event === 'login' && status === 'failure' && context?.reason === 'rate_limit') ||
+      (event === 'validation' && status === 'failure' && context?.critical === true)
+    ));
 
   if (shouldLog) {
     console.log('[Auth]', {
