@@ -1,5 +1,3 @@
-// Analysis: Removed redundant auth state checking logs from `Login.tsx` and added proper error state logging.
-// External libraries
 import { useEffect } from 'react';
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
@@ -61,7 +59,6 @@ export default function Login() {
     },
   });
 
-  // Simplified navigation effect
   useEffect(() => {
     if (!isAuthChecking && isAuthenticated) {
       window.location.replace('/');
@@ -106,8 +103,6 @@ export default function Login() {
         title: "エラー",
         description: "予期せぬエラーが発生しました",
       });
-      // Log the error to the console for debugging
-      console.error("Login error:", error);
     }
   };
 
