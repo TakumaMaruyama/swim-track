@@ -1,6 +1,8 @@
-// React and external libraries
+// External libraries and types
 import React, { useMemo } from 'react';
 import useSWR from "swr";
+import type { ExtendedSwimRecord } from "../hooks/use-swim-records";
+import type { Competition } from "db/schema";
 
 // UI Components
 import {
@@ -34,21 +36,13 @@ import { Badge } from "@/components/ui/badge";
 // Icons
 import { Trophy, Edit2, Trash2, Medal } from "lucide-react";
 
-// Internal components
+// Internal components and hooks
 import { TimeProgressChart } from './TimeProgressChart';
 import { EditRecordForm } from './EditRecordForm';
-
-// Hooks
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
 
-// Types
-import type { ExtendedSwimRecord } from "../hooks/use-swim-records";
-import type { Competition } from "db/schema";
-
-/**
- * Interface for TimeHistoryModal props
- */
+/** Interface for TimeHistoryModal props */
 interface TimeHistoryModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -58,14 +52,12 @@ interface TimeHistoryModalProps {
   onRecordUpdated?: () => void;
 }
 
-/**
- * Interface for grouped records
- */
+/** Interface for grouped records */
 interface GroupedRecords {
   [key: string]: ExtendedSwimRecord[];
 }
 
-// Constants
+/** Available swim styles */
 const SWIM_STYLES = [
   "自由形",
   "背泳ぎ",
@@ -76,7 +68,7 @@ const SWIM_STYLES = [
 
 /**
  * Formats a date string to localized format
- * @param date Date to format
+ * @param date - Date to format
  * @returns Formatted date string
  */
 const formatDate = (date: string | Date | null): string => {
@@ -86,8 +78,8 @@ const formatDate = (date: string | Date | null): string => {
 
 /**
  * TimeHistoryModal Component
- * Displays detailed swimming record history for an athlete
- * Includes time progression charts and record management
+ * Displays detailed swimming record history for an athlete with filtering,
+ * sorting, and management capabilities
  */
 export function TimeHistoryModal({ 
   isOpen, 
@@ -105,22 +97,21 @@ export function TimeHistoryModal({
   const [editingRecord, setEditingRecord] = React.useState<number | null>(null);
   const { data: competitions } = useSWR<Competition[]>("/api/competitions");
 
-  /**
-   * Groups and filters records based on current filters
-   */
+  /** Group and filter records based on current filters */
   const groupedAndFilteredRecords: GroupedRecords = useMemo(() => {
     const filtered = records.filter(record => 
       styleFilter === "all" || record.style === styleFilter
     );
 
     const sorted = [...filtered].sort((a, b) => {
+      const dateA = a.date ? new Date(a.date).getTime() : 0;
+      const dateB = b.date ? new Date(b.date).getTime() : 0;
+
       switch (sortBy) {
         case "date_asc":
-          return (a.date ? new Date(a.date).getTime() : 0) - 
-                 (b.date ? new Date(b.date).getTime() : 0);
+          return dateA - dateB;
         case "date_desc":
-          return (b.date ? new Date(b.date).getTime() : 0) - 
-                 (a.date ? new Date(a.date).getTime() : 0);
+          return dateB - dateA;
         case "time_asc":
           return a.time.localeCompare(b.time);
         case "time_desc":
@@ -140,11 +131,9 @@ export function TimeHistoryModal({
     }, {} as GroupedRecords);
   }, [records, styleFilter, sortBy]);
 
-  /**
-   * Calculates personal best times for each event
-   */
+  /** Calculate personal best times for each event */
   const personalBests = useMemo(() => {
-    const bests: { [key: string]: string } = {};
+    const bests: Record<string, string> = {};
     Object.entries(groupedAndFilteredRecords).forEach(([key, records]) => {
       bests[key] = records.reduce((best, record) => 
         record.time < best ? record.time : best
@@ -153,10 +142,8 @@ export function TimeHistoryModal({
     return bests;
   }, [groupedAndFilteredRecords]);
 
-  /**
-   * Handles record deletion
-   */
-  const handleDelete = async (recordId: number) => {
+  /** Handle record deletion */
+  const handleDelete = async (recordId: number): Promise<void> => {
     try {
       const response = await fetch(`/api/records/${recordId}`, {
         method: 'DELETE',
@@ -172,9 +159,7 @@ export function TimeHistoryModal({
         description: "記録が削除されました",
       });
       
-      if (onRecordDeleted) {
-        onRecordDeleted();
-      }
+      onRecordDeleted?.();
     } catch (error) {
       toast({
         variant: "destructive",
@@ -186,10 +171,8 @@ export function TimeHistoryModal({
     }
   };
 
-  /**
-   * Handles record updates
-   */
-  const handleEdit = async (recordId: number, data: any) => {
+  /** Handle record updates */
+  const handleEdit = async (recordId: number, data: unknown): Promise<void> => {
     try {
       const response = await fetch(`/api/records/${recordId}`, {
         method: 'PUT',
@@ -209,9 +192,7 @@ export function TimeHistoryModal({
         description: "記録が更新されました",
       });
 
-      if (onRecordUpdated) {
-        onRecordUpdated();
-      }
+      onRecordUpdated?.();
     } catch (error) {
       toast({
         variant: "destructive",
@@ -222,13 +203,10 @@ export function TimeHistoryModal({
     }
   };
 
-  /**
-   * Gets competition name from ID
-   */
+  /** Get competition name from ID */
   const getCompetitionName = (competitionId: number | null): string | null => {
     if (!competitionId || !competitions) return null;
-    const competition = competitions.find(c => c.id === competitionId);
-    return competition ? competition.name : null;
+    return competitions.find(c => c.id === competitionId)?.name ?? null;
   };
 
   const record = records.find(r => r.id === editingRecord);
@@ -298,7 +276,9 @@ export function TimeHistoryModal({
                         return (
                           <div
                             key={record.id}
-                            className={`p-4 rounded-lg ${isCompetitionRecord ? 'bg-primary/5 border border-primary/10' : 'bg-muted/50'} space-y-4`}
+                            className={`p-4 rounded-lg ${
+                              isCompetitionRecord ? 'bg-primary/5 border border-primary/10' : 'bg-muted/50'
+                            } space-y-4`}
                           >
                             <div className="flex flex-col gap-4">
                               {competitionName && (
@@ -311,7 +291,9 @@ export function TimeHistoryModal({
                               )}
                               <div className="flex flex-col gap-2">
                                 <div className="flex items-baseline gap-3">
-                                  <span className="text-xl font-bold tracking-tight">{record.time}</span>
+                                  <span className="text-xl font-bold tracking-tight">
+                                    {record.time}
+                                  </span>
                                   {record.time === personalBests[key] && (
                                     <Badge variant="secondary" className="h-6">
                                       <Trophy className="h-4 w-4 mr-1" />
@@ -325,7 +307,6 @@ export function TimeHistoryModal({
                               </div>
                             </div>
 
-                            {/* Actions Section */}
                             {user?.role === 'coach' && (
                               <div className="flex gap-2 justify-end">
                                 <Button
