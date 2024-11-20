@@ -60,7 +60,7 @@ function logAuth({ level, operation, status, username, message, error, context }
   // Only log critical errors and important state changes
   const shouldLog = 
     level === LogLevel.ERROR || 
-    (level === LogLevel.INFO && status === 'success') ||
+    (level === LogLevel.INFO && status === 'success' && operation !== 'validation') ||
     (level === LogLevel.WARN && context?.critical === true);
 
   if (shouldLog) {
@@ -192,7 +192,7 @@ export function setupAuth(app: Express): void {
             status: 'failure',
             username,
             message: loginCheck.message,
-            context: { reason: 'rate_limit' }
+            context: { reason: 'rate_limit', critical: true }
           });
           return done(null, false, { message: loginCheck.message });
         }
@@ -223,7 +223,7 @@ export function setupAuth(app: Express): void {
               status: 'failure',
               username,
               message: 'アカウントがロックされました',
-              context: { reason, attempts: newAttempts.count }
+              context: { reason, attempts: newAttempts.count, critical: true }
             });
           }
         };
