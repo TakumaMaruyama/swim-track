@@ -300,7 +300,7 @@ export default function Athletes() {
   const record = records?.find(r => r.id === editingRecord.id);
 
   return (
-    <>
+    <ErrorBoundary>
       <PageHeader 
         title="選手一覧"
         children={

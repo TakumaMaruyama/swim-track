@@ -17,35 +17,57 @@ export function useSwimRecords(isCompetition?: boolean) {
   const { data: records, error, mutate } = useSWR<ExtendedSwimRecord[]>(endpoint, {
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
-    dedupingInterval: 5000, // Increased to prevent rapid updates
+    dedupingInterval: 0, // Disable deduping to ensure immediate updates
     revalidateIfStale: true,
     shouldRetryOnError: true,
+    refreshInterval: 1000, // Poll every second
+    onSuccess: (data) => {
+      console.log('[Records] Cache updated:', { timestamp: new Date().toISOString() });
+    },
     onError: (error) => {
       console.error('[Records] Cache error:', error);
       errorBoundary?.setError(error);
-      mutate(undefined, { revalidate: true });
+      // Force immediate revalidation on error
+      mutate(undefined, { 
+        revalidate: true,
+        populateCache: false
+      });
     }
   });
 
-  // Add optimistic update function
+  // Add optimistic update function with complete cache invalidation
   const optimisticUpdate = async (operation: 'create' | 'update' | 'delete', data: any) => {
     const previousData = records;
+    
     try {
-      // Update cache optimistically
-      await mutate(
-        operation === 'delete'
-          ? records?.filter(r => r.id !== data.id)
-          : operation === 'create'
-          ? [...(records || []), data]
-          : records?.map(r => (r.id === data.id ? { ...r, ...data } : r)),
-        false
-      );
+      // Immediately update local data
+      const optimisticData = operation === 'delete'
+        ? records?.filter(r => r.id !== data.id)
+        : operation === 'create'
+        ? [...(records || []), data]
+        : records?.map(r => (r.id === data.id ? { ...r, ...data } : r));
 
-      // Return cleanup function for rollback
-      return () => mutate(previousData, false);
+      // Force immediate cache update
+      await mutate(optimisticData, {
+        revalidate: false, // Don't revalidate yet
+        populateCache: true
+      });
+
+      // Return cleanup function
+      return async () => {
+        console.log('[Records] Rolling back optimistic update');
+        await mutate(previousData, {
+          revalidate: true,
+          populateCache: true
+        });
+      };
     } catch (error) {
       // Rollback on error
-      await mutate(previousData, false);
+      console.error('[Records] Optimistic update failed:', error);
+      await mutate(previousData, {
+        revalidate: true,
+        populateCache: true
+      });
       throw error;
     }
   };

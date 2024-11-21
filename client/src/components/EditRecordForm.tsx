@@ -130,7 +130,7 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
   try {
     setIsSubmitting(true);
     
-    // Prepare optimistic update
+    // Prepare optimistic update with complete cache control
     rollback = await optimisticUpdate(
       record ? 'update' : 'create',
       record ? { ...record, ...values } : values
@@ -142,7 +142,7 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
     // Update cache with server data
     await mutate(undefined, {
       revalidate: true,
-      populateCache: true,
+      populateCache: false,
       rollbackOnError: true
     });
     
