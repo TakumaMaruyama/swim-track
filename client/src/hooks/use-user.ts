@@ -182,11 +182,11 @@ export function useUser() {
           errors: data.errors
         };
         setAuthState({ isLoading: false, error });
-        logAuth(LogLevel.ERROR, 'login_error', error.message);
+        logAuthEvent(LogLevel.ERROR, 'login', error.message);
         return { ok: false, ...error };
       }
 
-      logAuth(LogLevel.INFO, 'login_success', 'Login successful');
+      logAuthEvent(LogLevel.INFO, 'login', 'Login successful', { critical: true });
       await mutate();
       return { ok: true, user: data.user };
     } catch (error) {
@@ -195,7 +195,7 @@ export function useUser() {
         field: "network"
       };
       setAuthState({ isLoading: false, error: authError });
-      logAuth(LogLevel.ERROR, 'login_error', authError.message, {
+      logAuthEvent(LogLevel.ERROR, 'login', authError.message, {
         error: error instanceof Error ? error.message : String(error)
       });
       return { ok: false, ...authError };
@@ -227,11 +227,11 @@ export function useUser() {
           field: "network"
         };
         setAuthState({ isLoading: false, error });
-        logAuth(LogLevel.ERROR, 'logout_error', error.message);
+        logAuthEvent(LogLevel.ERROR, 'logout', error.message);
         return { ok: false, ...error };
       }
 
-      logAuth(LogLevel.INFO, 'logout_success', 'Logout successful');
+      logAuthEvent(LogLevel.INFO, 'logout', 'Logout successful', { critical: true });
       await mutate(undefined, false);
       return { ok: true };
     } catch (error) {
@@ -240,7 +240,7 @@ export function useUser() {
         field: "network"
       };
       setAuthState({ isLoading: false, error: authError });
-      logAuth(LogLevel.ERROR, 'logout_error', authError.message, {
+      logAuthEvent(LogLevel.ERROR, 'logout', authError.message, {
         error: error instanceof Error ? error.message : String(error)
       });
       return { ok: false, ...authError };
