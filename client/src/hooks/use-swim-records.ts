@@ -11,7 +11,9 @@ export function useSwimRecords(isCompetition?: boolean) {
   const { data: records, error, mutate } = useSWR<ExtendedSwimRecord[]>(endpoint, {
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
-    dedupingInterval: 1000, // Reduced to ensure quicker updates
+    dedupingInterval: 5000,
+    revalidateIfStale: true,
+    shouldRetryOnError: true,
     errorRetryCount: 3,
     errorRetryInterval: 3000,
     onErrorRetry: (error, key, config, revalidate, { retryCount }) => {
@@ -22,18 +24,10 @@ export function useSwimRecords(isCompetition?: boolean) {
       if (retryCount >= 3) return;
       setTimeout(() => revalidate({ retryCount }), Math.min(1000 * (2 ** retryCount), 30000));
     },
-    // Add proper error boundaries
     onError: (error) => {
-      console.error('SWR Error:', error);
+      console.error('[Records] Cache error:', error);
       // Force revalidation on next request
       mutate(undefined, { revalidate: true });
-    },
-    // Handle race conditions
-    keepPreviousData: true,
-    // Ensure data consistency
-    compare: (a, b) => {
-      if (!a || !b) return false;
-      return JSON.stringify(a) === JSON.stringify(b);
     }
   });
 
@@ -72,14 +66,17 @@ export function useSwimRecords(isCompetition?: boolean) {
       // Perform optimistic update
       await mutate(optimisticData, false);
 
-      // Always revalidate after successful operation, with force option
-      if (options?.revalidate || options?.forceRevalidate) {
-        await mutate(undefined, { 
-          revalidate: true,
-          populateCache: true,
-          rollbackOnError: options?.rollbackOnError
-        });
-      }
+      // Always force revalidate after mutation
+      await mutate(undefined, { 
+        revalidate: true,
+        populateCache: false // Don't keep stale data
+      });
+
+      console.log('[Records] Cache update:', {
+        operation,
+        timestamp: new Date().toISOString(),
+        success: true
+      });
 
       return { success: true };
     } catch (error) {

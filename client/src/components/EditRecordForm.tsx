@@ -135,29 +135,27 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
         values.competitionId = null;
       }
 
-      // Prepare optimistic data with current values
+      // Prepare optimistic data
       const optimisticData = {
         ...values,
         id: record?.id,
-        athleteName: record?.athleteName || '', // Preserve existing athlete name if available
         date: new Date(values.date).toISOString(),
       };
       
-      // Perform optimistic update with rollback option
+      // Perform optimistic update with forced revalidation
       optimisticUpdateResult = await optimisticUpdate(operation, optimisticData, {
         rollbackOnError: true,
-        revalidate: false
+        revalidate: true,
+        forceRevalidate: true
       });
 
       if (!optimisticUpdateResult.success) {
+        console.error('[Records] Optimistic update failed:', optimisticUpdateResult.error);
         throw optimisticUpdateResult.error;
       }
 
       // Perform actual API call
       await onSubmit(values);
-      
-      // Revalidate cache after successful update
-      await revalidateCache();
       
       toast({
         title: record ? "更新成功" : "記録追加成功",
@@ -165,16 +163,14 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
       });
       onClose();
     } catch (error) {
-      console.error('Error submitting record:', error);
+      console.error('[Records] Error submitting record:', error);
 
-      // If optimistic update failed, we don't need to rollback
-      if (optimisticUpdateResult?.success) {
-        // Rollback optimistic update and revalidate
-        await optimisticUpdate(operation, record || {}, {
-          rollbackOnError: true,
-          revalidate: true
-        });
-      }
+      // Always rollback on error and force revalidate
+      await optimisticUpdate(operation, record || {}, {
+        rollbackOnError: true,
+        revalidate: true,
+        forceRevalidate: true
+      });
 
       toast({
         variant: "destructive",
