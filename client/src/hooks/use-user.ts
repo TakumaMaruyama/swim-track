@@ -88,9 +88,16 @@ export function useUser() {
   } = useSWR<User>("/api/user", {
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
-    shouldRetryOnError: false,
-    refreshInterval: 300000, // 5 minutes
-    onError: () => mutate(undefined, false)
+    shouldRetryOnError: true,
+    errorRetryCount: 3,
+    refreshInterval: 60000, // 1 minute
+    dedupingInterval: 2000,
+    onError: (error) => {
+      if (error.status === 401) {
+        mutate(undefined, false);
+        logAuthEvent(LogLevel.INFO, 'session', 'Session expired or invalid', { critical: true });
+      }
+    }
   });
 
   /**

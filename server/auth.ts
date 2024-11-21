@@ -116,27 +116,36 @@ declare global {
 export function setupAuth(app: Express): void {
   const PgSession = pgSession(session);
   
-  // Create PostgreSQL session store
+  // Create PostgreSQL session store with enhanced configuration
   const sessionStore = new PgSession({
     pool: new pg.Pool({
       connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      max: 10,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 2000,
     }),
     tableName: 'session',
-    createTableIfMissing: true
+    createTableIfMissing: true,
+    pruneSessionInterval: 24 * 60 * 60 * 1000, // Prune expired sessions every 24 hours
+    errorLog: (err) => {
+      logAuth(LogLevel.ERROR, 'session_store', 'Session store error occurred', { error: err });
+    }
   });
 
   const sessionSettings: session.SessionOptions = {
     secret: process.env.REPL_ID || "secure-session-secret",
-    resave: false,
+    resave: true,
     saveUninitialized: false,
     rolling: true,
     store: sessionStore,
+    name: 'swimtrack.sid',
     cookie: {
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax'
+      sameSite: 'lax',
+      path: '/'
     }
   };
 
