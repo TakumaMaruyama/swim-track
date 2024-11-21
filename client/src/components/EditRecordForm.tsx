@@ -122,36 +122,28 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
   const watchIsCompetition = form.watch('isCompetition');
   const watchedPoolLength = form.watch('poolLength') as PoolLength;
 
-  const { optimisticUpdate } = useSwimRecords();
+  const { mutate } = useSwimRecords();
 
 const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
     try {
         setIsSubmitting(true);
         
-        // Wait for the API call first
+        // First do the API call
         await onSubmit(values);
         
-        // Then perform cache update
+        // Then force a complete cache refresh
         await mutate(undefined, {
             revalidate: true,
-            populateCache: true
+            populateCache: false,  // Don't use old cache
+            rollbackOnError: true
         });
         
-        toast({
-            title: record ? "更新成功" : "記録追加成功",
-            description: record ? "記録が更新されました" : "新しい記録が追加されました",
-        });
         onClose();
     } catch (error) {
-        console.error('[Records] Error submitting record:', error);
-        toast({
-            variant: "destructive",
-            title: "エラー",
-            description: record ? "記録の更新に失敗しました" : "記録の追加に失敗しました",
-        });
-        
+        console.error('[Records] Error:', error);
         // Force revalidate on error
         await mutate(undefined, { revalidate: true });
+        throw error;
     } finally {
         setIsSubmitting(false);
     }
