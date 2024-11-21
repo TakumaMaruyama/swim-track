@@ -59,19 +59,18 @@ function logAuth(level: LogLevel, operation: string, message: string, context?: 
     credentials: undefined,
     token: undefined,
     sessionId: undefined,
-    authToken: undefined,
-    sessionData: undefined,
-    userCredentials: undefined
+    authData: undefined,
+    sessionData: undefined
   } : undefined;
 
-  // Use consistent log format
+  // Use standardized log format
   console.log({
     timestamp: new Date().toISOString(),
-    system: 'Auth',
+    system: 'ServerAuth',
     level,
     operation,
     message,
-    ...(filteredContext && { context: filteredContext }
+    ...(filteredContext && { context: filteredContext })
   });
 }
 

@@ -21,7 +21,7 @@ import {
  * @param context - Optional context (sensitive data filtered)
  */
 function logAuth(level: LogLevel, operation: string, message: string, context?: Record<string, unknown>): void {
-  // Only log critical auth events and errors
+  // Only log errors and critical auth events
   const shouldLog = 
     level === LogLevel.ERROR || 
     (level === LogLevel.INFO && context?.critical === true);
@@ -35,19 +35,18 @@ function logAuth(level: LogLevel, operation: string, message: string, context?: 
     credentials: undefined,
     token: undefined,
     sessionId: undefined,
-    authToken: undefined,
-    sessionData: undefined,
+    authData: undefined,
     authState: undefined
   } : undefined;
 
-  // Use consistent log format
+  // Use standardized log format
   console.log({
     timestamp: new Date().toISOString(),
     system: 'ClientAuth',
     level,
     operation,
     message,
-    ...(filteredContext && { context: filteredContext }
+    ...(filteredContext && { context: filteredContext })
   });
 }
 
