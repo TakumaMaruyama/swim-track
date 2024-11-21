@@ -89,13 +89,36 @@ export function useUser() {
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
     shouldRetryOnError: true,
-    errorRetryCount: 3,
-    refreshInterval: 60000, // 1 minute
-    dedupingInterval: 2000,
-    onError: (error) => {
+    errorRetryCount: 5,
+    refreshInterval: 300000, // 5 minutes
+    dedupingInterval: 5000,
+    refreshWhenHidden: true,
+    refreshWhenOffline: false,
+    onSuccess: (data) => {
+      if (data) {
+        logAuthEvent(LogLevel.INFO, 'session', 'Session validated successfully');
+      }
+    },
+    onError: async (error) => {
       if (error.status === 401) {
-        mutate(undefined, false);
         logAuthEvent(LogLevel.INFO, 'session', 'Session expired or invalid', { critical: true });
+        // Clear auth state
+        mutate(undefined, false);
+        // Attempt to refresh session
+        try {
+          const refreshResponse = await fetch('/api/refresh-session', { 
+            credentials: 'include',
+            headers: { 'Cache-Control': 'no-cache' }
+          });
+          if (refreshResponse.ok) {
+            // Revalidate after successful refresh
+            mutate();
+          }
+        } catch (refreshError) {
+          logAuthEvent(LogLevel.ERROR, 'session', 'Session refresh failed', { 
+            error: refreshError instanceof Error ? refreshError.message : String(refreshError)
+          });
+        }
       }
     }
   });

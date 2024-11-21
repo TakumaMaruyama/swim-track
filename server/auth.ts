@@ -116,52 +116,70 @@ declare global {
 export function setupAuth(app: Express): void {
   const PgSession = pgSession(session);
   
-  // Enhanced PostgreSQL session store with better error handling and connection management
+  // Enhanced PostgreSQL session store with robust error handling and connection management
   const sessionStore = new PgSession({
     pool: new pg.Pool({
       connectionString: process.env.DATABASE_URL,
       ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-      max: 20, // Increased connection pool
-      min: 5, // Minimum connections
-      idleTimeoutMillis: 60000, // Longer idle timeout
-      connectionTimeoutMillis: 5000, // Longer connection timeout
-      keepAlive: true, // Enable connection keep-alive
+      max: 20,
+      min: 5,
+      idleTimeoutMillis: 300000, // 5 minutes idle timeout
+      connectionTimeoutMillis: 10000, // 10 seconds connection timeout
+      allowExitOnIdle: false,
     }),
     tableName: 'session',
     createTableIfMissing: true,
-    pruneSessionInterval: 12 * 60 * 60 * 1000, // Prune expired sessions every 12 hours
-    touchInterval: 30 * 60 * 1000, // Touch active sessions every 30 minutes
+    pruneSessionInterval: 3600000, // Prune expired sessions every hour
     errorLog: (err) => {
       logAuth(LogLevel.ERROR, 'session_store', 'Session store error occurred', { error: err });
     },
-    // Retry failed queries
-    retries: 3,
-    minTimeout: 1000,
-    maxTimeout: 5000,
-    // Keep sessions alive
-    keepAlive: true,
-    keepAliveInterval: 60000,
-    // Clean up on errors
-    cleanup: true
+    schemaName: 'public',
+    disableTouch: false,
+    ttl: 30 * 24 * 60 * 60 // 30 days in seconds
   });
 
-  // Enhanced session configuration with better security and persistence
+  // Implement session store error handling and reconnection
+  sessionStore.on('error', (error: Error) => {
+    logAuth(LogLevel.ERROR, 'session_store', 'Session store error, attempting recovery', { error });
+    setTimeout(() => {
+      sessionStore.connect().catch(err => {
+        logAuth(LogLevel.ERROR, 'session_store', 'Session store reconnection failed', { error: err });
+      });
+    }, 5000);
+  });
+
+  // Enhanced session configuration with improved security and persistence
   const sessionSettings: session.SessionOptions = {
     secret: process.env.REPL_ID || "secure-session-secret",
-    resave: false, // Only save session if data changed
-    saveUninitialized: false, // Don't create session until something stored
-    rolling: true, // Refresh session with each request
+    resave: false,
+    saveUninitialized: false,
+    rolling: true,
     store: sessionStore,
     name: 'swimtrack.sid',
+    proxy: process.env.NODE_ENV === 'production',
     cookie: {
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      path: '/'
+      path: '/',
+      domain: process.env.NODE_ENV === 'production' ? process.env.DOMAIN : undefined
     },
-    unset: 'destroy' // Properly cleanup removed sessions
+    unset: 'destroy',
   };
+
+  // Session cleanup interval
+  setInterval(() => {
+    try {
+      sessionStore.clear((err) => {
+        if (err) {
+          logAuth(LogLevel.ERROR, 'session_cleanup', 'Failed to clean expired sessions', { error: err });
+        }
+      });
+    } catch (error) {
+      logAuth(LogLevel.ERROR, 'session_cleanup', 'Session cleanup error', { error });
+    }
+  }, 6 * 60 * 60 * 1000); // Run cleanup every 6 hours
 
   app.use(session(sessionSettings));
   app.use(passport.initialize());
@@ -426,10 +444,35 @@ export function setupAuth(app: Express): void {
     });
   });
 
+  // Session refresh endpoint
+  app.get("/api/refresh-session", (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    
+    // Update session expiry
+    if (req.session) {
+      req.session.touch();
+    }
+    
+    res.json({ message: "Session refreshed" });
+  });
+
+  // User info endpoint with enhanced session validation
   app.get("/api/user", (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Authentication required" });
     }
+
+    // Ensure session is still valid
+    if (!req.session?.passport?.user) {
+      logAuth(LogLevel.WARN, 'session_validation', 'Invalid session state detected', {
+        userId: req.user?.id,
+        critical: true
+      });
+      return res.status(401).json({ message: "Session expired" });
+    }
+
     res.json(req.user);
   });
 }
