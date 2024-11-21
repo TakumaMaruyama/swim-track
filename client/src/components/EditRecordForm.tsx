@@ -125,62 +125,37 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
   const { optimisticUpdate } = useSwimRecords();
 
 const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
-    const operation = record ? 'update' : 'create';
-    let optimisticUpdateResult;
-
     try {
-      setIsSubmitting(true);
-
-      if (!values.isCompetition) {
-        values.competitionId = null;
-      }
-
-      // Prepare optimistic data
-      const optimisticData = {
-        ...values,
-        id: record?.id,
-        date: new Date(values.date).toISOString(),
-      };
-      
-      // Perform optimistic update with forced revalidation
-      optimisticUpdateResult = await optimisticUpdate(operation, optimisticData, {
-        rollbackOnError: true,
-        revalidate: true,
-        forceRevalidate: true
-      });
-
-      if (!optimisticUpdateResult.success) {
-        console.error('[Records] Optimistic update failed:', optimisticUpdateResult.error);
-        throw optimisticUpdateResult.error;
-      }
-
-      // Perform actual API call
-      await onSubmit(values);
-      
-      toast({
-        title: record ? "更新成功" : "記録追加成功",
-        description: record ? "記録が更新されました" : "新しい記録が追加されました",
-      });
-      onClose();
+        setIsSubmitting(true);
+        
+        // Wait for the API call first
+        await onSubmit(values);
+        
+        // Then perform cache update
+        await mutate(undefined, {
+            revalidate: true,
+            populateCache: true
+        });
+        
+        toast({
+            title: record ? "更新成功" : "記録追加成功",
+            description: record ? "記録が更新されました" : "新しい記録が追加されました",
+        });
+        onClose();
     } catch (error) {
-      console.error('[Records] Error submitting record:', error);
-
-      // Always rollback on error and force revalidate
-      await optimisticUpdate(operation, record || {}, {
-        rollbackOnError: true,
-        revalidate: true,
-        forceRevalidate: true
-      });
-
-      toast({
-        variant: "destructive",
-        title: "エラー",
-        description: record ? "記録の更新に失敗しました" : "記録の追加に失敗しました",
-      });
+        console.error('[Records] Error submitting record:', error);
+        toast({
+            variant: "destructive",
+            title: "エラー",
+            description: record ? "記録の更新に失敗しました" : "記録の追加に失敗しました",
+        });
+        
+        // Force revalidate on error
+        await mutate(undefined, { revalidate: true });
     } finally {
-      setIsSubmitting(false);
+        setIsSubmitting(false);
     }
-  };
+};
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
