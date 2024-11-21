@@ -78,12 +78,15 @@ export default function Competitions() {
         throw new Error('記録の更新に失敗しました');
       }
 
-      await mutate();
+      // Only revalidate after successful update
+      await mutate(undefined, { revalidate: true });
       toast({
         title: "更新成功",
         description: "大会記録が更新されました",
       });
     } catch (error) {
+      // Force revalidate on error
+      await mutate();
       toast({
         variant: "destructive",
         title: "エラー",

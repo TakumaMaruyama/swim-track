@@ -178,6 +178,7 @@ export default function Athletes() {
         throw new Error('記録の作成に失敗しました');
       }
 
+      // Only revalidate to get the actual server state
       await mutateRecords();
       
       toast({
@@ -185,6 +186,8 @@ export default function Athletes() {
         description: "新しい記録が追加されました",
       });
     } catch (error) {
+      // Force revalidate on error
+      await mutateRecords();
       toast({
         variant: "destructive",
         title: "エラー",

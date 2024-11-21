@@ -121,7 +121,9 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
   const watchIsCompetition = form.watch('isCompetition');
   const watchedPoolLength = form.watch('poolLength') as PoolLength;
 
-  const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
+  const { optimisticUpdate } = useSwimRecords();
+
+const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
     try {
       setIsSubmitting(true);
 
@@ -129,6 +131,15 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
         values.competitionId = null;
       }
 
+      // Perform optimistic update before the actual API call
+      const operation = record ? 'update' : 'create';
+      const optimisticData = {
+        ...values,
+        id: record?.id,
+        athleteName: '', // Will be updated after API response
+      };
+      
+      await optimisticUpdate(operation, optimisticData);
       await onSubmit(values);
       
       toast({
@@ -137,6 +148,8 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
       });
       onClose();
     } catch (error) {
+      // Revalidate on error to restore correct state
+      await mutate();
       toast({
         variant: "destructive",
         title: "エラー",
