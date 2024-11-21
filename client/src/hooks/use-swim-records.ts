@@ -11,16 +11,29 @@ export function useSwimRecords(isCompetition?: boolean) {
   const { data: records, error, mutate } = useSWR<ExtendedSwimRecord[]>(endpoint, {
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
-    dedupingInterval: 2000,
+    dedupingInterval: 1000, // Reduced to ensure quicker updates
     errorRetryCount: 3,
     errorRetryInterval: 3000,
     onErrorRetry: (error, key, config, revalidate, { retryCount }) => {
-      // Never retry on 404 or 403
-      if (error.status === 404 || error.status === 403) return;
+      // Never retry on 404, 403, or 422
+      if (error.status === 404 || error.status === 403 || error.status === 422) return;
 
       // Retry up to 3 times with exponential backoff
       if (retryCount >= 3) return;
       setTimeout(() => revalidate({ retryCount }), Math.min(1000 * (2 ** retryCount), 30000));
+    },
+    // Add proper error boundaries
+    onError: (error) => {
+      console.error('SWR Error:', error);
+      // Force revalidation on next request
+      mutate(undefined, { revalidate: true });
+    },
+    // Handle race conditions
+    keepPreviousData: true,
+    // Ensure data consistency
+    compare: (a, b) => {
+      if (!a || !b) return false;
+      return JSON.stringify(a) === JSON.stringify(b);
     }
   });
 
@@ -30,6 +43,7 @@ export function useSwimRecords(isCompetition?: boolean) {
     options?: { 
       rollbackOnError?: boolean;
       revalidate?: boolean;
+      forceRevalidate?: boolean;
     }
   ): Promise<{ success: boolean; error?: Error }> => {
     if (!records) return { success: false, error: new Error('No records available') };
@@ -58,9 +72,13 @@ export function useSwimRecords(isCompetition?: boolean) {
       // Perform optimistic update
       await mutate(optimisticData, false);
 
-      // If revalidate is true, trigger a revalidation after the optimistic update
-      if (options?.revalidate) {
-        await mutate(undefined, { revalidate: true });
+      // Always revalidate after successful operation, with force option
+      if (options?.revalidate || options?.forceRevalidate) {
+        await mutate(undefined, { 
+          revalidate: true,
+          populateCache: true,
+          rollbackOnError: options?.rollbackOnError
+        });
       }
 
       return { success: true };

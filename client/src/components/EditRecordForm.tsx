@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
 import { SwimRecord, Competition } from "db/schema";
 import useSWR from "swr";
+import { useSwimRecords } from '../hooks/use-swim-records';
 import * as z from "zod";
 import { Loader2 } from "lucide-react";
 
