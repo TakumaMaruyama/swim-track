@@ -12,51 +12,43 @@ import {
 } from "../types/auth";
 
 /**
- * Structured logging function with filtered output
- * Only logs critical events and errors
- */
-/**
- * Structured logging function for authentication events
- * Only logs critical authentication events and errors
- *
- * @param level - Log level (ERROR, WARN, INFO)
- * @param operation - Operation being performed
- * @param message - Log message
- * @param context - Additional context data
- */
-/**
  * Structured logging function for client-side authentication
  * Only logs critical authentication events and errors
  * 
- * @param level - Log level (ERROR, WARN, INFO)
+ * @param level - Log level from LogLevel enum
  * @param operation - Authentication operation being performed
- * @param message - Descriptive log message
- * @param context - Additional contextual information
+ * @param message - Descriptive message about the event
+ * @param context - Optional context data (filtered for sensitive data)
  */
 function logAuth(level: LogLevel, operation: string, message: string, context?: Record<string, unknown>): void {
-  // Only log errors and critical auth events
+  // Only log errors and critical authentication events
   const shouldLog = 
     level === LogLevel.ERROR || 
     (level === LogLevel.INFO && context?.critical === true);
 
-  if (shouldLog) {
-    console.log({
-      timestamp: new Date().toISOString(),
-      system: 'ClientAuth',
-      level,
-      operation,
-      message,
-      // Only include context for errors or critical events
-      ...(level === LogLevel.ERROR || context?.critical ? {
-        context: {
-          ...context,
-          // Remove sensitive data
-          password: undefined,
-          credentials: undefined
-        }
-      } : {})
-    });
-  }
+  if (!shouldLog) return;
+
+  // Filter sensitive data from context
+  const filteredContext = context ? {
+    ...context,
+    password: undefined,
+    credentials: undefined,
+    token: undefined,
+    sessionData: undefined,
+    authState: undefined
+  } : undefined;
+
+  // Use standardized log format
+  console.log({
+    timestamp: new Date().toISOString(),
+    system: 'ClientAuth',
+    level,
+    operation,
+    message,
+    ...(filteredContext && (level === LogLevel.ERROR || context?.critical) ? {
+      context: filteredContext
+    } : {})
+  });
 }
 
 /**
