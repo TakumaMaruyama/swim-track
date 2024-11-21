@@ -3,7 +3,8 @@ import passport from "passport";
 import { IVerifyOptions, Strategy as LocalStrategy } from "passport-local";
 import { type Express } from "express";
 import session from "express-session";
-import createMemoryStore from "memorystore";
+import pgSession from "connect-pg-simple";
+import pg from "pg";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { eq } from "drizzle-orm";
@@ -113,15 +114,24 @@ declare global {
  * @param app Express application instance
  */
 export function setupAuth(app: Express): void {
-  const MemoryStore = createMemoryStore(session);
+  const PgSession = pgSession(session);
+  
+  // Create PostgreSQL session store
+  const sessionStore = new PgSession({
+    pool: new pg.Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    }),
+    tableName: 'session',
+    createTableIfMissing: true
+  });
+
   const sessionSettings: session.SessionOptions = {
     secret: process.env.REPL_ID || "secure-session-secret",
     resave: false,
     saveUninitialized: false,
     rolling: true,
-    store: new MemoryStore({
-      checkPeriod: 86400000 // 24 hours
-    }),
+    store: sessionStore,
     cookie: {
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
       httpOnly: true,
