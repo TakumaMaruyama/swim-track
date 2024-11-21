@@ -36,42 +36,42 @@ interface LoginAttempt {
 }
 
 /**
- * Structured logging function for authentication server operations
- * Only logs critical events and errors with proper context
+ * Structured logging function for server-side authentication.
+ * Logs only critical authentication events and errors.
  * 
- * @param level - Log level from LogLevel enum (ERROR, WARN, INFO)
- * @param operation - Authentication operation being performed (e.g., 'login', 'register')
- * @param message - Descriptive message about the event
- * @param context - Optional context data for the event (filtered for sensitive data)
+ * @param level - Log level (ERROR, WARN, INFO)
+ * @param operation - Auth operation (login, register, logout)
+ * @param message - Event description
+ * @param context - Optional context (sensitive data filtered)
  */
 function logAuth(level: LogLevel, operation: string, message: string, context?: Record<string, unknown>): void {
-  // Determine if this event should be logged based on severity
+  // Only log critical auth events and errors
   const shouldLog = 
     level === LogLevel.ERROR || 
     (level === LogLevel.INFO && context?.critical === true);
 
   if (!shouldLog) return;
 
-  // Filter sensitive data from context
+  // Filter sensitive data
   const filteredContext = context ? {
     ...context,
     password: undefined,
     credentials: undefined,
     token: undefined,
+    sessionId: undefined,
+    authToken: undefined,
     sessionData: undefined,
     userCredentials: undefined
   } : undefined;
 
-  // Log with standardized format
+  // Use consistent log format
   console.log({
     timestamp: new Date().toISOString(),
     system: 'Auth',
     level,
     operation,
     message,
-    ...(filteredContext && (level === LogLevel.ERROR || context?.critical) ? { 
-      context: filteredContext
-    } : {})
+    ...(filteredContext && { context: filteredContext }
   });
 }
 

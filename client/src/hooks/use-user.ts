@@ -12,42 +12,42 @@ import {
 } from "../types/auth";
 
 /**
- * Structured logging function for client-side authentication
- * Only logs critical authentication events and errors
+ * Structured logging function for client-side authentication.
+ * Logs only critical authentication events and errors.
  * 
  * @param level - Log level from LogLevel enum
- * @param operation - Authentication operation being performed
- * @param message - Descriptive message about the event
- * @param context - Optional context data (filtered for sensitive data)
+ * @param operation - Auth operation (login, register, logout)
+ * @param message - Event description
+ * @param context - Optional context (sensitive data filtered)
  */
 function logAuth(level: LogLevel, operation: string, message: string, context?: Record<string, unknown>): void {
-  // Only log errors and critical authentication events
+  // Only log critical auth events and errors
   const shouldLog = 
     level === LogLevel.ERROR || 
     (level === LogLevel.INFO && context?.critical === true);
 
   if (!shouldLog) return;
 
-  // Filter sensitive data from context
+  // Filter sensitive data
   const filteredContext = context ? {
     ...context,
     password: undefined,
     credentials: undefined,
     token: undefined,
+    sessionId: undefined,
+    authToken: undefined,
     sessionData: undefined,
     authState: undefined
   } : undefined;
 
-  // Use standardized log format
+  // Use consistent log format
   console.log({
     timestamp: new Date().toISOString(),
     system: 'ClientAuth',
     level,
     operation,
     message,
-    ...(filteredContext && (level === LogLevel.ERROR || context?.critical) ? {
-      context: filteredContext
-    } : {})
+    ...(filteredContext && { context: filteredContext }
   });
 }
 
