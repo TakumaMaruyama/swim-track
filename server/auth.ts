@@ -116,37 +116,51 @@ declare global {
 export function setupAuth(app: Express): void {
   const PgSession = pgSession(session);
   
-  // Create PostgreSQL session store with enhanced configuration
+  // Enhanced PostgreSQL session store with better error handling and connection management
   const sessionStore = new PgSession({
     pool: new pg.Pool({
       connectionString: process.env.DATABASE_URL,
       ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-      max: 10,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
+      max: 20, // Increased connection pool
+      min: 5, // Minimum connections
+      idleTimeoutMillis: 60000, // Longer idle timeout
+      connectionTimeoutMillis: 5000, // Longer connection timeout
+      keepAlive: true, // Enable connection keep-alive
     }),
     tableName: 'session',
     createTableIfMissing: true,
-    pruneSessionInterval: 24 * 60 * 60 * 1000, // Prune expired sessions every 24 hours
+    pruneSessionInterval: 12 * 60 * 60 * 1000, // Prune expired sessions every 12 hours
+    touchInterval: 30 * 60 * 1000, // Touch active sessions every 30 minutes
     errorLog: (err) => {
       logAuth(LogLevel.ERROR, 'session_store', 'Session store error occurred', { error: err });
-    }
+    },
+    // Retry failed queries
+    retries: 3,
+    minTimeout: 1000,
+    maxTimeout: 5000,
+    // Keep sessions alive
+    keepAlive: true,
+    keepAliveInterval: 60000,
+    // Clean up on errors
+    cleanup: true
   });
 
+  // Enhanced session configuration with better security and persistence
   const sessionSettings: session.SessionOptions = {
     secret: process.env.REPL_ID || "secure-session-secret",
-    resave: true,
-    saveUninitialized: false,
-    rolling: true,
+    resave: false, // Only save session if data changed
+    saveUninitialized: false, // Don't create session until something stored
+    rolling: true, // Refresh session with each request
     store: sessionStore,
     name: 'swimtrack.sid',
     cookie: {
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/'
-    }
+    },
+    unset: 'destroy' // Properly cleanup removed sessions
   };
 
   app.use(session(sessionSettings));
