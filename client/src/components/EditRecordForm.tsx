@@ -124,6 +124,9 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
   const { optimisticUpdate } = useSwimRecords();
 
 const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
+    const operation = record ? 'update' : 'create';
+    let optimisticUpdateResult;
+
     try {
       setIsSubmitting(true);
 
@@ -131,16 +134,29 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
         values.competitionId = null;
       }
 
-      // Perform optimistic update before the actual API call
-      const operation = record ? 'update' : 'create';
+      // Prepare optimistic data with current values
       const optimisticData = {
         ...values,
         id: record?.id,
-        athleteName: '', // Will be updated after API response
+        athleteName: record?.athleteName || '', // Preserve existing athlete name if available
+        date: new Date(values.date).toISOString(),
       };
       
-      await optimisticUpdate(operation, optimisticData);
+      // Perform optimistic update with rollback option
+      optimisticUpdateResult = await optimisticUpdate(operation, optimisticData, {
+        rollbackOnError: true,
+        revalidate: false
+      });
+
+      if (!optimisticUpdateResult.success) {
+        throw optimisticUpdateResult.error;
+      }
+
+      // Perform actual API call
       await onSubmit(values);
+      
+      // Revalidate cache after successful update
+      await revalidateCache();
       
       toast({
         title: record ? "更新成功" : "記録追加成功",
@@ -148,8 +164,17 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
       });
       onClose();
     } catch (error) {
-      // Revalidate on error to restore correct state
-      await mutate();
+      console.error('Error submitting record:', error);
+
+      // If optimistic update failed, we don't need to rollback
+      if (optimisticUpdateResult?.success) {
+        // Rollback optimistic update and revalidate
+        await optimisticUpdate(operation, record || {}, {
+          rollbackOnError: true,
+          revalidate: true
+        });
+      }
+
       toast({
         variant: "destructive",
         title: "エラー",
