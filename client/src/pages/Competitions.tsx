@@ -34,7 +34,7 @@ const formatDate = (date: Date | null) => {
 export default function Competitions() {
   const { user } = useUser();
   const { toast } = useToast();
-  const { records, isLoading, error, mutate } = useSwimRecords(true);
+  const { records, isLoading, error, mutate, optimisticUpdate } = useSwimRecords(true);
   const [editingRecord, setEditingRecord] = React.useState<number | null>(null);
 
   const groupedRecords: GroupedCompetitions = React.useMemo(() => {
@@ -187,7 +187,7 @@ export default function Competitions() {
   }
 
   return (
-    <>
+    <ErrorBoundary>
       <PageHeader 
         title="大会記録"
         children={
@@ -267,6 +267,6 @@ export default function Competitions() {
           }
         }}
       />
-    </>
+    </ErrorBoundary>
   );
 }

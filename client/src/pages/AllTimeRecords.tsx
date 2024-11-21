@@ -46,7 +46,7 @@ type GroupedRecords = {
 export default function AllTimeRecords() {
   const { user } = useUser();
   const { toast } = useToast();
-  const { records, isLoading, error, mutate } = useSwimRecords();
+  const { records, isLoading, error, mutate, optimisticUpdate } = useSwimRecords();
   const [editingRecord, setEditingRecord] = React.useState<number | null>(null);
   const [styleFilter, setStyleFilter] = React.useState<string>("all");
   const [poolLengthFilter, setPoolLengthFilter] = React.useState<string>("all_pools");
@@ -170,7 +170,7 @@ export default function AllTimeRecords() {
   }
 
   return (
-    <>
+    <ErrorBoundary>
       <PageHeader title="歴代記録">
         <div className="flex gap-4">
           <Select value={styleFilter} onValueChange={setStyleFilter}>
@@ -261,6 +261,6 @@ export default function AllTimeRecords() {
           }}
         />
       </div>
-    </>
+    </ErrorBoundary>
   );
 }

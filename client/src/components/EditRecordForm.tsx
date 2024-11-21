@@ -125,28 +125,40 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
   const { mutate } = useSwimRecords();
 
 const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
-    try {
-        setIsSubmitting(true);
-        
-        // First do the API call
-        await onSubmit(values);
-        
-        // Then force a complete cache refresh
-        await mutate(undefined, {
-            revalidate: true,
-            populateCache: false,  // Don't use old cache
-            rollbackOnError: true
-        });
-        
-        onClose();
-    } catch (error) {
-        console.error('[Records] Error:', error);
-        // Force revalidate on error
-        await mutate(undefined, { revalidate: true });
-        throw error;
-    } finally {
-        setIsSubmitting(false);
+  let rollback: (() => Promise<any>) | undefined;
+  
+  try {
+    setIsSubmitting(true);
+    
+    // Prepare optimistic update
+    rollback = await optimisticUpdate(
+      record ? 'update' : 'create',
+      record ? { ...record, ...values } : values
+    );
+    
+    // Perform API call
+    await onSubmit(values);
+    
+    // Update cache with server data
+    await mutate(undefined, {
+      revalidate: true,
+      populateCache: true,
+      rollbackOnError: true
+    });
+    
+    onClose();
+  } catch (error) {
+    console.error('[Records] Error:', error);
+    // Execute rollback if available
+    if (rollback) {
+      await rollback();
     }
+    // Force revalidate
+    await mutate(undefined, { revalidate: true });
+    throw error;
+  } finally {
+    setIsSubmitting(false);
+  }
 };
 
   return (

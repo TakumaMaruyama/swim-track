@@ -31,10 +31,12 @@ const formatDate = (date: Date) => {
   }).format(date);
 };
 
+import { ErrorBoundary } from '../components/ErrorBoundary';
+
 export default function BestTimes() {
   const { user } = useUser();
   const { toast } = useToast();
-  const { records, isLoading, error, mutate } = useSwimRecords();
+  const { records, isLoading, error, mutate, optimisticUpdate } = useSwimRecords();
   const [editingRecord, setEditingRecord] = React.useState<number | null>(null);
 
   const groupedRecords: GroupedRecords = React.useMemo(() => {
@@ -186,7 +188,7 @@ export default function BestTimes() {
   }
 
   return (
-    <>
+    <ErrorBoundary>
       <PageHeader 
         title="ベストタイム"
         children={
@@ -262,6 +264,6 @@ export default function BestTimes() {
           }
         }}
       />
-    </>
+    </ErrorBoundary>
   );
 }
