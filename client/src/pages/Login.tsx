@@ -40,6 +40,15 @@ type LoginFormValues = z.infer<typeof insertUserSchema>;
  * Structured logging function with filtered output
  * Only logs critical events and errors
  */
+/**
+ * Structured logging function for login operations
+ * Only logs critical login events and errors
+ *
+ * @param level - Log level (ERROR, WARN, INFO)
+ * @param operation - Operation being performed
+ * @param message - Log message
+ * @param context - Additional context data
+ */
 function logLogin(level: LogLevel, operation: string, message: string, context?: Record<string, unknown>): void {
   // Only log errors and critical state changes
   const shouldLog = 
@@ -53,7 +62,6 @@ function logLogin(level: LogLevel, operation: string, message: string, context?:
       level,
       operation,
       message,
-      // Only include context for errors or critical operations
       ...(level === LogLevel.ERROR || context?.critical ? { context } : {})
     });
   }

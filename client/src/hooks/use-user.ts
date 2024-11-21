@@ -15,11 +15,20 @@ import {
  * Structured logging function with filtered output
  * Only logs critical events and errors
  */
+/**
+ * Structured logging function for authentication events
+ * Only logs critical authentication events and errors
+ *
+ * @param level - Log level (ERROR, WARN, INFO)
+ * @param operation - Operation being performed
+ * @param message - Log message
+ * @param context - Additional context data
+ */
 function logAuth(level: LogLevel, operation: string, message: string, context?: Record<string, unknown>): void {
   // Only log errors and critical auth state changes
   const shouldLog = 
     level === LogLevel.ERROR || 
-    (operation === 'auth_state' && context?.critical === true);
+    (level === LogLevel.INFO && context?.critical === true);
 
   if (shouldLog) {
     console.log({
@@ -28,7 +37,7 @@ function logAuth(level: LogLevel, operation: string, message: string, context?: 
       level,
       operation,
       message,
-      ...(context && { context })
+      ...(level === LogLevel.ERROR || context?.critical ? { context } : {})
     });
   }
 }

@@ -39,8 +39,17 @@ interface LoginAttempt {
  * Structured logging function with filtered output
  * Only logs critical events and errors
  */
+/**
+ * Structured logging function for authentication server operations
+ * Only logs critical authentication events and errors
+ * 
+ * @param level - Log level from LogLevel enum
+ * @param operation - Operation being performed (e.g., 'login', 'register')
+ * @param message - Descriptive message about the event
+ * @param context - Optional context data for the event
+ */
 function logAuth(level: LogLevel, operation: string, message: string, context?: Record<string, unknown>): void {
-  // Only log critical auth events and errors
+  // Only log errors and critical authentication events
   const shouldLog = 
     level === LogLevel.ERROR || 
     (level === LogLevel.INFO && context?.critical === true);
@@ -48,12 +57,11 @@ function logAuth(level: LogLevel, operation: string, message: string, context?: 
   if (shouldLog) {
     console.log({
       timestamp: new Date().toISOString(),
-      system: 'Auth',
+      system: 'AuthServer',
       level,
       operation,
       message,
-      // Only include context if it contains critical information
-      ...(context?.critical && { context })
+      ...(level === LogLevel.ERROR || context?.critical ? { context } : {})
     });
   }
 }
