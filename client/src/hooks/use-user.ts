@@ -24,8 +24,17 @@ import {
  * @param message - Log message
  * @param context - Additional context data
  */
+/**
+ * Structured logging function for client-side authentication
+ * Only logs critical authentication events and errors
+ * 
+ * @param level - Log level (ERROR, WARN, INFO)
+ * @param operation - Authentication operation being performed
+ * @param message - Descriptive log message
+ * @param context - Additional contextual information
+ */
 function logAuth(level: LogLevel, operation: string, message: string, context?: Record<string, unknown>): void {
-  // Only log errors and critical auth state changes
+  // Only log errors and critical auth events
   const shouldLog = 
     level === LogLevel.ERROR || 
     (level === LogLevel.INFO && context?.critical === true);
@@ -33,11 +42,19 @@ function logAuth(level: LogLevel, operation: string, message: string, context?: 
   if (shouldLog) {
     console.log({
       timestamp: new Date().toISOString(),
-      system: 'Auth',
+      system: 'ClientAuth',
       level,
       operation,
       message,
-      ...(level === LogLevel.ERROR || context?.critical ? { context } : {})
+      // Only include context for errors or critical events
+      ...(level === LogLevel.ERROR || context?.critical ? {
+        context: {
+          ...context,
+          // Remove sensitive data
+          password: undefined,
+          credentials: undefined
+        }
+      } : {})
     });
   }
 }
