@@ -40,10 +40,10 @@ interface LoginAttempt {
  * Only logs critical events and errors
  */
 function logAuth(level: LogLevel, operation: string, message: string, context?: Record<string, unknown>): void {
-  // Only log errors and critical events
+  // Only log critical auth events and errors
   const shouldLog = 
     level === LogLevel.ERROR || 
-    context?.critical === true;
+    (level === LogLevel.INFO && context?.critical === true);
 
   if (shouldLog) {
     console.log({
@@ -52,7 +52,8 @@ function logAuth(level: LogLevel, operation: string, message: string, context?: 
       level,
       operation,
       message,
-      ...(context && { context })
+      // Only include context if it contains critical information
+      ...(context?.critical && { context })
     });
   }
 }

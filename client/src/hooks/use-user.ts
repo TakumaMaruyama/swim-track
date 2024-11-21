@@ -19,11 +19,7 @@ function logAuth(level: LogLevel, operation: string, message: string, context?: 
   // Only log errors and critical auth state changes
   const shouldLog = 
     level === LogLevel.ERROR || 
-    (level === LogLevel.INFO && (
-      operation === 'login_success' ||
-      operation === 'logout_success' ||
-      operation === 'register_success'
-    ));
+    (operation === 'auth_state' && context?.critical === true);
 
   if (shouldLog) {
     console.log({

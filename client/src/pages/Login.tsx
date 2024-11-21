@@ -41,10 +41,10 @@ type LoginFormValues = z.infer<typeof insertUserSchema>;
  * Only logs critical events and errors
  */
 function logLogin(level: LogLevel, operation: string, message: string, context?: Record<string, unknown>): void {
-  // Only log critical auth events and errors
+  // Only log errors and critical state changes
   const shouldLog = 
     level === LogLevel.ERROR || 
-    (operation === 'navigation' && context?.critical === true);
+    (level === LogLevel.INFO && context?.critical === true);
 
   if (shouldLog) {
     console.log({
@@ -53,7 +53,8 @@ function logLogin(level: LogLevel, operation: string, message: string, context?:
       level,
       operation,
       message,
-      ...(context && { context })
+      // Only include context for errors or critical operations
+      ...(level === LogLevel.ERROR || context?.critical ? { context } : {})
     });
   }
 }
