@@ -224,23 +224,67 @@ export function setupAuth(app: Express): void {
     unset: 'destroy',
   };
 
-  // Enhanced session cleanup with better error handling
+  // Enhanced session cleanup with better error handling and recovery
   const cleanupSessions = async (): Promise<void> => {
     const pool = (sessionStore as SessionStore).pool;
     if (!pool || pool.ended) return;
 
     try {
-      await pool.query(`
+      // First, log session statistics for monitoring
+      const [stats] = await pool.query(`
+        SELECT 
+          COUNT(*) as total_sessions,
+          COUNT(*) FILTER (WHERE expire < NOW()) as expired_sessions,
+          COUNT(*) FILTER (WHERE sess IS NULL) as null_sessions,
+          COUNT(*) FILTER (WHERE sess->>'passport' IS NULL) as invalid_sessions
+        FROM "session"
+      `);
+      
+      logAuth(LogLevel.INFO, 'session_stats', 'Session statistics before cleanup', {
+        ...stats.rows[0],
+        critical: true
+      });
+
+      // Execute cleanup with transaction
+      await pool.query('BEGIN');
+      
+      // Delete invalid sessions
+      const result = await pool.query(`
         DELETE FROM "session" 
         WHERE "expire" < NOW() 
         OR "sess" IS NULL 
         OR "sess"->>'passport' IS NULL
+        RETURNING sid
       `);
-      logAuth(LogLevel.INFO, 'session_cleanup', 'Successfully cleaned expired sessions');
-    } catch (error) {
-      logAuth(LogLevel.ERROR, 'session_cleanup', 'Session cleanup error', {
-        error: error instanceof Error ? error.message : String(error)
+
+      await pool.query('COMMIT');
+
+      logAuth(LogLevel.INFO, 'session_cleanup', 'Successfully cleaned expired sessions', {
+        removedCount: result.rowCount,
+        critical: true
       });
+
+      // Vacuum the session table to reclaim space
+      await pool.query('VACUUM ANALYZE "session"');
+    } catch (error) {
+      await pool.query('ROLLBACK').catch(() => {
+        // Ignore rollback errors
+      });
+
+      logAuth(LogLevel.ERROR, 'session_cleanup', 'Session cleanup error', {
+        error: error instanceof Error ? error.message : String(error),
+        critical: true
+      });
+
+      // Attempt recovery by reconnecting pool
+      try {
+        await handleSessionStoreError(error instanceof Error ? error : new Error(String(error)));
+      } catch (recoveryError) {
+        logAuth(LogLevel.ERROR, 'session_cleanup', 'Failed to recover from cleanup error', {
+          error: recoveryError instanceof Error ? recoveryError.message : String(recoveryError),
+          critical: true
+        });
+      }
     }
   };
 
@@ -545,14 +589,64 @@ export function setupAuth(app: Express): void {
     res.json({ message: "Session refreshed" });
   });
 
-  // User info endpoint with enhanced session validation
-  app.get("/api/user", (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Authentication required" });
-    }
+  // User info endpoint with enhanced session validation and recovery
+  app.get("/api/user", async (req, res) => {
+    try {
+      // Enhanced session validation
+      if (!req.isAuthenticated()) {
+        logAuth(LogLevel.WARN, 'session_validation', 'Unauthenticated request', {
+          path: '/api/user',
+          critical: true
+        });
+        return res.status(401).json({ message: "Authentication required" });
+      }
 
-    // Ensure session is still valid
-    if (!req.session?.passport?.user) {
+      // Comprehensive session validation
+      if (!req.session?.passport?.user) {
+        logAuth(LogLevel.WARN, 'session_validation', 'Invalid session detected', {
+          critical: true
+        });
+        
+        // Attempt session recovery
+        try {
+          if (req.session) {
+            // Regenerate session
+            await new Promise<void>((resolve, reject) => {
+              req.session.regenerate((err) => {
+                if (err) reject(err);
+                else resolve();
+              });
+            });
+          }
+        } catch (error) {
+          logAuth(LogLevel.ERROR, 'session_recovery', 'Failed to recover session', {
+            error: error instanceof Error ? error.message : String(error),
+            critical: true
+          });
+        }
+        
+        return res.status(401).json({ message: "Session invalid" });
+      }
+
+      // Validate user exists in database
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, req.user.id))
+        .limit(1);
+
+      if (!user) {
+        logAuth(LogLevel.WARN, 'session_validation', 'User not found in database', {
+          userId: req.user.id,
+          critical: true
+        });
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      // Update session expiry
+      if (req.session) {
+        req.session.touch();
+      }
       logAuth(LogLevel.WARN, 'session_validation', 'Invalid session state detected', {
         userId: req.user?.id,
         critical: true
