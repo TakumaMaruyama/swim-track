@@ -96,8 +96,7 @@ export function TimeHistoryModal({
     });
 
     return sorted.reduce((acc, record) => {
-      // Include poolLength in the grouping key
-      const key = `${record.style}-${record.distance}-${record.poolLength}`;
+      const key = `${record.style}-${record.distance}`;
       if (!acc[key]) {
         acc[key] = [];
       }
@@ -192,7 +191,8 @@ export function TimeHistoryModal({
 
           <div className="space-y-6">
             {Object.entries(groupedAndFilteredRecords).map(([key, records]) => {
-              const [style, distance, poolLength] = key.split('-');
+              const [style, distance] = key.split('-');
+              const poolLength = records[0]?.poolLength || 25;
               
               return (
                 <Card key={key}>
@@ -207,7 +207,7 @@ export function TimeHistoryModal({
                       records={records} 
                       style={style} 
                       distance={parseInt(distance)}
-                      poolLength={parseInt(poolLength)}
+                      poolLength={poolLength}
                     />
 
                     <div className="space-y-3 mt-4">

@@ -29,12 +29,12 @@ interface TimeProgressChartProps {
   poolLength?: number;
 }
 
-export function TimeProgressChart({ records, style, distance, poolLength = 25 }: TimeProgressChartProps) {
+export function TimeProgressChart({ records, style, distance }: TimeProgressChartProps) {
   const filteredRecords = records
     .filter(r => {
       return r.style === style &&
              r.distance === distance &&
-             r.poolLength === poolLength;
+             r.poolLength === 15;
     })
     .sort((a, b) => {
       const dateA = new Date(a.date || '');
@@ -56,7 +56,7 @@ export function TimeProgressChart({ records, style, distance, poolLength = 25 }:
     labels: filteredRecords.map(r => formatDate(r.date)),
     datasets: [
       {
-        label: `${style} ${distance}m (${poolLength}mプール)`,
+        label: `${style} ${distance}m (15mプール)`,
         data: filteredRecords.map(r => timeToSeconds(r.time)),
         borderColor: 'rgb(75, 192, 192)',
         backgroundColor: 'rgba(75, 192, 192, 0.5)',
@@ -75,7 +75,7 @@ export function TimeProgressChart({ records, style, distance, poolLength = 25 }:
       },
       title: {
         display: true,
-        text: `${style} ${distance}m (${poolLength}mプール) の記録推移`,
+        text: `${style} ${distance}m (15mプール) の記録推移`,
       },
       tooltip: {
         callbacks: {
