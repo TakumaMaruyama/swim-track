@@ -120,7 +120,7 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
         ? record.poolLength as PoolLength
         : defaultPoolLength,
       competitionId: record?.competitionId ?? null,
-      studentId: record ? record.studentId : (studentId ?? undefined),
+      studentId: record ? record.studentId : studentId,
     },
     mode: "onChange",
   });
@@ -347,7 +347,7 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
                   <Select
                     value={field.value?.toString()}
                     onValueChange={(value) => field.onChange(Number(value))}
-                    disabled={isSubmitting || !!record}
+                    disabled={isSubmitting}
                   >
                     <FormControl>
                       <SelectTrigger>
