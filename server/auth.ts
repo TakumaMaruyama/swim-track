@@ -146,12 +146,14 @@ export function setupAuth(app: Express): void {
   const pgPool = new pg.Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-    max: 20,
-    min: 5,
-    idleTimeoutMillis: 300000, // 5 minutes idle timeout
-    connectionTimeoutMillis: 10000, // 10 seconds connection timeout
+    max: 10, // Reduced max connections for better resource management
+    min: 2,
+    idleTimeoutMillis: 30000, // Reduced idle timeout to 30 seconds
+    connectionTimeoutMillis: 5000, // Reduced connection timeout to 5 seconds
     keepAlive: true,
     allowExitOnIdle: false,
+    statement_timeout: 10000, // Add statement timeout of 10 seconds
+    query_timeout: 10000, // Add query timeout of 10 seconds
   });
 
   // Enhanced PostgreSQL session store with robust error handling
