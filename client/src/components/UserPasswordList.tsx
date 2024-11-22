@@ -115,8 +115,8 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
         <div className="space-y-4 mt-4 overflow-y-auto max-h-[60vh] pr-2">
           {filteredUsers.map((user) => (
             <Card key={user.id}>
-              <CardContent className="flex justify-between items-center p-4">
-                <div className="flex items-center gap-2">
+              <CardContent className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 gap-4">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium">{user.username}</span>
                   <Badge variant={getRoleBadgeVariant(user.role)}>
                     {getRoleDisplayName(user.role)}
@@ -128,39 +128,44 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
                   )}
                 </div>
                 {editingUser === user.id ? (
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
                     <Input
                       type="password"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="新しいパスワード"
-                      className="w-40"
+                      className="w-full sm:w-40"
                       disabled={isSubmitting}
                     />
-                    <Button 
-                      size="sm"
-                      onClick={() => handlePasswordUpdate(user.id)}
-                      disabled={isSubmitting}
-                    >
-                      更新
-                    </Button>
-                    <Button 
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setEditingUser(null);
-                        setNewPassword("");
-                      }}
-                      disabled={isSubmitting}
-                    >
-                      キャンセル
-                    </Button>
+                    <div className="flex gap-2 w-full sm:w-auto">
+                      <Button 
+                        size="sm"
+                        onClick={() => handlePasswordUpdate(user.id)}
+                        disabled={isSubmitting}
+                        className="flex-1 sm:flex-none"
+                      >
+                        更新
+                      </Button>
+                      <Button 
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setEditingUser(null);
+                          setNewPassword("");
+                        }}
+                        disabled={isSubmitting}
+                        className="flex-1 sm:flex-none"
+                      >
+                        キャンセル
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setEditingUser(user.id)}
+                    className="w-full sm:w-auto"
                   >
                     パスワード変更
                   </Button>
