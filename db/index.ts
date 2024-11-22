@@ -6,12 +6,10 @@ import { db as poolDb, executeQuery } from "./pool";
 import { withCache, generateCacheKey } from './cache';
 
 // Optimized database instance with enhanced configurations
+// Export database instance with proper typing and configuration
 export const db = drizzle(poolDb, {
-  logger: true,
-  schema,
-  // Enhanced query batching and prepared statements
-  queryBatchMaxSize: 1000,
-  prepareCacheSize: 100,
+  schema: schema,
+  logger: true
 });
 
 // Optimized query helpers
@@ -117,8 +115,14 @@ initializePreparedStatements();
 // Export query helper for optimized operations
 export { executeQuery, preparedStatements };
 
-// Initialize prepared statements cache
-const preparedStatementsCache = new Map<string, any>();
+// Initialize prepared statements cache with proper typing
+interface PreparedStatement {
+  name: string;
+  text: string;
+  values?: any[];
+}
+
+const preparedStatementsCache = new Map<string, PreparedStatement>();
 
 // Helper to get or create prepared statement
 export async function getPreparedStatement(queryString: string, name: string) {
@@ -131,8 +135,9 @@ export async function getPreparedStatement(queryString: string, name: string) {
 
 // Function to clear prepared statements cache
 export async function clearPreparedStatements() {
-  for (const [name] of preparedStatementsCache) {
-    await poolDb.query(`DEALLOCATE ${name}`);
+  const statements = Array.from(preparedStatementsCache.keys());
+  for (const name of statements) {
+    await poolDb.query(`DEALLOCATE IF EXISTS ${name}`);
   }
   preparedStatementsCache.clear();
 }

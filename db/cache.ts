@@ -69,14 +69,14 @@ setInterval(() => {
       ...cacheStats,
       keys: queryCache.keys().length,
       hitRate: (cacheStats.hits / (cacheStats.hits + cacheStats.misses)) * 100,
-      memory: stats.memory,
+      memoryUsage: process.memoryUsage().heapUsed,
     },
   });
 }, 300000); // Log every 5 minutes
 
 // Automatic cache cleanup for memory management
 setInterval(() => {
-  queryCache.prune();
+  queryCache.flushAll();
   console.log({
     timestamp: new Date().toISOString(),
     system: 'Database',

@@ -143,6 +143,7 @@ export const db = drizzle(pool, {
 });
 
 // Enhanced query helper with timeout, retries, and detailed error tracking
+// Enhanced query execution with proper state management
 export async function executeQuery<T>(
   queryFn: () => Promise<T>,
   options: {
@@ -190,12 +191,20 @@ export async function executeQuery<T>(
         critical,
         ...context,
 // Query performance monitoring
-const queryStats = new Map<string, {
+interface QueryStats {
   count: number;
   totalTime: number;
+  avgTime: number;
+  slowQueries: number;
+}
+
+interface ExtendedQueryStats extends QueryStats {
   errors: number;
   lastError?: Error;
-}>();
+}
+
+const queryStats = new Map<string, QueryStats>();
+const extendedQueryStats = new Map<string, ExtendedQueryStats>();
 
 // Monitor query performance
 export function monitorQueryPerformance(operation: string, duration: number, error?: Error) {
