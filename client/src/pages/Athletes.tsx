@@ -317,7 +317,7 @@ export default function Athletes() {
         title="選手一覧"
         children={
           user?.role === 'coach' && (
-            <Button onClick={() => setEditingRecord({ id: null, studentId: null })}>
+            <Button onClick={() => setEditingRecord({ id: -1, studentId: null })}>
               <Plus className="mr-2 h-4 w-4" />
               新規記録追加
             </Button>
