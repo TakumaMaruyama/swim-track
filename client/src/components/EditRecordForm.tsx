@@ -83,7 +83,10 @@ const editRecordSchema = z.object({
     })
   ),
   competitionId: z.number().nullable(),
-  studentId: z.number().optional(),
+  studentId: z.number({
+    required_error: "選手IDは必須です",
+    invalid_type_error: "選手IDは数値である必要があります"
+  }),
 });
 
 type EditRecordFormProps = {
@@ -126,13 +129,22 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
 
 const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
   try {
+    if (!values.studentId) {
+      toast({
+        variant: "destructive",
+        title: "エラー",
+        description: "選手IDが設定されていません",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     
     // Perform API call first
     await onSubmit(values);
     
     // Force immediate cache refresh
-    await forceRefresh();
+    await mutate(undefined, { revalidate: true });
     
     toast({
       title: record ? "更新成功" : "記録追加成功",

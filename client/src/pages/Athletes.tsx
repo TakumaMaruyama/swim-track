@@ -162,6 +162,15 @@ export default function Athletes() {
    */
   const handleCreateRecord = async (data: Record<string, any>): Promise<void> => {
     try {
+      if (!data.studentId) {
+        toast({
+          variant: "destructive",
+          title: "エラー",
+          description: "選手IDが設定されていません",
+        });
+        return;
+      }
+
       const response = await fetch('/api/records', {
         method: 'POST',
         headers: {
@@ -170,12 +179,14 @@ export default function Athletes() {
         body: JSON.stringify({
           ...data,
           poolLength: Number(data.poolLength),
+          studentId: Number(data.studentId),
         }),
         credentials: 'include',
       });
 
       if (!response.ok) {
-        throw new Error('記録の作成に失敗しました');
+        const errorData = await response.json();
+        throw new Error(errorData.message || '記録の作成に失敗しました');
       }
 
       // Only revalidate to get the actual server state
@@ -186,12 +197,13 @@ export default function Athletes() {
         description: "新しい記録が追加されました",
       });
     } catch (error) {
+      console.error('[Records] Create error:', error);
       // Force revalidate on error
       await mutateRecords();
       toast({
         variant: "destructive",
         title: "エラー",
-        description: "記録の追加に失敗しました",
+        description: error instanceof Error ? error.message : "記録の追加に失敗しました",
       });
       throw error;
     }
