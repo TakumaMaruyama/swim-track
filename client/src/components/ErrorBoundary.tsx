@@ -44,7 +44,8 @@ function getErrorContext(error: Error, errorInfo?: React.ErrorInfo): ErrorContex
       language: navigator.language,
       platform: navigator.platform,
       screenSize: `${window.innerWidth}x${window.innerHeight}`,
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      networkStatus: navigator.onLine ? 'online' : 'offline'
     },
     timestamp: new Date().toISOString(),
     componentStack: errorInfo?.componentStack,
@@ -215,7 +216,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
     return { 
       error, 
       errorInfo: null,
-      errorCount: (prevState: State) => prevState.errorCount + 1,
+      errorCount: 1,
       lastError: Date.now()
     };
   }
@@ -286,7 +287,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   getErrorContext = (): ErrorContext | null => {
     if (!this.state.error) return null;
-    return getErrorContext(this.state.error, this.state.errorInfo);
+    return getErrorContext(this.state.error, this.state.errorInfo || undefined);
   }
 
   render() {

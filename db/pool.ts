@@ -71,17 +71,26 @@ export const db = drizzle(pool, {
   logger: true
 });
 
-// Query helper with timeout and retries
+// Enhanced query helper with timeout, retries, and detailed error tracking
 export async function executeQuery<T>(
   queryFn: () => Promise<T>,
   options: {
     timeout?: number;
     retries?: number;
     operation?: string;
+    critical?: boolean;
+    context?: Record<string, unknown>;
   } = {}
 ): Promise<T> {
-  const { timeout = 30000, retries = 3, operation = 'unknown' } = options;
+  const { 
+    timeout = 30000, 
+    retries = 3, 
+    operation = 'unknown',
+    critical = false,
+    context = {}
+  } = options;
   let lastError: Error | null = null;
+  const startTime = Date.now();
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
@@ -103,8 +112,17 @@ export async function executeQuery<T>(
         event: 'query.error',
         operation,
         attempt,
+        duration: Date.now() - startTime,
         error: lastError.message,
-        willRetry: attempt < retries
+        stack: lastError.stack,
+        willRetry: attempt < retries,
+        critical,
+        ...context,
+        queryStats: {
+          timeoutValue: timeout,
+          maxRetries: retries,
+          currentAttempt: attempt
+        }
       });
 
       if (attempt === retries) break;
