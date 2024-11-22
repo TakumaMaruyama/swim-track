@@ -37,8 +37,60 @@ const POOL_CONFIG: PoolConfig = {
   }
 };
 
-// Create the connection pool
-const pool = new Pool(POOL_CONFIG);
+// Create the connection pool with enhanced monitoring
+const pool = new Pool({
+  ...POOL_CONFIG,
+  max: 10, // Reduced for better resource management
+  min: 2,  // Minimum connections needed
+  idleTimeoutMillis: 30000, // 30 seconds idle timeout
+  connectionTimeoutMillis: 5000, // 5 seconds connection timeout
+  statement_timeout: 10000, // 10 seconds statement timeout
+  query_timeout: 10000, // 10 seconds query timeout
+});
+
+// Query performance monitoring
+const queryStats = new Map<string, {
+  count: number;
+  totalTime: number;
+  avgTime: number;
+  slowQueries: number;
+}>();
+
+pool.on('query', (query) => {
+  const start = process.hrtime();
+  
+  query.on('end', () => {
+    const [seconds, nanoseconds] = process.hrtime(start);
+    const duration = seconds * 1000 + nanoseconds / 1000000;
+    
+    const stats = queryStats.get(query.text) || {
+      count: 0,
+      totalTime: 0,
+      avgTime: 0,
+      slowQueries: 0,
+    };
+    
+    stats.count++;
+    stats.totalTime += duration;
+    stats.avgTime = stats.totalTime / stats.count;
+    if (duration > 1000) stats.slowQueries++;
+    
+    queryStats.set(query.text, stats);
+    
+    // Log slow queries
+    if (duration > 1000) {
+      console.log({
+        timestamp: new Date().toISOString(),
+        system: 'Database',
+        level: LogLevel.WARN,
+        event: 'query.slow',
+        query: query.text,
+        duration,
+        params: query.values,
+      });
+    }
+  });
+});
 
 // Log database events
 pool.on('connect', () => {

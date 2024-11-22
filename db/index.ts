@@ -3,13 +3,66 @@ import * as schema from "./schema";
 import { db as poolDb, executeQuery } from "./pool";
 
 // Export optimized database instance with performance configurations
+import { withCache, generateCacheKey } from './cache';
+
+// Optimized database instance with enhanced configurations
 export const db = drizzle(poolDb, {
   logger: true,
   schema,
-  // Enhanced query batching
+  // Enhanced query batching and prepared statements
   queryBatchMaxSize: 1000,
   prepareCacheSize: 100,
 });
+
+// Optimized query helpers
+export async function findUserById(id: number) {
+  const cacheKey = generateCacheKey('user', { id });
+  return withCache(cacheKey, async () => {
+    const [user] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.id, id))
+      .limit(1);
+    return user;
+  });
+}
+
+export async function findDocumentsByCategory(categoryId: number) {
+  const cacheKey = generateCacheKey('documents_by_category', { categoryId });
+  return withCache(cacheKey, async () => {
+    return db
+      .select({
+        id: schema.documents.id,
+        title: schema.documents.title,
+        filename: schema.documents.filename,
+        categoryName: schema.categories.name,
+        uploaderName: schema.users.username,
+      })
+      .from(schema.documents)
+      .leftJoin(schema.categories, eq(schema.documents.categoryId, schema.categories.id))
+      .leftJoin(schema.users, eq(schema.documents.uploaderId, schema.users.id))
+      .where(eq(schema.documents.categoryId, categoryId))
+      .orderBy(desc(schema.documents.createdAt));
+  });
+}
+
+export async function findSwimRecordsByStudent(studentId: number) {
+  const cacheKey = generateCacheKey('swim_records_by_student', { studentId });
+  return withCache(cacheKey, async () => {
+    return db
+      .select({
+        id: schema.swimRecords.id,
+        style: schema.swimRecords.style,
+        time: schema.swimRecords.time,
+        date: schema.swimRecords.date,
+        competitionName: schema.competitions.name,
+      })
+      .from(schema.swimRecords)
+      .leftJoin(schema.competitions, eq(schema.swimRecords.competitionId, schema.competitions.id))
+      .where(eq(schema.swimRecords.studentId, studentId))
+      .orderBy(desc(schema.swimRecords.date));
+  }, { ttl: 600 }); // 10 minutes cache for swim records
+}
 
 // Prepared statements for frequently used queries
 const preparedStatements = {
