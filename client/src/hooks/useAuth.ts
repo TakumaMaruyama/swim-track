@@ -1,13 +1,60 @@
-import { useEffect } from 'react'
+import { useEffect, useCallback } from 'react'
 import { useAuthStore } from '../stores/auth'
 import { useToastStore } from '../stores/toast'
 import { useNavigate } from 'react-router-dom'
+import { useErrorStore } from '../stores/error'
 
 export function useAuth() {
-  const { user, isAuthenticated, login, logout, error } = useAuthStore()
+  const { 
+    user, 
+    isAuthenticated, 
+    login, 
+    logout, 
+    error,
+    checkSession,
+    updateLastActivity,
+    validateSession
+  } = useAuthStore()
   const addToast = useToastStore((state) => state.addToast)
+  const addError = useErrorStore((state) => state.addError)
   const navigate = useNavigate()
 
+  // セッションの定期的なチェック
+  useEffect(() => {
+    if (isAuthenticated) {
+      const sessionCheck = setInterval(() => {
+        if (!validateSession()) {
+          handleLogout()
+          addToast({
+            type: 'warning',
+            message: 'セッションの有効期限が切れました。再度ログインしてください。',
+            duration: 5000,
+          })
+        }
+      }, 60000) // 1分ごとにチェック
+
+      return () => clearInterval(sessionCheck)
+    }
+  }, [isAuthenticated])
+
+  // アクティビティの監視
+  useEffect(() => {
+    if (isAuthenticated) {
+      const handleActivity = () => {
+        updateLastActivity()
+      }
+
+      window.addEventListener('mousemove', handleActivity)
+      window.addEventListener('keypress', handleActivity)
+
+      return () => {
+        window.removeEventListener('mousemove', handleActivity)
+        window.removeEventListener('keypress', handleActivity)
+      }
+    }
+  }, [isAuthenticated, updateLastActivity])
+
+  // エラー処理
   useEffect(() => {
     if (error) {
       addToast({
@@ -15,25 +62,58 @@ export function useAuth() {
         message: error,
         duration: 5000,
       })
+      addError('auth', error)
     }
-  }, [error, addToast])
+  }, [error, addToast, addError])
 
-  const handleLogin = async (username: string, password: string) => {
-    await login({ username, password })
-    if (isAuthenticated) {
-      navigate('/')
+  // 初期セッションチェック
+  useEffect(() => {
+    checkSession()
+  }, [])
+
+  const handleLogin = useCallback(async (username: string, password: string) => {
+    try {
+      await login({ username, password })
+      if (isAuthenticated) {
+        addToast({
+          type: 'success',
+          message: 'ログインしました',
+          duration: 3000,
+        })
+        navigate('/')
+      }
+    } catch (error) {
+      addToast({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'ログインに失敗しました',
+        duration: 5000,
+      })
     }
-  }
+  }, [login, isAuthenticated, navigate, addToast])
 
-  const handleLogout = async () => {
-    await logout()
-    navigate('/login')
-  }
+  const handleLogout = useCallback(async () => {
+    try {
+      await logout()
+      addToast({
+        type: 'info',
+        message: 'ログアウトしました',
+        duration: 3000,
+      })
+      navigate('/login')
+    } catch (error) {
+      addToast({
+        type: 'error',
+        message: 'ログアウトに失敗しました',
+        duration: 5000,
+      })
+    }
+  }, [logout, navigate, addToast])
 
   return {
     user,
     isAuthenticated,
     login: handleLogin,
     logout: handleLogout,
+    validateSession,
   }
 }
