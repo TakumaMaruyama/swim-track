@@ -8,58 +8,206 @@ interface Props {
   children: React.ReactNode;
   fallback?: React.ReactNode;
   onError?: (error: Error, errorInfo: React.ErrorInfo) => void;
+  componentName?: string;
 }
 
 interface State {
   error: Error | null;
   errorInfo: React.ErrorInfo | null;
+  errorCount: number;
+  lastError: number | null;
 }
 
-function logError(error: Error, errorInfo?: React.ErrorInfo) {
-  console.log({
+interface ErrorContext {
+  browserInfo: {
+    userAgent: string;
+    language: string;
+    platform: string;
+  };
+  timestamp: string;
+  componentStack?: string;
+}
+
+function getErrorContext(error: Error, errorInfo?: React.ErrorInfo): ErrorContext {
+  return {
+    browserInfo: {
+      userAgent: navigator.userAgent,
+      language: navigator.language,
+      platform: navigator.platform
+    },
     timestamp: new Date().toISOString(),
+    componentStack: errorInfo?.componentStack
+  };
+}
+
+function logError(error: Error, errorInfo?: React.ErrorInfo, componentName?: string) {
+  const context = getErrorContext(error, errorInfo);
+  
+  console.log({
+    timestamp: context.timestamp,
     system: 'ErrorBoundary',
     level: LogLevel.ERROR,
+    component: componentName || 'Unknown',
     error: {
       name: error.name,
       message: error.message,
       stack: error.stack,
-      componentStack: errorInfo?.componentStack
+      type: error.constructor.name,
+      componentStack: context.componentStack
+    },
+    context: {
+      browser: context.browserInfo,
+      recoverable: error instanceof Error && 'recoverable' in error ? error.recoverable : true,
     }
   });
 }
 
+// Error recovery strategies
+const ErrorRecoveryStrategies = {
+  // Attempt to recover from network errors
+  async handleNetworkError(error: Error): Promise<boolean> {
+    if (error.message.toLowerCase().includes('network') || error.message.toLowerCase().includes('failed to fetch')) {
+      // Wait and retry
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      return true;
+    }
+    return false;
+  },
+
+  // Handle state-related errors
+  handleStateError(error: Error): boolean {
+    if (error.message.includes('state') || error.message.includes('props')) {
+      // Clear local storage and session storage
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  },
+
+  // Generic error recovery
+  async attemptRecovery(error: Error): Promise<boolean> {
+    try {
+      const strategies = [
+        ErrorRecoveryStrategies.handleNetworkError,
+        ErrorRecoveryStrategies.handleStateError
+      ];
+
+      for (const strategy of strategies) {
+        if (await strategy(error)) {
+          return true;
+        }
+      }
+    } catch {
+      return false;
+    }
+    return false;
+  }
+};
+
 export const ErrorBoundaryContext = React.createContext<{
   setError: (error: Error) => void;
+  getErrorContext: () => ErrorContext | null;
 }>({
   setError: () => {
     console.warn('ErrorBoundaryContext used outside of provider');
-  }
+  },
+  getErrorContext: () => null
 });
 
 export class ErrorBoundary extends React.Component<Props, State> {
+  private recoveryTimeout: NodeJS.Timeout | null = null;
+  
   constructor(props: Props) {
     super(props);
-    this.state = { error: null, errorInfo: null };
+    this.state = { 
+      error: null, 
+      errorInfo: null, 
+      errorCount: 0,
+      lastError: null
+    };
   }
 
-  static getDerivedStateFromError(error: Error): State {
-    return { error, errorInfo: null };
+  static getDerivedStateFromError(error: Error): Partial<State> {
+    return { 
+      error, 
+      errorInfo: null,
+      errorCount: (prevState: State) => prevState.errorCount + 1,
+      lastError: Date.now()
+    };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+  async componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     this.setState({ errorInfo });
-    logError(error, errorInfo);
+    logError(error, errorInfo, this.props.componentName);
     this.props.onError?.(error, errorInfo);
+
+    // Attempt automatic recovery for certain errors
+    if (this.state.errorCount < 3) {
+      const recovered = await ErrorRecoveryStrategies.attemptRecovery(error);
+      if (recovered) {
+        this.handleReset();
+      }
+    }
+
+    // If multiple errors occur in quick succession, force a full reload
+    const timeSinceLastError = this.state.lastError ? Date.now() - this.state.lastError : Infinity;
+    if (this.state.errorCount >= 3 && timeSinceLastError < 60000) {
+      logError(
+        new Error('Multiple errors detected, forcing reload'), 
+        errorInfo,
+        this.props.componentName
+      );
+      window.location.reload();
+    }
   }
 
-  handleReset = () => {
-    this.setState({ error: null, errorInfo: null });
+  componentWillUnmount() {
+    if (this.recoveryTimeout) {
+      clearTimeout(this.recoveryTimeout);
+    }
+  }
+
+  handleReset = async () => {
+    try {
+      // Clear error state
+      this.setState({ 
+        error: null, 
+        errorInfo: null,
+        errorCount: 0,
+        lastError: null
+      });
+
+      // Attempt to refresh data if available
+      if ('mutate' in window) {
+        await (window as any).mutate();
+      }
+    } catch (error) {
+      logError(
+        error instanceof Error ? error : new Error(String(error)), 
+        undefined,
+        this.props.componentName
+      );
+    }
   }
 
   setError = (error: Error) => {
-    logError(error);
-    this.setState({ error, errorInfo: null });
+    logError(error, undefined, this.props.componentName);
+    this.setState(prevState => ({
+      error,
+      errorInfo: null,
+      errorCount: prevState.errorCount + 1,
+      lastError: Date.now()
+    }));
+  }
+
+  getErrorContext = (): ErrorContext | null => {
+    if (!this.state.error) return null;
+    return getErrorContext(this.state.error, this.state.errorInfo);
   }
 
   render() {
@@ -76,19 +224,27 @@ export class ErrorBoundary extends React.Component<Props, State> {
             <p className="text-sm text-muted-foreground">
               {this.state.error.message}
             </p>
-            {process.env.NODE_ENV === 'development' && this.state.errorInfo && (
-              <pre className="mt-2 text-xs overflow-auto">
-                {this.state.errorInfo.componentStack}
-              </pre>
+            {process.env.NODE_ENV === 'development' && (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  エラー発生回数: {this.state.errorCount}
+                </p>
+                {this.state.errorInfo && (
+                  <pre className="mt-2 text-xs overflow-auto">
+                    {this.state.errorInfo.componentStack}
+                  </pre>
+                )}
+              </>
             )}
             <Button
               variant="outline"
               size="sm"
               onClick={this.handleReset}
               className="mt-2 w-fit"
+              disabled={this.state.errorCount >= 3}
             >
               <RefreshCw className="mr-2 h-4 w-4" />
-              再試行
+              {this.state.errorCount >= 3 ? 'ページを更新してください' : '再試行'}
             </Button>
           </AlertDescription>
         </Alert>
@@ -96,7 +252,10 @@ export class ErrorBoundary extends React.Component<Props, State> {
     }
 
     return (
-      <ErrorBoundaryContext.Provider value={{ setError: this.setError }}>
+      <ErrorBoundaryContext.Provider value={{ 
+        setError: this.setError,
+        getErrorContext: this.getErrorContext
+      }}>
         {this.props.children}
       </ErrorBoundaryContext.Provider>
     );
@@ -104,5 +263,29 @@ export class ErrorBoundary extends React.Component<Props, State> {
 }
 
 export function useErrorBoundary() {
-  return React.useContext(ErrorBoundaryContext);
+  const context = React.useContext(ErrorBoundaryContext);
+  
+  const throwError = React.useCallback((error: Error | string) => {
+    const errorObject = typeof error === 'string' ? new Error(error) : error;
+    context.setError(errorObject);
+  }, [context]);
+
+  return {
+    throwError,
+    getErrorContext: context.getErrorContext
+  };
+}
+
+// Type-safe wrapper for error boundary usage
+export function withErrorBoundary<P extends object>(
+  Component: React.ComponentType<P>,
+  componentName: string
+): React.FC<P> {
+  return function WrappedComponent(props: P) {
+    return (
+      <ErrorBoundary componentName={componentName}>
+        <Component {...props} />
+      </ErrorBoundary>
+    );
+  };
 }
