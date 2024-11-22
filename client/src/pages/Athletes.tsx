@@ -451,7 +451,7 @@ export default function Athletes() {
         <EditRecordForm
           record={record}
           studentId={editingRecord.studentId ?? undefined}
-          isOpen={!!editingRecord.studentId}
+          isOpen={editingRecord.id !== null || editingRecord.studentId !== null}
           onClose={() => setEditingRecord({ id: null, studentId: null })}
           onSubmit={async (data) => {
             if (editingRecord.id) {
