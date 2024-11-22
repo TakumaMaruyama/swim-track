@@ -617,18 +617,83 @@ export function setupAuth(app: Express): void {
     });
   });
 
-  // Session refresh endpoint
-  app.get("/api/refresh-session", (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Authentication required" });
+  // Enhanced session refresh endpoint with validation and recovery
+  app.get("/api/refresh-session", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        logAuth(LogLevel.WARN, 'session_refresh', 'Unauthenticated session refresh attempt', {
+          ip: req.ip,
+          path: req.path,
+          critical: true
+        });
+        return res.status(401).json({ message: "認証が必要です" });
+      }
+
+      const session = req.session as SessionWithPassport;
+      if (!session?.passport?.user) {
+        logAuth(LogLevel.WARN, 'session_refresh', 'Invalid session state detected', {
+          ip: req.ip,
+          critical: true
+        });
+        return res.status(401).json({ message: "セッションが無効です" });
+      }
+
+      // Verify user exists and is active
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, session.passport.user))
+        .limit(1);
+
+      if (!user || !user.isActive) {
+        logAuth(LogLevel.WARN, 'session_refresh', 'User not found or inactive', {
+          userId: session.passport.user,
+          critical: true
+        });
+        req.logout(() => {
+          res.status(401).json({ message: "ユーザーが見つからないか、無効になっています" });
+        });
+        return;
+      }
+
+      // Update session expiry and regenerate
+      await new Promise<void>((resolve, reject) => {
+        session.regenerate((err) => {
+          if (err) {
+            logAuth(LogLevel.ERROR, 'session_refresh', 'Session regeneration failed', {
+              error: err instanceof Error ? err.message : String(err),
+              critical: true
+            });
+            reject(err);
+          } else {
+            session.passport = { user: user.id };
+            session.touch();
+            resolve();
+          }
+        });
+      });
+
+      logAuth(LogLevel.INFO, 'session_refresh', 'Session refreshed successfully', {
+        userId: user.id,
+        username: user.username,
+        critical: true
+      });
+      
+      res.json({ 
+        message: "セッションを更新しました",
+        user: {
+          id: user.id,
+          username: user.username,
+          role: user.role
+        }
+      });
+    } catch (error) {
+      logAuth(LogLevel.ERROR, 'session_refresh', 'Session refresh failed', {
+        error: error instanceof Error ? error.message : String(error),
+        critical: true
+      });
+      res.status(500).json({ message: "セッションの更新に失敗しました" });
     }
-    
-    // Update session expiry
-    if (req.session) {
-      req.session.touch();
-    }
-    
-    res.json({ message: "Session refreshed" });
   });
 
   // User info endpoint with enhanced session validation and recovery

@@ -28,7 +28,7 @@ interface ErrorContext {
     networkStatus: string;
   };
   timestamp: string;
-  componentStack?: string;
+  componentStack?: string | null;
   errorType: string;
   errorMessage: string;
   stackTrace?: string;
