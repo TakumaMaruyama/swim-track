@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { SwimRecord, Competition } from "db/schema";
 import useSWR from "swr";
 import { useSwimRecords } from '../hooks/use-swim-records';
+import { useAthletes } from '../hooks/use-athletes';
 import * as z from "zod";
 import { Loader2 } from "lucide-react";
 
@@ -101,6 +102,7 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { data: competitions } = useSWR<Competition[]>("/api/competitions");
+  const { athletes } = useAthletes();
 
   const defaultPoolLength: PoolLength = 25;
 
@@ -332,6 +334,39 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
                 </FormItem>
               )}
             />
+            {!record && (
+              <FormField
+                control={form.control}
+                name="studentId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>選手</FormLabel>
+                    <Select
+                      value={field.value?.toString()}
+                      onValueChange={(value) => field.onChange(Number(value))}
+                      disabled={isSubmitting || !!record}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="選手を選択" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {athletes?.map((athlete) => (
+                          <SelectItem
+                            key={athlete.id}
+                            value={athlete.id.toString()}
+                          >
+                            {athlete.username}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             {watchIsCompetition && (
               <FormField
                 control={form.control}

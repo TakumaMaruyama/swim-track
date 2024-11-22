@@ -376,13 +376,7 @@ export default function Athletes() {
                           >
                             <Edit2 className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setEditingRecord({ id: null, studentId: athlete.id })}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
+                          
                           <Button
                             variant="ghost"
                             size="icon"
