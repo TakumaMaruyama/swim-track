@@ -85,20 +85,13 @@ const editRecordSchema = z.object({
   ),
   competitionId: z.number().nullable(),
   studentId: z.number({
-    required_error: "選手の選択は必須です",
+    required_error: "選手を選択してください",
     invalid_type_error: "無効な選手IDです"
   })
-  .positive("有効な選手を選択してください")
+  .positive("選手を選択してください")
   .int("無効な選手IDです")
   .refine((val) => val !== undefined && val !== null && val > 0, {
-    message: "選手を選択してください"
-  })
-  .refine((val) => {
-    if (typeof window === 'undefined') return true;
-    const athletes = form?.getValues()?.athletes;
-    return athletes?.some((athlete) => athlete.id === val) ?? false;
-  }, {
-    message: "選択された選手が見つかりません"
+    message: "記録を登録するには、選手を選択してください"
   }),
 });
 
@@ -132,7 +125,7 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
         ? record.poolLength as PoolLength
         : defaultPoolLength,
       competitionId: record?.competitionId ?? null,
-      studentId: record?.studentId ?? studentId,
+      studentId: record?.studentId ?? studentId ?? null,
     },
     mode: "onChange",
   });
