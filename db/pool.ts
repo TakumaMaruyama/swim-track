@@ -6,18 +6,16 @@ import { LogLevel } from '../client/src/types/auth';
 const POOL_CONFIG: PoolConfig = {
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-  max: 20, // Maximum number of clients in the pool
-  min: 5, // Minimum number of idle clients maintained in the pool
-  idleTimeoutMillis: 300000, // Close idle clients after 5 minutes
-  connectionTimeoutMillis: 10000, // Return an error after 10 seconds if connection could not be established
-  statement_timeout: 30000, // Cancel queries that take more than 30 seconds
+  max: 30, // Increased for better concurrency
+  min: 10, // Increased minimum connections
+  idleTimeoutMillis: 600000, // 10 minutes idle timeout
+  connectionTimeoutMillis: 5000, // Reduced connection timeout for faster failure detection
+  statement_timeout: 20000, // Reduced statement timeout for better responsiveness
   allowExitOnIdle: false,
   keepAlive: true,
-  application_name: 'swimtrack', // For better query monitoring
-  query_timeout: 30000, // Timeout for individual queries
-  idle_in_transaction_session_timeout: 30000, // Timeout for idle transactions
-  statement_cache_size: 100, // Cache prepared statements
-  poolSize: 20 // Explicit pool size setting
+  application_name: 'swimtrack',
+  query_timeout: 15000, // Reduced query timeout for better responsiveness
+  idle_in_transaction_session_timeout: 15000, // Reduced idle transaction timeout
 };
 
 // Create the connection pool
