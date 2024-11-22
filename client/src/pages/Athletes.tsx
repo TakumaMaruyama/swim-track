@@ -1,6 +1,7 @@
 // Import groups organized by type
 import { useEffect, useState } from 'react';
 
+import { ErrorBoundary } from '../components/ErrorBoundary';
 // External libraries
 import { AlertCircle, Edit2, Plus, Power, History, Trash2 } from "lucide-react";
 
@@ -317,7 +318,7 @@ export default function Athletes() {
         title="選手一覧"
         children={
           user?.role === 'coach' && (
-            <Button onClick={() => setEditingRecord(-1)}>
+            <Button onClick={() => setEditingRecord({ id: -1, studentId: null })}>
               <Plus className="mr-2 h-4 w-4" />
               新規記録追加
             </Button>
