@@ -2,20 +2,37 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool, PoolConfig } from 'pg';
 import { LogLevel } from '../client/src/types/auth';
 
-// Connection pool configuration
+// Enhanced connection pool configuration with better error handling and monitoring
 const POOL_CONFIG: PoolConfig = {
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-  max: 30, // Increased for better concurrency
-  min: 10, // Increased minimum connections
-  idleTimeoutMillis: 600000, // 10 minutes idle timeout
-  connectionTimeoutMillis: 5000, // Reduced connection timeout for faster failure detection
-  statement_timeout: 20000, // Reduced statement timeout for better responsiveness
+  max: 20, // Optimized for better resource management
+  min: 5, // Reduced minimum connections for better resource utilization
+  idleTimeoutMillis: 300000, // 5 minutes idle timeout
+  connectionTimeoutMillis: 10000, // Connection timeout
+  statement_timeout: 30000, // Statement timeout
   allowExitOnIdle: false,
   keepAlive: true,
   application_name: 'swimtrack',
-  query_timeout: 15000, // Reduced query timeout for better responsiveness
-  idle_in_transaction_session_timeout: 15000, // Reduced idle transaction timeout
+  query_timeout: 20000, // Query timeout
+  idle_in_transaction_session_timeout: 30000, // Transaction timeout
+  // Additional error handling parameters
+  max_retries: 3,
+  retry_delay: 1000,
+  error_handler: (err: Error) => {
+    console.log({
+      timestamp: new Date().toISOString(),
+      system: 'Database',
+      level: LogLevel.ERROR,
+      event: 'connection.error',
+      error: err.message,
+      stack: err.stack,
+      context: {
+        application: 'swimtrack',
+        environment: process.env.NODE_ENV
+      }
+    });
+  }
 };
 
 // Create the connection pool
@@ -118,6 +135,59 @@ export async function executeQuery<T>(
         willRetry: attempt < retries,
         critical,
         ...context,
+// Query performance monitoring
+const queryStats = new Map<string, {
+  count: number;
+  totalTime: number;
+  errors: number;
+  lastError?: Error;
+}>();
+
+// Monitor query performance
+export function monitorQueryPerformance(operation: string, duration: number, error?: Error) {
+  const stats = queryStats.get(operation) || { count: 0, totalTime: 0, errors: 0 };
+  stats.count++;
+  stats.totalTime += duration;
+  if (error) {
+    stats.errors++;
+    stats.lastError = error;
+  }
+  queryStats.set(operation, stats);
+
+  // Log slow queries
+  if (duration > 1000) {
+    console.log({
+      timestamp: new Date().toISOString(),
+      system: 'Database',
+      level: LogLevel.WARN,
+      event: 'query.slow',
+      operation,
+      duration,
+      averageTime: stats.totalTime / stats.count,
+      errorRate: (stats.errors / stats.count) * 100
+    });
+  }
+}
+
+// Health check function
+export async function checkDatabaseHealth(): Promise<boolean> {
+  try {
+    await pool.query('SELECT 1');
+    return true;
+  } catch (error) {
+    console.log({
+      timestamp: new Date().toISOString(),
+      system: 'Database',
+      level: LogLevel.ERROR,
+      event: 'health.check',
+      error: error instanceof Error ? error.message : String(error)
+    });
+    return false;
+  }
+}
+
+// Periodic health checks
+setInterval(checkDatabaseHealth, 60000);
         queryStats: {
           timeoutValue: timeout,
           maxRetries: retries,
