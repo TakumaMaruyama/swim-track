@@ -1,12 +1,13 @@
 import React from 'react';
 import { useSwimRecords } from '../hooks/use-swim-records';
-import { useUser } from '../hooks/use-user';
-import { useToast } from '@/hooks/use-toast';
-
-// UI Components
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, Edit2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { EditRecordForm } from '../components/EditRecordForm';
+import { useUser } from '../hooks/use-user';
+import { useToast } from '@/hooks/use-toast';
+import { PageHeader } from '../components/PageHeader';
 import {
   Select,
   SelectContent,
@@ -15,14 +16,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-// Icons
-import { AlertCircle, Edit2, Trash2 } from "lucide-react";
-
-// Components
-import { EditRecordForm } from '../components/EditRecordForm';
-import { PageHeader } from '../components/PageHeader';
-
-// Types
 type GroupedRecord = {
   id: number;
   style: string;
@@ -39,14 +32,10 @@ type GroupedRecords = {
   [key: string]: GroupedRecord;
 };
 
-/**
- * AllTimeRecords Component
- * Displays all-time best records for each swimming event
- */
 export default function AllTimeRecords() {
   const { user } = useUser();
   const { toast } = useToast();
-  const { records, isLoading, error, mutate, optimisticUpdate } = useSwimRecords();
+  const { records, isLoading, error, mutate } = useSwimRecords();
   const [editingRecord, setEditingRecord] = React.useState<number | null>(null);
   const [styleFilter, setStyleFilter] = React.useState<string>("all");
   const [poolLengthFilter, setPoolLengthFilter] = React.useState<string>("all_pools");
@@ -91,7 +80,7 @@ export default function AllTimeRecords() {
       });
 
       if (!response.ok) {
-        throw new Error('記録の更新に失敗しました');
+        throw new Error('Failed to update record');
       }
 
       await mutate();
@@ -100,6 +89,7 @@ export default function AllTimeRecords() {
         description: "記録が更新されました",
       });
     } catch (error) {
+      console.error('Error updating record:', error);
       toast({
         variant: "destructive",
         title: "エラー",
@@ -121,7 +111,7 @@ export default function AllTimeRecords() {
       });
 
       if (!response.ok) {
-        throw new Error('記録の削除に失敗しました');
+        throw new Error('Failed to delete record');
       }
 
       await mutate();
@@ -130,6 +120,7 @@ export default function AllTimeRecords() {
         description: "記録が削除されました",
       });
     } catch (error) {
+      console.error('Error deleting record:', error);
       toast({
         variant: "destructive",
         title: "エラー",
@@ -170,7 +161,7 @@ export default function AllTimeRecords() {
   }
 
   return (
-    <ErrorBoundary>
+    <>
       <PageHeader title="歴代記録">
         <div className="flex gap-4">
           <Select value={styleFilter} onValueChange={setStyleFilter}>
@@ -261,6 +252,6 @@ export default function AllTimeRecords() {
           }}
         />
       </div>
-    </ErrorBoundary>
+    </>
   );
 }

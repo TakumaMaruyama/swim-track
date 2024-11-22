@@ -1,13 +1,6 @@
-import { useEffect } from 'react';
-import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Home, AlertCircle } from "lucide-react";
-
-import { useToast } from "@/hooks/use-toast";
-import { useUser } from "../hooks/use-user";
-import { LogLevel } from "../types/auth";
-
+import { useLocation } from "wouter";
 import {
   Form,
   FormControl,
@@ -18,87 +11,25 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle, 
-  CardFooter 
-} from "@/components/ui/card";
-import { 
-  Alert, 
-  AlertDescription 
-} from "@/components/ui/alert";
-
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, Loader2, Home } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useUser } from "../hooks/use-user";
 import { insertUserSchema } from "db/schema";
-import type { z } from "zod";
+import { useEffect, useCallback } from "react";
 
-/** Login form values type */
-type LoginFormValues = z.infer<typeof insertUserSchema>;
-
-/**
- * Structured logging function with filtered output
- * Only logs critical events and errors
- */
-/**
- * Structured logging function for login operations
- * Only logs critical login events and errors
- *
- * @param level - Log level (ERROR, WARN, INFO)
- * @param operation - Operation being performed
- * @param message - Log message
- * @param context - Additional context data
- */
-/**
- * Structured logging function for login operations
- * Only logs critical login events and errors
- * 
- * @param level - Log level (ERROR, WARN, INFO)
- * @param operation - Login operation being performed
- * @param message - Descriptive log message
- * @param context - Additional contextual information
- */
-function logLogin(level: LogLevel, operation: string, message: string, context?: Record<string, unknown>): void {
-  // Only log errors and critical state changes
-  const shouldLog = 
-    level === LogLevel.ERROR || 
-    (level === LogLevel.INFO && context?.critical === true);
-
-  if (shouldLog) {
-    console.log({
-      timestamp: new Date().toISOString(),
-      system: 'Login',
-      level,
-      operation,
-      message,
-      // Only include context for errors or critical events
-      ...(level === LogLevel.ERROR || context?.critical ? {
-        context: {
-          ...context,
-          // Remove sensitive data
-          password: undefined,
-          credentials: undefined
-        }
-      } : {})
-    });
-  }
-}
-
-/**
- * Login Page Component
- * Handles user authentication and login functionality
- */
-function Login(): JSX.Element {
+export default function Login() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { 
     login, 
     isAuthenticated, 
-    isAuthChecking,
+    isLoading: isAuthChecking,
     error: authError 
   } = useUser();
-
-  const form = useForm<LoginFormValues>({
+  
+  const form = useForm({
     resolver: zodResolver(insertUserSchema),
     defaultValues: {
       username: "",
@@ -106,35 +37,42 @@ function Login(): JSX.Element {
     },
   });
 
-  // Handle redirect on successful authentication
+  // Check initial authentication state with cleanup
   useEffect(() => {
-    if (!isAuthChecking && isAuthenticated) {
-      logLogin(LogLevel.INFO, 'navigation', 'Redirecting authenticated user', { critical: true });
+    let mounted = true;
+    
+    console.log('[Login] Checking initial auth state:', { isAuthenticated, isAuthChecking });
+    
+    if (!isAuthChecking && isAuthenticated && mounted) {
+      console.log('[Login] User is already authenticated, redirecting');
       window.location.replace('/');
     }
+
+    return () => {
+      mounted = false;
+    };
   }, [isAuthChecking, isAuthenticated]);
 
-  /**
-   * Handles form submission for login
-   * @param values - Form values containing username and password
-   */
-  const onSubmit = async (values: LoginFormValues): Promise<void> => {
+  async function onSubmit(values: { username: string; password: string }) {
     try {
+      console.log('[Login] Attempting login');
       const result = await login(values);
       
       if (result.ok) {
+        console.log('[Login] Login successful, initiating navigation');
         toast({
           title: "ログイン成功",
           description: "ダッシュボードに移動します",
         });
+        // Force reload navigation
         window.location.replace('/');
         return;
       }
 
-      // Handle validation errors
+      console.log('[Login] Login failed:', result.message);
       if (result.errors) {
         Object.entries(result.errors).forEach(([field, messages]) => {
-          form.setError(field as keyof LoginFormValues, {
+          form.setError(field as "username" | "password", {
             type: "manual",
             message: messages[0],
           });
@@ -147,19 +85,15 @@ function Login(): JSX.Element {
         });
       }
     } catch (error) {
-      logLogin(LogLevel.ERROR, 'login_error', 'Login failed', {
-        error: error instanceof Error ? error.message : String(error)
-      });
-      
+      console.error('[Login] Unexpected error:', error);
       toast({
         variant: "destructive",
         title: "エラー",
         description: "予期せぬエラーが発生しました",
       });
     }
-  };
+  }
 
-  // Show loading state during authentication check
   if (isAuthChecking) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
@@ -278,5 +212,3 @@ function Login(): JSX.Element {
     </div>
   );
 }
-
-export default withErrorBoundary(Login, "LoginPage");

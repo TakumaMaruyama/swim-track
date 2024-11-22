@@ -1,93 +1,32 @@
-// External libraries
 import useSWR from "swr";
+import type { User, InsertUser } from "db/schema";
 import { useCallback, useState } from "react";
 
-// Types
-import type { User, InsertUser } from "db/schema";
-import { 
-  AuthError, 
-  AuthState, 
-  AuthResult,
-  LogLevel 
-} from "../types/auth";
-
-/**
- * Structured logging function for client-side authentication.
- * Only logs critical events and errors to maintain clean logs.
- * 
- * @param level - Log level (ERROR, WARN, INFO)
- * @param event - Authentication event type (auth.login, auth.register, auth.logout)
- * @param message - Descriptive message about the event
- * @param context - Optional context data (sensitive data automatically filtered)
- */
-function logAuthEvent(level: LogLevel, event: string, message: string, context?: Record<string, unknown>): void {
-  // Only log errors and critical events
-  const shouldLog = 
-    level === LogLevel.ERROR || 
-    (level === LogLevel.INFO && context?.critical === true);
-
-  if (!shouldLog) return;
-
-  // Filter sensitive information
-  const filteredContext = context ? {
-    ...context,
-    // Remove all sensitive data
-    password: undefined,
-    credentials: undefined,
-    token: undefined,
-    sessionId: undefined,
-    authData: undefined,
-    authState: undefined,
-    sessionToken: undefined,
-    authToken: undefined
-  } : undefined;
-
-  // Use standardized logging format
-  console.log({
-    timestamp: new Date().toISOString(),
-    system: 'Authentication',
-    level,
-    event: `auth.${event}`,
-    message,
-    ...(filteredContext && { context: filteredContext })
-  });
+interface AuthError {
+  message: string;
+  field?: string;
+  errors?: Record<string, string[]>;
 }
 
-/**
- * Custom hook for managing user authentication state and operations.
- * Provides comprehensive authentication functionality with proper error handling.
- * 
- * Features:
- * - User registration with validation
- * - Secure login with proper state management
- * - Logout with session cleanup
- * - Automatic session refresh
- * - Error boundary integration
- * 
- * @returns {Object} Authentication state and methods
- * @property {User | undefined} user - Current authenticated user or undefined
- * @property {boolean} isLoading - Loading state for auth operations
- * @property {boolean} isAuthChecking - Initial auth state check
- * @property {boolean} isAuthenticated - Whether user is authenticated
- * @property {AuthError | null} error - Current authentication error
- * @property {Function} register - User registration function
- * @property {Function} login - User login function
- * @property {Function} logout - User logout function
- */
+interface AuthState {
+  isLoading: boolean;
+  error: AuthError | null;
+}
+
+interface AuthResult {
+  ok: boolean;
+  message?: string;
+  field?: string;
+  errors?: Record<string, string[]>;
+  user?: User;
+}
+
 export function useUser() {
   const [authState, setAuthState] = useState<AuthState>({
     isLoading: false,
     error: null
   });
 
-  const SESSION_CONFIG = {
-    REFRESH_INTERVAL: 300000, // 5 minutes
-    RETRY_COUNT: 5,
-    RETRY_INTERVAL: 5000,
-    ERROR_THRESHOLD: 3,
-  } as const;
-
-  // Session refresh and error handling
   const { 
     data, 
     error: swrError, 
@@ -96,103 +35,24 @@ export function useUser() {
   } = useSWR<User>("/api/user", {
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
-    shouldRetryOnError: true,
-    errorRetryCount: SESSION_CONFIG.RETRY_COUNT,
-    refreshInterval: SESSION_CONFIG.REFRESH_INTERVAL,
-    dedupingInterval: 2000,
-    refreshWhenHidden: true,
-    refreshWhenOffline: false,
-    onSuccess: (data) => {
-      if (data) {
-        logAuthEvent(LogLevel.INFO, 'session', 'Session validated successfully');
-        // Reset error count on successful validation
-        sessionStorage.removeItem('authErrorCount');
-      }
-    },
-    onError: async (error) => {
-      // Track consecutive errors
-      const errorCount = Number(sessionStorage.getItem('authErrorCount') || 0) + 1;
-      sessionStorage.setItem('authErrorCount', String(errorCount));
-
-      if (error.status === 401) {
-        logAuthEvent(LogLevel.INFO, 'session', 'Session expired or invalid', { 
-          critical: true,
-          errorCount 
-        });
-
-        // Implement exponential backoff for retries
-        const retryDelay = Math.min(1000 * Math.pow(2, errorCount - 1), 30000);
-
-        // Clear auth state but maintain retry capability
-        mutate(undefined, false);
-
-        // Enhanced session refresh with retry mechanism
-        const refreshSession = async (attempt: number = 1): Promise<boolean> => {
-          try {
-            const refreshResponse = await fetch('/api/refresh-session', { 
-              credentials: 'include',
-              headers: {
-                'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache'
-              }
-            });
-
-            if (refreshResponse.ok) {
-              // Reset error count on successful refresh
-              sessionStorage.removeItem('authErrorCount');
-              await mutate();
-              return true;
-            }
-
-            // Implement retry with backoff
-            if (attempt < SESSION_CONFIG.RETRY_COUNT) {
-              await new Promise(resolve => setTimeout(resolve, retryDelay));
-              return refreshSession(attempt + 1);
-            }
-
-            return false;
-          } catch (refreshError) {
-            logAuthEvent(LogLevel.ERROR, 'session', 'Session refresh failed', { 
-              error: refreshError instanceof Error ? refreshError.message : String(refreshError),
-              attempt,
-              maxAttempts: SESSION_CONFIG.RETRY_COUNT
-            });
-
-            if (attempt < SESSION_CONFIG.RETRY_COUNT) {
-              await new Promise(resolve => setTimeout(resolve, retryDelay));
-              return refreshSession(attempt + 1);
-            }
-
-            return false;
-          }
-        };
-
-        // Start refresh attempt
-        refreshSession();
-      }
-
-      // Handle critical error threshold
-      if (errorCount >= SESSION_CONFIG.ERROR_THRESHOLD) {
-        logAuthEvent(LogLevel.ERROR, 'session', 'Critical error threshold reached', {
-          errorCount,
-          threshold: SESSION_CONFIG.ERROR_THRESHOLD,
-          critical: true
-        });
-      }
+    shouldRetryOnError: false,
+    refreshInterval: 300000,
+    onError: () => {
+      console.log('[Auth] Session validation failed, clearing user data');
+      mutate(undefined, false);
     }
   });
 
-  /**
-   * Handles user registration
-   * @param user - User registration data
-   */
   const register = useCallback(async (user: InsertUser): Promise<AuthResult> => {
     if (authState.isLoading) {
-      return { ok: false, message: "Registration in progress" };
+      console.log('[Auth] Registration already in progress');
+      return { ok: false, message: "登録処理中です" };
     }
 
     try {
+      console.log('[Auth] Starting registration attempt');
       setAuthState({ isLoading: true, error: null });
+
       const response = await fetch("/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -203,51 +63,48 @@ export function useUser() {
       const data = await response.json();
 
       if (!response.ok) {
-        const error: AuthError = {
-          message: data.message || "Registration failed",
+        console.log('[Auth] Registration failed:', data.message);
+        const error = {
+          message: data.message || "登録に失敗しました",
           field: data.field,
-          errors: data.errors
+          errors: data.errors,
         };
-        setAuthState({ isLoading: false, error });
-        logAuthEvent(LogLevel.ERROR, 'register.failed', error.message, {
-          errors: error.errors,
-          critical: true
+        setAuthState({
+          isLoading: false,
+          error
         });
         return { ok: false, ...error };
       }
 
-      logAuthEvent(LogLevel.INFO, 'register.success', 'User registration completed successfully', {
-          critical: true
-        });
+      console.log('[Auth] Registration successful');
       await mutate();
       return { ok: true, user: data.user };
-    } catch (error) {
-      const authError: AuthError = {
-        message: "Failed to communicate with server",
-        field: "network"
+    } catch (e: any) {
+      console.error('[Auth] Registration error:', e);
+      const error = {
+        message: "サーバーとの通信に失敗しました",
+        field: "network",
       };
-      setAuthState({ isLoading: false, error: authError });
-      logAuthEvent(LogLevel.ERROR, 'register.failed', 'Registration failed due to network error', {
-        error: error instanceof Error ? error.message : String(error),
-        critical: true
+      setAuthState({
+        isLoading: false,
+        error
       });
-      return { ok: false, ...authError };
+      return { ok: false, ...error };
     } finally {
       setAuthState(prev => ({ ...prev, isLoading: false }));
     }
   }, [authState.isLoading, mutate]);
 
-  /**
-   * Handles user login
-   * @param user - User login credentials
-   */
   const login = useCallback(async (user: InsertUser): Promise<AuthResult> => {
     if (authState.isLoading) {
-      return { ok: false, message: "Login in progress" };
+      console.log('[Auth] Login already in progress');
+      return { ok: false, message: "ログイン処理中です" };
     }
 
     try {
+      console.log('[Auth] Starting login attempt');
       setAuthState({ isLoading: true, error: null });
+
       const response = await fetch("/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -258,43 +115,45 @@ export function useUser() {
       const data = await response.json();
 
       if (!response.ok) {
-        const error: AuthError = {
-          message: data.message || "Login failed",
+        console.log('[Auth] Login failed:', data.message);
+        const error = {
+          message: data.message || "ログインに失敗しました",
           field: data.field,
-          errors: data.errors
+          errors: data.errors,
         };
-        setAuthState({ isLoading: false, error });
-        logAuthEvent(LogLevel.ERROR, 'login', error.message);
+        setAuthState({
+          isLoading: false,
+          error
+        });
         return { ok: false, ...error };
       }
 
-      logAuthEvent(LogLevel.INFO, 'login', 'Login successful', { critical: true });
+      console.log('[Auth] Login successful');
       await mutate();
       return { ok: true, user: data.user };
-    } catch (error) {
-      const authError: AuthError = {
-        message: "Failed to communicate with server",
-        field: "network"
+    } catch (e: any) {
+      console.error('[Auth] Login error:', e);
+      const error = {
+        message: "サーバーとの通信に失敗しました",
+        field: "network",
       };
-      setAuthState({ isLoading: false, error: authError });
-      logAuthEvent(LogLevel.ERROR, 'login', authError.message, {
-        error: error instanceof Error ? error.message : String(error)
+      setAuthState({
+        isLoading: false,
+        error
       });
-      return { ok: false, ...authError };
+      return { ok: false, ...error };
     } finally {
       setAuthState(prev => ({ ...prev, isLoading: false }));
     }
   }, [authState.isLoading, mutate]);
 
-  /**
-   * Handles user logout
-   */
   const logout = useCallback(async (): Promise<AuthResult> => {
     if (authState.isLoading) {
-      return { ok: false, message: "Logout in progress" };
+      return { ok: false, message: "ログアウト処理中です" };
     }
 
     try {
+      console.log('[Auth] Starting logout');
       setAuthState({ isLoading: true, error: null });
       const response = await fetch("/logout", {
         method: "POST",
@@ -304,28 +163,62 @@ export function useUser() {
       const data = await response.json();
 
       if (!response.ok) {
-        const error: AuthError = {
-          message: data.message || "Logout failed",
-          field: "network"
-        };
-        setAuthState({ isLoading: false, error });
-        logAuthEvent(LogLevel.ERROR, 'logout', error.message);
+        const error = { message: data.message || "ログアウトに失敗しました" };
+        setAuthState({
+          isLoading: false,
+          error
+        });
         return { ok: false, ...error };
       }
 
-      logAuthEvent(LogLevel.INFO, 'logout', 'Logout successful', { critical: true });
       await mutate(undefined, false);
       return { ok: true };
-    } catch (error) {
-      const authError: AuthError = {
-        message: "Failed to communicate with server",
-        field: "network"
-      };
-      setAuthState({ isLoading: false, error: authError });
-      logAuthEvent(LogLevel.ERROR, 'logout', authError.message, {
-        error: error instanceof Error ? error.message : String(error)
+    } catch (e: any) {
+      console.error('[Auth] Logout error:', e);
+      const error = { message: "サーバーとの通信に失敗しました" };
+      setAuthState({
+        isLoading: false,
+        error
       });
-      return { ok: false, ...authError };
+      return { ok: false, ...error };
+    } finally {
+      setAuthState(prev => ({ ...prev, isLoading: false }));
+    }
+  }, [authState.isLoading, mutate]);
+
+  const deleteAccount = useCallback(async (): Promise<AuthResult> => {
+    if (authState.isLoading) {
+      return { ok: false, message: "削除処理中です" };
+    }
+
+    try {
+      setAuthState({ isLoading: true, error: null });
+      const response = await fetch("/api/user", {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        const error = { message: data.message || "アカウントの削除に失敗しました" };
+        setAuthState({
+          isLoading: false,
+          error
+        });
+        return { ok: false, ...error };
+      }
+
+      await mutate(undefined, false);
+      return { ok: true, message: data.message };
+    } catch (error) {
+      console.error('Error deleting account:', error);
+      const errorMessage = { message: "サーバーとの通信に失敗しました" };
+      setAuthState({
+        isLoading: false,
+        error: errorMessage
+      });
+      return { ok: false, ...errorMessage };
     } finally {
       setAuthState(prev => ({ ...prev, isLoading: false }));
     }
@@ -334,13 +227,12 @@ export function useUser() {
   return {
     user: data,
     isLoading: swrLoading || authState.isLoading,
-    isAuthChecking: swrLoading,
+    isLoginPending: authState.isLoading,
     isAuthenticated: !!data,
-    error: authState.error || (swrError ? { 
-      message: "Authentication failed"
-    } : null),
+    error: authState.error || (swrError ? { message: "認証に失敗しました" } : null),
     register,
     login,
     logout,
+    deleteAccount,
   };
 }

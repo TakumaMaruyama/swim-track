@@ -1,11 +1,6 @@
-// External libraries
 import React from 'react';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { Loader2 } from "lucide-react";
-
-// UI Components
 import {
   Form,
   FormControl,
@@ -24,25 +19,17 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-
-// Hooks
+import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-// Types
 import { Competition } from "db/schema";
+import * as z from "zod";
 
-/**
- * Competition form validation schema
- */
 const editCompetitionSchema = z.object({
   name: z.string().min(2, "大会名は2文字以上である必要があります"),
   date: z.string().min(1, "日付を選択してください"),
   location: z.string().min(2, "開催場所は2文字以上である必要があります"),
 });
 
-/**
- * Props for EditCompetitionForm component
- */
 type EditCompetitionFormProps = {
   competition?: Competition;
   isOpen: boolean;
@@ -50,15 +37,6 @@ type EditCompetitionFormProps = {
   onSubmit: (values: z.infer<typeof editCompetitionSchema>) => Promise<void>;
 };
 
-/**
- * EditCompetitionForm Component
- * Provides a form for creating and editing competition details
- * 
- * @param competition - Optional competition data for editing
- * @param isOpen - Dialog visibility state
- * @param onClose - Function to handle dialog close
- * @param onSubmit - Function to handle form submission
- */
 export function EditCompetitionForm({ 
   competition, 
   isOpen, 

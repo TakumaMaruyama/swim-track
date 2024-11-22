@@ -138,7 +138,7 @@ export default function Documents() {
   return (
     <>
       <PageHeader title="資料" />
-      <div className="container px-4 md:px-8 max-w-full md:max-w-7xl mx-auto">
+      <div className="container px-4 md:px-8">
         <FileUpload onSuccess={() => mutate()} />
 
         <div className="flex justify-between items-center mt-8 mb-4">
@@ -184,16 +184,15 @@ export default function Documents() {
                     {documents.map((doc) => (
                       <Card key={doc.id}>
                         <CardHeader>
-                          <CardTitle className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                            <div className="flex items-center gap-2 w-full sm:w-auto">
+                          <CardTitle className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
                               <span className="text-sm">{doc.title}</span>
                             </div>
-                            <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                            <div className="flex gap-2">
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleDownload(doc.id, doc.filename)}
-                                className="flex-1 sm:flex-none"
                               >
                                 <FileDown className="mr-2 h-4 w-4" />
                                 ダウンロード
@@ -203,7 +202,7 @@ export default function Documents() {
                                   variant="outline"
                                   size="sm"
                                   onClick={() => setDeletingDocument(doc.id)}
-                                  className="flex-1 sm:flex-none text-red-500 hover:text-red-600"
+                                  className="text-red-500 hover:text-red-600"
                                 >
                                   <Trash2 className="mr-2 h-4 w-4" />
                                   削除

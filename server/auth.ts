@@ -1,129 +1,40 @@
-// External libraries
 import passport from "passport";
 import { IVerifyOptions, Strategy as LocalStrategy } from "passport-local";
 import { type Express } from "express";
 import session from "express-session";
-import pgSession from "connect-pg-simple";
-import pg from "pg";
+import createMemoryStore from "memorystore";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { eq } from "drizzle-orm";
-
-// Internal modules
+import { users, insertUserSchema, type User as SelectUser } from "db/schema";
 import { db } from "db";
-import { users, insertUserSchema } from "db/schema";
-
-// Types
-import type { User as SelectUser } from "db/schema";
-import { LogLevel } from "../client/src/types/auth";
-
-/** Constants for authentication configuration */
-const AUTH_CONSTANTS = {
-  SALT_LENGTH: 32,
-  HASH_LENGTH: 64,
-  MAX_ATTEMPTS: 5,
-  LOCKOUT_TIME: 15 * 60 * 1000, // 15 minutes
-  ATTEMPT_RESET_TIME: 30 * 60 * 1000, // 30 minutes
-} as const;
+import { eq } from "drizzle-orm";
 
 const scryptAsync = promisify(scrypt);
 
-/** Interface for login attempt tracking */
-// Type definitions for enhanced session handling
-interface SessionStore extends session.Store {
-  pool?: pg.Pool;
-}
+const SALT_LENGTH = 32;
+const HASH_LENGTH = 64;
 
-interface SessionWithPassport extends session.Session {
-  passport?: {
-    user?: number;
-  };
-}
-
-interface LoginAttempt {
-  count: number;
-  lastAttempt: number;
-  lastSuccess?: number;
-  lockoutUntil?: number;
-}
-
-// Extend Express types for proper typing
-declare module 'express-session' {
-  interface SessionData {
-    passport?: {
-      user?: number;
-    };
-  }
-}
-
-declare module 'connect-pg-simple' {
-  interface PGStore extends session.Store {
-    pool?: pg.Pool;
-  }
-}
-
-/**
- * Structured logging function for server-side authentication.
- * Logs only critical authentication events and errors.
- * 
- * @param level - Log level (ERROR, WARN, INFO)
- * @param operation - Auth operation (login, register, logout)
- * @param message - Event description
- * @param context - Optional context (sensitive data filtered)
- */
-function logAuth(level: LogLevel, operation: string, message: string, context?: Record<string, unknown>): void {
-  // Only log critical auth events and errors
-  const shouldLog = 
-    level === LogLevel.ERROR || 
-    (level === LogLevel.INFO && context?.critical === true);
-
-  if (!shouldLog) return;
-
-  // Filter sensitive data
-  const filteredContext = context ? {
-    ...context,
-    password: undefined,
-    credentials: undefined,
-    token: undefined,
-    sessionId: undefined,
-    authData: undefined,
-    sessionData: undefined
-  } : undefined;
-
-  // Use standardized log format
-  console.log({
-    timestamp: new Date().toISOString(),
-    system: 'ServerAuth',
-    level,
-    operation,
-    message,
-    ...(filteredContext && { context: filteredContext })
-  });
-}
-
-/** Crypto utility functions */
 const crypto = {
-  async hash(password: string): Promise<string> {
+  hash: async (password: string) => {
     try {
-      const salt = randomBytes(AUTH_CONSTANTS.SALT_LENGTH);
-      const hash = (await scryptAsync(password, salt, AUTH_CONSTANTS.HASH_LENGTH)) as Buffer;
+      const salt = randomBytes(SALT_LENGTH);
+      const hash = (await scryptAsync(password, salt, HASH_LENGTH)) as Buffer;
       const hashedPassword = Buffer.concat([hash, salt]);
       return hashedPassword.toString('hex');
     } catch (error) {
-      logAuth(LogLevel.ERROR, 'hash', 'Password hashing failed', { error });
-      throw new Error('Password hashing failed');
+      console.error('Password hashing error:', error);
+      throw new Error('パスワードのハッシュ化に失敗しました');
     }
   },
-
-  async compare(suppliedPassword: string, storedPassword: string): Promise<boolean> {
+  compare: async (suppliedPassword: string, storedPassword: string) => {
     try {
       const buffer = Buffer.from(storedPassword, 'hex');
-      const hash = buffer.subarray(0, AUTH_CONSTANTS.HASH_LENGTH);
-      const salt = buffer.subarray(AUTH_CONSTANTS.HASH_LENGTH);
-      const suppliedHash = (await scryptAsync(suppliedPassword, salt, AUTH_CONSTANTS.HASH_LENGTH)) as Buffer;
+      const hash = buffer.subarray(0, HASH_LENGTH);
+      const salt = buffer.subarray(HASH_LENGTH);
+      const suppliedHash = (await scryptAsync(suppliedPassword, salt, HASH_LENGTH)) as Buffer;
       return timingSafeEqual(hash, suppliedHash);
     } catch (error) {
-      logAuth(LogLevel.ERROR, 'compare', 'Password verification failed', { error });
+      console.error('Password comparison error:', error);
       return false;
     }
   },
@@ -135,392 +46,65 @@ declare global {
   }
 }
 
-/**
- * Sets up authentication middleware and routes
- * @param app Express application instance
- */
-export function setupAuth(app: Express): void {
-  const PgSession = pgSession(session);
-  
-  // Create PostgreSQL pool for session store
-  const pgPool = new pg.Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-    max: 10, // Reduced max connections for better resource management
-    min: 2,
-    idleTimeoutMillis: 30000, // Reduced idle timeout to 30 seconds
-    connectionTimeoutMillis: 5000, // Reduced connection timeout to 5 seconds
-    keepAlive: true,
-    allowExitOnIdle: false,
-    statement_timeout: 10000, // Add statement timeout of 10 seconds
-    query_timeout: 10000, // Add query timeout of 10 seconds
-  });
-
-  // Enhanced PostgreSQL session store with robust error handling
-  const sessionStore = new PgSession({
-    pool: pgPool,
-    tableName: 'session',
-    createTableIfMissing: true,
-    pruneSessionInterval: 1800000, // Prune expired sessions every 30 minutes
-    schemaName: 'public',
-    errorLog: (err: Error) => {
-      logAuth(LogLevel.ERROR, 'session_store', 'Session store error occurred', { 
-        error: err instanceof Error ? err.message : String(err) 
-      });
-    }
-  }) as SessionStore;
-
-  // Enhanced error handling for session store
-  const handleSessionStoreError = async (error: Error): Promise<void> => {
-    logAuth(LogLevel.ERROR, 'session_store', 'Session store error, attempting recovery', {
-      error: error instanceof Error ? error.message : String(error)
-    });
-
-    // Safely handle pool cleanup
-    const pool = (sessionStore as SessionStore).pool;
-    if (pool && !pool.ended) {
-      try {
-        await pool.end();
-      } catch (err) {
-        logAuth(LogLevel.ERROR, 'session_store', 'Failed to close pool connections', {
-          error: err instanceof Error ? err.message : String(err)
-        });
-      }
-    }
-  };
-
-  // Attach error handler
-  sessionStore.on('error', handleSessionStoreError);
-
-  // Set up periodic session store health check with proper error handling
-  const healthCheck = async (): Promise<void> => {
-    const pool = (sessionStore as SessionStore).pool;
-    if (pool && !pool.ended) {
-      try {
-        await pool.query('SELECT 1');
-      } catch (error) {
-        await handleSessionStoreError(error as Error);
-      }
-    }
-  };
-
-  setInterval(healthCheck, 300000); // Check every 5 minutes
-
-  // Enhanced session configuration with improved security and persistence
+export function setupAuth(app: Express) {
+  const MemoryStore = createMemoryStore(session);
   const sessionSettings: session.SessionOptions = {
-    secret: process.env.REPL_ID || "secure-session-secret",
-    resave: false,
-    saveUninitialized: false,
+    secret: process.env.REPL_ID || "porygon-supremacy",
+    resave: true,
+    saveUninitialized: true,
     rolling: true,
-    store: sessionStore,
-    name: 'swimtrack.sid',
-    proxy: process.env.NODE_ENV === 'production',
     cookie: {
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      maxAge: 24 * 60 * 60 * 1000,
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      domain: process.env.NODE_ENV === 'production' ? process.env.DOMAIN : undefined
-    },
-    unset: 'destroy',
-  };
-
-  // Enhanced session cleanup with better error handling and recovery
-  const cleanupSessions = async (): Promise<void> => {
-    const pool = (sessionStore as SessionStore).pool;
-    if (!pool || pool.ended) return;
-
-    try {
-      // First, log session statistics for monitoring
-      const [stats] = await pool.query(`
-        SELECT 
-          COUNT(*) as total_sessions,
-          COUNT(*) FILTER (WHERE expire < NOW()) as expired_sessions,
-          COUNT(*) FILTER (WHERE sess IS NULL) as null_sessions,
-          COUNT(*) FILTER (WHERE sess->>'passport' IS NULL) as invalid_sessions
-        FROM "session"
-      `);
-      
-      logAuth(LogLevel.INFO, 'session_stats', 'Session statistics before cleanup', {
-        ...stats.rows[0],
-        critical: true
-      });
-
-      // Execute cleanup with transaction
-      await pool.query('BEGIN');
-      
-      // Delete invalid sessions
-      const result = await pool.query(`
-        DELETE FROM "session" 
-        WHERE "expire" < NOW() 
-        OR "sess" IS NULL 
-        OR "sess"->>'passport' IS NULL
-        RETURNING sid
-      `);
-
-      await pool.query('COMMIT');
-
-      logAuth(LogLevel.INFO, 'session_cleanup', 'Successfully cleaned expired sessions', {
-        removedCount: result.rowCount,
-        critical: true
-      });
-
-      // Vacuum the session table to reclaim space
-      await pool.query('VACUUM ANALYZE "session"');
-    } catch (error) {
-      await pool.query('ROLLBACK').catch(() => {
-        // Ignore rollback errors
-      });
-
-      logAuth(LogLevel.ERROR, 'session_cleanup', 'Session cleanup error', {
-        error: error instanceof Error ? error.message : String(error),
-        critical: true
-      });
-
-      // Attempt recovery by reconnecting pool
-      try {
-        await handleSessionStoreError(error instanceof Error ? error : new Error(String(error)));
-      } catch (recoveryError) {
-        logAuth(LogLevel.ERROR, 'session_cleanup', 'Failed to recover from cleanup error', {
-          error: recoveryError instanceof Error ? recoveryError.message : String(recoveryError),
-          critical: true
-        });
-      }
+      secure: 'auto',
+      sameSite: 'lax'
     }
   };
 
-  // Run cleanup every hour
-  setInterval(cleanupSessions, 3600000);
-
-  // Initialize session middleware with enhanced configuration
   app.use(session(sessionSettings));
-
-  // Add session keep-alive middleware with proper typing
-  // Enhanced session validation middleware
-  // Enhanced session validation middleware with retry mechanism
-  app.use(async (req, res, next) => {
-    const MAX_RETRIES = 3;
-    const RETRY_DELAY = 1000; // 1 second
-
-    const validateSession = async (attempt: number = 1): Promise<void> => {
-      try {
-        const session = req.session as SessionWithPassport;
-        
-        // Enhanced session validation
-        if (!session?.passport?.user) {
-          const error = {
-            code: 'SESSION_INVALID',
-            message: "セッションが無効または期限切れです",
-            action: "再ログインが必要です"
-          };
-          
-          logAuth(LogLevel.WARN, 'session_validation', error.message, {
-            path: req.path,
-            method: req.method,
-            attempt,
-            critical: true
-          });
-          
-          return res.status(401).json(error);
-        }
-
-        // Enhanced user validation with detailed error reporting
-        const [user] = await db
-          .select()
-          .from(users)
-          .where(eq(users.id, session.passport.user))
-          .limit(1);
-
-        if (!user) {
-          const error = {
-            code: 'USER_NOT_FOUND',
-            message: "ユーザーが見つかりません",
-            action: "アカウントの確認が必要です"
-          };
-          
-          logAuth(LogLevel.WARN, 'session_validation', error.message, {
-            userId: session.passport.user,
-            attempt,
-            critical: true
-          });
-          
-          req.logout(() => {
-            res.status(401).json(error);
-          });
-          return;
-        }
-
-        if (!user.isActive) {
-          const error = {
-            code: 'USER_INACTIVE',
-            message: "アカウントが無効になっています",
-            action: "管理者に連絡してください"
-          };
-          
-          logAuth(LogLevel.WARN, 'session_validation', error.message, {
-            userId: session.passport.user,
-            attempt,
-            critical: true
-          });
-          
-          req.logout(() => {
-            res.status(401).json(error);
-          });
-          return;
-        }
-
-        // Update session with latest user data
-        req.session.user = user;
-        next();
-
-      } catch (error) {
-        // Implement retry mechanism for transient errors
-        if (attempt < MAX_RETRIES) {
-          logAuth(LogLevel.WARN, 'session_validation', 'Retrying session validation', {
-            attempt,
-            error: error instanceof Error ? error.message : String(error),
-            critical: true
-          });
-          
-          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * attempt));
-          return validateSession(attempt + 1);
-        }
-
-        logAuth(LogLevel.ERROR, 'session_validation', 'Session validation failed after retries', {
-          error: error instanceof Error ? error.message : String(error),
-          attempts: attempt,
-          critical: true
-        });
-
-        const errorResponse = {
-          code: 'SYSTEM_ERROR',
-          message: "システムエラーが発生しました",
-          action: "しばらく待ってから再試行してください"
-        };
-
-        res.status(500).json(errorResponse);
-      }
-    };
-
-    await validateSession();
-  });
-  app.use((req, res, next) => {
-    const session = req.session as SessionWithPassport;
-    if (session?.cookie && !session.touch) {
-      const hour = 3600000;
-      const originalMaxAge = session.cookie.maxAge || hour * 24;
-      const expires = session.cookie.expires;
-      
-      // Safely handle session extension
-      if (expires instanceof Date) {
-        const timeUntilExpiry = expires.getTime() - Date.now();
-        if (timeUntilExpiry < hour * 2) {
-          session.cookie.maxAge = originalMaxAge;
-          logAuth(LogLevel.INFO, 'session_refresh', 'Extended session lifetime');
-        }
-      }
-    }
-    next();
-  });
   app.use(passport.initialize());
-  // トークンリフレッシュエンドポイント
-  app.post('/api/auth/refresh', async (req, res) => {
-    try {
-      const session = req.session as SessionWithPassport;
-      
-      if (!session?.passport?.user) {
-        return res.status(401).json({
-          code: 'SESSION_INVALID',
-          message: 'セッションが無効です',
-          action: '再度ログインしてください'
-        });
-      }
-
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, session.passport.user))
-        .limit(1);
-
-      if (!user || !user.isActive) {
-        return res.status(401).json({
-          code: 'USER_INVALID',
-          message: 'ユーザーが無効です',
-          action: '管理者に連絡してください'
-        });
-      }
-
-      // セッションを更新
-      req.session.touch();
-      req.session.user = user;
-
-      // 新しいトークンを生成
-      const token = randomBytes(32).toString('hex');
-      
-      res.json({
-        token,
-        user: {
-          id: user.id,
-          username: user.username,
-          role: user.role,
-          isActive: user.isActive
-        }
-      });
-    } catch (error) {
-      logAuth(LogLevel.ERROR, 'token_refresh', 'トークンの更新に失敗しました', {
-        error: error instanceof Error ? error.message : String(error),
-        critical: true
-      });
-      res.status(500).json({
-        code: 'REFRESH_ERROR',
-        message: 'トークンの更新に失敗しました',
-        action: 'しばらく待ってから再試行してください'
-      });
-    }
-  });
   app.use(passport.session());
 
-  // Rate limiting configuration
-  const loginAttempts = new Map<string, LoginAttempt>();
+  // Enhanced rate limiting with more sophisticated tracking
+  const loginAttempts = new Map<string, { 
+    count: number; 
+    lastAttempt: number;
+    lastSuccess?: number;
+    lockoutUntil?: number;
+  }>();
+  
+  const MAX_ATTEMPTS = 5;
+  const LOCKOUT_TIME = 15 * 60 * 1000; // 15 minutes
+  const ATTEMPT_RESET_TIME = 30 * 60 * 1000; // 30 minutes
 
-  /**
-   * Checks login attempts for rate limiting
-   * @param username Username to check
-   * @returns LoginCheck result
-   */
-  const checkLoginAttempts = (username: string): { allowed: boolean; message: string } => {
+  const checkLoginAttempts = (username: string): { allowed: boolean; message?: string } => {
     const now = Date.now();
     const key = username.toLowerCase();
     const attempts = loginAttempts.get(key) || { count: 0, lastAttempt: 0 };
 
-    if (now - attempts.lastAttempt > AUTH_CONSTANTS.ATTEMPT_RESET_TIME) {
+    // Reset attempts if enough time has passed since last attempt
+    if (now - attempts.lastAttempt > ATTEMPT_RESET_TIME) {
       loginAttempts.delete(key);
-      return { allowed: true, message: '' };
+      return { allowed: true };
     }
 
+    // Check if user is in lockout period
     if (attempts.lockoutUntil && now < attempts.lockoutUntil) {
       const remainingTime = Math.ceil((attempts.lockoutUntil - now) / 60000);
       return {
         allowed: false,
-        message: `Account temporarily locked. Please try again in ${remainingTime} minutes.`
+        message: `アカウントが一時的にロックされています。${remainingTime}分後に再試行してください。`
       };
     }
 
-    return { allowed: true, message: '' };
+    return { allowed: true };
   };
 
-  // Configure passport local strategy
   passport.use(
-    new LocalStrategy(async (username: string, password: string, done) => {
+    new LocalStrategy(async (username, password, done) => {
       try {
         const loginCheck = checkLoginAttempts(username);
         if (!loginCheck.allowed) {
-          logAuth(LogLevel.WARN, 'login_attempt', loginCheck.message, {
-            username,
-            reason: 'rate_limit',
-            critical: true
-          });
           return done(null, false, { message: loginCheck.message });
         }
 
@@ -528,59 +112,48 @@ export function setupAuth(app: Express): void {
         const now = Date.now();
         const attempts = loginAttempts.get(ipKey) || { count: 0, lastAttempt: 0 };
 
+        // Add delay to prevent timing attacks
+        await new Promise(resolve => setTimeout(resolve, Math.random() * 100));
+
         const [user] = await db
           .select()
           .from(users)
           .where(eq(users.username, username))
           .limit(1);
 
-        const handleFailedAttempt = (reason: string) => {
-          const newAttempts = {
+        if (!user?.password) {
+          loginAttempts.set(ipKey, {
             count: attempts.count + 1,
             lastAttempt: now,
-            lockoutUntil: attempts.count + 1 >= AUTH_CONSTANTS.MAX_ATTEMPTS ? 
-              now + AUTH_CONSTANTS.LOCKOUT_TIME : undefined
-          };
-          loginAttempts.set(ipKey, newAttempts);
-          
-          if (newAttempts.count >= AUTH_CONSTANTS.MAX_ATTEMPTS) {
-            logAuth(LogLevel.WARN, 'account_locked', 'Account locked due to multiple failed attempts', {
-              username,
-              reason,
-              attempts: newAttempts.count,
-              critical: true
-            });
-          }
-        };
-
-        if (!user?.password) {
-          handleFailedAttempt('invalid_user');
-          return done(null, false, { message: "Invalid username or password" });
+            lockoutUntil: attempts.count + 1 >= MAX_ATTEMPTS ? now + LOCKOUT_TIME : undefined
+          });
+          return done(null, false, { 
+            message: "ユーザー名またはパスワードが正しくありません。" 
+          });
         }
 
         const isMatch = await crypto.compare(password, user.password);
         if (!isMatch) {
-          handleFailedAttempt('invalid_password');
-          return done(null, false, { message: "Invalid username or password" });
+          loginAttempts.set(ipKey, {
+            count: attempts.count + 1,
+            lastAttempt: now,
+            lockoutUntil: attempts.count + 1 >= MAX_ATTEMPTS ? now + LOCKOUT_TIME : undefined
+          });
+          return done(null, false, { 
+            message: "ユーザー名またはパスワードが正しくありません。"
+          });
         }
 
+        // Reset attempts on successful login
         loginAttempts.set(ipKey, {
           count: 0,
           lastAttempt: now,
           lastSuccess: now
         });
 
-        logAuth(LogLevel.INFO, 'login_success', 'Login successful', {
-          username,
-          critical: true
-        });
-
         return done(null, user);
       } catch (err) {
-        logAuth(LogLevel.ERROR, 'auth_error', 'Authentication error occurred', { 
-          username,
-          error: err
-        });
+        console.error('Authentication error:', err);
         return done(err);
       }
     })
@@ -599,33 +172,33 @@ export function setupAuth(app: Express): void {
         .limit(1);
       
       if (!user) {
-        logAuth(LogLevel.WARN, 'session_error', 'Session user not found', { userId: id });
-        return done(null, false);
+        return done(new Error("ユーザーが見つかりません"));
       }
 
       done(null, user);
     } catch (err) {
-      logAuth(LogLevel.ERROR, 'session_error', 'Session deserialization failed', { 
-        userId: id,
-        error: err
-      });
+      console.error('Deserialization error:', err);
       done(err);
     }
   });
 
-  // Authentication routes
   app.post("/register", async (req, res, next) => {
     try {
+      console.log('[Auth] Processing registration request');
       const result = insertUserSchema.safeParse(req.body);
       if (!result.success) {
-        return res.status(400).json({ 
-          message: "Invalid input", 
-          errors: result.error.flatten().fieldErrors 
-        });
+        console.log('[Auth] Registration validation failed:', result.error);
+        return res
+          .status(400)
+          .json({ 
+            message: "入力が無効です", 
+            errors: result.error.flatten().fieldErrors 
+          });
       }
 
       const { username, password, role } = result.data;
 
+      // Check if user already exists
       const [existingUser] = await db
         .select()
         .from(users)
@@ -633,17 +206,15 @@ export function setupAuth(app: Express): void {
         .limit(1);
 
       if (existingUser) {
-        logAuth(LogLevel.WARN, 'register_error', 'Username already taken', {
-          username,
-          critical: true
-        });
+        console.log('[Auth] Registration failed: username already exists');
         return res.status(400).json({ 
-          message: "Username already taken",
+          message: "このユーザー名は既に使用されています",
           field: "username"
         });
       }
 
       const hashedPassword = await crypto.hash(password);
+
       const [newUser] = await db
         .insert(users)
         .values({
@@ -653,237 +224,92 @@ export function setupAuth(app: Express): void {
         })
         .returning();
 
-      logAuth(LogLevel.INFO, 'register_success', 'Registration successful', {
-        username,
-        role,
-        critical: true
-      });
-
+      console.log('[Auth] Registration successful');
       req.login(newUser, (err) => {
         if (err) {
+          console.error('[Auth] Login after registration failed:', err);
           return next(err);
         }
         return res.json({
-          message: "Registration successful",
+          message: "登録が完了しました",
           user: { id: newUser.id, username: newUser.username, role: newUser.role },
         });
       });
     } catch (error) {
-      logAuth(LogLevel.ERROR, 'register_error', 'Registration failed', {
-        username: req.body?.username,
-        error
-      });
+      console.error('Registration error:', error);
       next(error);
     }
   });
 
   app.post("/login", (req, res, next) => {
+    console.log('[Auth] Processing login request');
     const result = insertUserSchema.safeParse(req.body);
     if (!result.success) {
-      return res.status(400).json({ 
-        message: "Invalid input", 
-        errors: result.error.flatten().fieldErrors 
-      });
+      return res
+        .status(400)
+        .json({ 
+          message: "入力が無効です", 
+          errors: result.error.flatten().fieldErrors 
+        });
     }
 
-    passport.authenticate("local", (err: any, user: Express.User | false, info: IVerifyOptions) => {
+    const cb = (err: any, user: Express.User, info: IVerifyOptions) => {
       if (err) {
+        console.error("[Auth] Login error:", err);
         return next(err);
       }
       if (!user) {
+        console.log('[Auth] Login failed:', info.message);
         return res.status(401).json({
-          message: info.message ?? "Login failed",
+          message: info.message ?? "ログインに失敗しました",
           field: "credentials"
         });
       }
 
       req.logIn(user, (err) => {
         if (err) {
+          console.error("[Auth] Session error:", err);
           return next(err);
         }
+        console.log('[Auth] Login successful, session established');
         return res.json({
-          message: "Login successful",
+          message: "ログインしました",
           user: { id: user.id, username: user.username, role: user.role },
         });
       });
-    })(req, res, next);
+    };
+    
+    passport.authenticate("local", cb)(req, res, next);
   });
 
   app.post("/logout", (req, res) => {
     const username = req.user?.username;
     req.logout((err) => {
       if (err) {
-        logAuth(LogLevel.ERROR, 'logout_error', 'Logout failed', {
-          username,
-          error: err
-        });
-        return res.status(500).json({ message: "Logout failed" });
+        console.error('[Auth] Logout error:', err);
+        return res.status(500).json({ message: "ログアウトに失敗しました" });
       }
-      
+      if (username) {
+        loginAttempts.delete(username.toLowerCase());
+      }
       req.session.destroy((err) => {
         if (err) {
-          logAuth(LogLevel.ERROR, 'session_error', 'Session destruction failed', {
-            username,
-            error: err
-          });
-          return res.status(500).json({ message: "Session destruction failed" });
+          console.error('[Auth] Session destruction error:', err);
+          return res.status(500).json({ message: "セッションの削除に失敗しました" });
         }
-
-        logAuth(LogLevel.INFO, 'logout_success', 'Logout successful', {
-          username,
-          critical: true
-        });
-
         res.clearCookie('connect.sid');
-        res.json({ message: "Logged out successfully" });
+        console.log('[Auth] Logout successful');
+        res.json({ message: "ログアウトしました" });
       });
     });
   });
 
-  // Enhanced session refresh endpoint with validation and recovery
-  app.get("/api/refresh-session", async (req, res) => {
-    try {
-      if (!req.isAuthenticated()) {
-        logAuth(LogLevel.WARN, 'session_refresh', 'Unauthenticated session refresh attempt', {
-          ip: req.ip,
-          path: req.path,
-          critical: true
-        });
-        return res.status(401).json({ message: "認証が必要です" });
-      }
-
-      const session = req.session as SessionWithPassport;
-      if (!session?.passport?.user) {
-        logAuth(LogLevel.WARN, 'session_refresh', 'Invalid session state detected', {
-          ip: req.ip,
-          critical: true
-        });
-        return res.status(401).json({ message: "セッションが無効です" });
-      }
-
-      // Verify user exists and is active
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, session.passport.user))
-        .limit(1);
-
-      if (!user || !user.isActive) {
-        logAuth(LogLevel.WARN, 'session_refresh', 'User not found or inactive', {
-          userId: session.passport.user,
-          critical: true
-        });
-        req.logout(() => {
-          res.status(401).json({ message: "ユーザーが見つからないか、無効になっています" });
-        });
-        return;
-      }
-
-      // Update session expiry and regenerate
-      await new Promise<void>((resolve, reject) => {
-        session.regenerate((err) => {
-          if (err) {
-            logAuth(LogLevel.ERROR, 'session_refresh', 'Session regeneration failed', {
-              error: err instanceof Error ? err.message : String(err),
-              critical: true
-            });
-            reject(err);
-          } else {
-            session.passport = { user: user.id };
-            session.touch();
-            resolve();
-          }
-        });
-      });
-
-      logAuth(LogLevel.INFO, 'session_refresh', 'Session refreshed successfully', {
-        userId: user.id,
-        username: user.username,
-        critical: true
-      });
-      
-      res.json({ 
-        message: "セッションを更新しました",
-        user: {
-          id: user.id,
-          username: user.username,
-          role: user.role
-        }
-      });
-    } catch (error) {
-      logAuth(LogLevel.ERROR, 'session_refresh', 'Session refresh failed', {
-        error: error instanceof Error ? error.message : String(error),
-        critical: true
-      });
-      res.status(500).json({ message: "セッションの更新に失敗しました" });
+  app.get("/api/user", (req, res) => {
+    if (req.isAuthenticated()) {
+      console.log('[Auth] User session validated');
+      return res.json(req.user);
     }
-  });
-
-  // User info endpoint with enhanced session validation and recovery
-  app.get("/api/user", async (req, res) => {
-    try {
-      // Enhanced session validation
-      if (!req.isAuthenticated()) {
-        logAuth(LogLevel.WARN, 'session_validation', 'Unauthenticated request', {
-          path: '/api/user',
-          critical: true
-        });
-        return res.status(401).json({ message: "Authentication required" });
-      }
-
-      // Comprehensive session validation
-      if (!req.session?.passport?.user) {
-        logAuth(LogLevel.WARN, 'session_validation', 'Invalid session detected', {
-          critical: true
-        });
-        
-        // Attempt session recovery
-        try {
-          if (req.session) {
-            // Regenerate session
-            await new Promise<void>((resolve, reject) => {
-              req.session.regenerate((err) => {
-                if (err) reject(err);
-                else resolve();
-              });
-            });
-          }
-        } catch (error) {
-          logAuth(LogLevel.ERROR, 'session_recovery', 'Failed to recover session', {
-            error: error instanceof Error ? error.message : String(error),
-            critical: true
-          });
-        }
-        
-        return res.status(401).json({ message: "Session invalid" });
-      }
-
-      // Validate user exists in database
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, req.user.id))
-        .limit(1);
-
-      if (!user) {
-        logAuth(LogLevel.WARN, 'session_validation', 'User not found in database', {
-          userId: req.user.id,
-          critical: true
-        });
-        return res.status(401).json({ message: "User not found" });
-      }
-
-      // Update session expiry
-      if (req.session) {
-        req.session.touch();
-      }
-      logAuth(LogLevel.WARN, 'session_validation', 'Invalid session state detected', {
-        userId: req.user?.id,
-        critical: true
-      });
-      return res.status(401).json({ message: "Session expired" });
-    }
-
-    res.json(req.user);
+    console.log('[Auth] No valid session found');
+    res.status(401).json({ message: "認証が必要です" });
   });
 }

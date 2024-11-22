@@ -1,28 +1,11 @@
-// Import groups organized by type
-import { useEffect, useState } from 'react';
-
-import { ErrorBoundary } from '../components/ErrorBoundary';
-// External libraries
-import { AlertCircle, Edit2, Plus, Power, History, Trash2 } from "lucide-react";
-
-// Internal hooks
+import React from 'react';
 import { useAthletes } from '../hooks/use-athletes';
 import { useSwimRecords } from '../hooks/use-swim-records';
-import { useUser } from '../hooks/use-user';
-import { useToast } from '@/hooks/use-toast';
-
-// Internal components
-import { PageHeader } from '../components/PageHeader';
-import { EditAthleteForm } from '../components/EditAthleteForm';
-import { EditRecordForm } from '../components/EditRecordForm';
-import { TimeHistoryModal } from '../components/TimeHistoryModal';
-
-// UI Components
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import { AlertCircle, Edit2, Plus, Power, History, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,79 +16,43 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { EditAthleteForm } from '../components/EditAthleteForm';
+import { EditRecordForm } from '../components/EditRecordForm';
+import { TimeHistoryModal } from '../components/TimeHistoryModal';
+import { useUser } from '../hooks/use-user';
+import { useToast } from '@/hooks/use-toast';
+import { PageHeader } from '../components/PageHeader';
+import { Badge } from "@/components/ui/badge";
 
-// Types
-import type { User } from "db/schema";
-import type { ExtendedSwimRecord } from "../hooks/use-swim-records";
-
-interface LatestPerformance extends Omit<ExtendedSwimRecord, 'date'> {
-  date: string | null;
-}
-
-interface ViewingHistoryState {
-  athleteId: number | null;
-  athleteName: string;
-}
-
-interface EditingRecordState {
-  id: number | null;
-  studentId: number | null;
-}
-
-/**
- * Athletes page component that displays a list of athletes and their records
- * Allows coaches to manage athletes and their performance records
- */
 export default function Athletes() {
   const { user } = useUser();
   const { toast } = useToast();
   const { athletes, isLoading: athletesLoading, error: athletesError, mutate: mutateAthletes } = useAthletes();
   const { records, isLoading: recordsLoading, error: recordsError, mutate: mutateRecords } = useSwimRecords();
-  
-  // State management
-  const [editingAthlete, setEditingAthlete] = useState<number | null>(null);
-  const [deletingAthlete, setDeletingAthlete] = useState<number | null>(null);
-  const [editingRecord, setEditingRecord] = useState<EditingRecordState>({
+  const [editingAthlete, setEditingAthlete] = React.useState<number | null>(null);
+  const [deletingAthlete, setDeletingAthlete] = React.useState<number | null>(null);
+  const [editingRecord, setEditingRecord] = React.useState<{id: number | null, studentId: number | null}>({
     id: null,
     studentId: null
   });
-  const [viewingHistory, setViewingHistory] = useState<ViewingHistoryState>({
-    athleteId: null,
-    athleteName: ''
-  });
+  const [viewingHistory, setViewingHistory] = React.useState<{
+    athleteId: number | null;
+    athleteName: string;
+  }>({ athleteId: null, athleteName: '' });
 
-  /**
-   * Gets the latest performance record for a given athlete
-   */
-  const getLatestPerformance = (studentId: number): LatestPerformance | null => {
+  const getLatestPerformance = (studentId: number) => {
     if (!records) return null;
-    const studentRecords = records.filter(record => record.studentId === studentId);
-    if (studentRecords.length === 0) return null;
-    
-    const latestRecord = studentRecords.sort((a, b) => {
-      const dateA = new Date(a.date || '').getTime();
-      const dateB = new Date(b.date || '').getTime();
-      return dateB - dateA;
-    })[0];
-
-    return {
-      ...latestRecord,
-      date: latestRecord.date ? new Date(latestRecord.date).toISOString() : null
-    };
+    return records
+      .filter(record => record.studentId === studentId)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
   };
 
-  /**
-   * Gets all records for a given athlete
-   */
-  const getAthleteRecords = (studentId: number): ExtendedSwimRecord[] => {
+  const getAthleteRecords = (studentId: number) => {
     if (!records) return [];
     return records.filter(record => record.studentId === studentId);
   };
 
-  /**
-   * Handles toggling athlete's active status
-   */
-  const handleToggleStatus = async (athleteId: number, currentStatus: boolean): Promise<void> => {
+  const handleToggleStatus = async (athleteId: number, currentStatus: boolean) => {
     try {
       const response = await fetch(`/api/athletes/${athleteId}/status`, {
         method: 'PATCH',
@@ -117,7 +64,7 @@ export default function Athletes() {
       });
 
       if (!response.ok) {
-        throw new Error('選手のステータス更新に失敗しました');
+        throw new Error('Failed to update athlete status');
       }
 
       await mutateAthletes();
@@ -126,6 +73,7 @@ export default function Athletes() {
         description: `選手のステータスが${!currentStatus ? '有効' : '無効'}になりました`,
       });
     } catch (error) {
+      console.error('Error updating athlete status:', error);
       toast({
         variant: "destructive",
         title: "エラー",
@@ -134,10 +82,7 @@ export default function Athletes() {
     }
   };
 
-  /**
-   * Handles editing athlete information
-   */
-  const handleEdit = async (athleteId: number, data: { username: string }): Promise<void> => {
+  const handleEdit = async (athleteId: number, data: { username: string }) => {
     try {
       const response = await fetch(`/api/athletes/${athleteId}`, {
         method: 'PUT',
@@ -149,86 +94,60 @@ export default function Athletes() {
       });
 
       if (!response.ok) {
-        throw new Error('選手情報の更新に失敗しました');
+        throw new Error('Failed to update athlete');
       }
 
       await mutateAthletes();
     } catch (error) {
+      console.error('Error updating athlete:', error);
       throw error;
     }
   };
 
-  /**
-   * Handles creating a new record
-   */
-  const handleCreateRecord = async (data: Record<string, any>): Promise<void> => {
+  const handleCreateRecord = async (data: any) => {
     try {
-      if (!data.studentId) {
-        toast({
-          variant: "destructive",
-          title: "エラー",
-          description: "選手IDが設定されていません",
-        });
-        return;
-      }
-
       const response = await fetch('/api/records', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          ...data,
-          poolLength: Number(data.poolLength),
-          studentId: Number(data.studentId),
-        }),
+        body: JSON.stringify(data),
         credentials: 'include',
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || '記録の作成に失敗しました');
+        throw new Error('Failed to create record');
       }
 
-      // Only revalidate to get the actual server state
       await mutateRecords();
-      
       toast({
         title: "追加成功",
         description: "新しい記録が追加されました",
       });
     } catch (error) {
-      console.error('[Records] Create error:', error);
-      // Force revalidate on error
-      await mutateRecords();
+      console.error('Error creating record:', error);
       toast({
         variant: "destructive",
         title: "エラー",
-        description: error instanceof Error ? error.message : "記録の追加に失敗しました",
+        description: "記録の追加に失敗しました",
       });
       throw error;
     }
   };
 
-  /**
-   * Handles editing an existing record
-   */
-  const handleEditRecord = async (recordId: number, data: Record<string, any>): Promise<void> => {
+  const handleEditRecord = async (recordId: number, data: any) => {
     try {
       const response = await fetch(`/api/records/${recordId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          ...data,
-          poolLength: Number(data.poolLength),
-        }),
+        body: JSON.stringify(data),
         credentials: 'include',
       });
 
       if (!response.ok) {
-        throw new Error('記録の更新に失敗しました');
+        throw new Error('Failed to update record');
       }
 
       await mutateRecords();
@@ -237,6 +156,7 @@ export default function Athletes() {
         description: "記録が更新されました",
       });
     } catch (error) {
+      console.error('Error updating record:', error);
       toast({
         variant: "destructive",
         title: "エラー",
@@ -246,10 +166,7 @@ export default function Athletes() {
     }
   };
 
-  /**
-   * Handles deleting an athlete and their records
-   */
-  const handleDelete = async (athleteId: number): Promise<void> => {
+  const handleDelete = async (athleteId: number) => {
     try {
       const response = await fetch(`/api/athletes/${athleteId}`, {
         method: 'DELETE',
@@ -257,7 +174,7 @@ export default function Athletes() {
       });
 
       if (!response.ok) {
-        throw new Error('選手の削除に失敗しました');
+        throw new Error('Failed to delete athlete');
       }
 
       await Promise.all([
@@ -270,6 +187,7 @@ export default function Athletes() {
         description: "選手と関連する記録が削除されました",
       });
     } catch (error) {
+      console.error('Error deleting athlete:', error);
       toast({
         variant: "destructive",
         title: "エラー",
@@ -278,7 +196,6 @@ export default function Athletes() {
     }
   };
 
-  // Loading state
   if (athletesLoading || recordsLoading) {
     return (
       <>
@@ -292,7 +209,6 @@ export default function Athletes() {
     );
   }
 
-  // Error state
   if (athletesError || recordsError) {
     return (
       <>
@@ -313,12 +229,12 @@ export default function Athletes() {
   const record = records?.find(r => r.id === editingRecord.id);
 
   return (
-    <ErrorBoundary>
+    <>
       <PageHeader 
         title="選手一覧"
         children={
           user?.role === 'coach' && (
-            <Button onClick={() => setEditingRecord(-1)}>
+            <Button onClick={() => setEditingRecord({ id: null, studentId: null })}>
               <Plus className="mr-2 h-4 w-4" />
               新規記録追加
             </Button>
@@ -377,7 +293,13 @@ export default function Athletes() {
                           >
                             <Edit2 className="h-4 w-4" />
                           </Button>
-                          
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setEditingRecord({ id: null, studentId: athlete.id })}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"
@@ -424,7 +346,7 @@ export default function Athletes() {
                         <div>
                           <p className="text-sm font-medium">日付</p>
                           <p className="text-base">
-                            {latestRecord.date ? new Date(latestRecord.date).toLocaleDateString() : ''}
+                            {new Date(latestRecord.date).toLocaleDateString()}
                           </p>
                         </div>
                       </div>
@@ -452,7 +374,7 @@ export default function Athletes() {
         <EditRecordForm
           record={record}
           studentId={editingRecord.studentId ?? undefined}
-          isOpen={editingRecord.id !== null || editingRecord.studentId !== null}
+          isOpen={!!editingRecord.studentId}
           onClose={() => setEditingRecord({ id: null, studentId: null })}
           onSubmit={async (data) => {
             if (editingRecord.id) {

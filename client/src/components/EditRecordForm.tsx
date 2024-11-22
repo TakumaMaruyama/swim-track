@@ -1,15 +1,6 @@
-import { useEffect, useState } from 'react';
+import React from 'react';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useToast } from "@/hooks/use-toast";
-import { SwimRecord, Competition } from "db/schema";
-import useSWR from "swr";
-import { useSwimRecords } from '../hooks/use-swim-records';
-import { useAthletes } from '../hooks/use-athletes';
-import * as z from "zod";
-import { Loader2 } from "lucide-react";
-
-// UI Components
 import {
   Form,
   FormControl,
@@ -37,27 +28,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { SwimRecord, Competition } from "db/schema";
+import * as z from "zod";
+import useSWR from "swr";
 
-// Constants and Types
-const POOL_LENGTHS = [15, 25, 50] as const;
-type PoolLength = typeof POOL_LENGTHS[number];
+// Time format validation regex: MM:SS.ms
+const timeRegex = /^([0-5]?[0-9]):([0-5][0-9])\.([0-9]{1,3})$/;
 
-const TIME_FORMAT_REGEX = /^([0-5]?[0-9]):([0-5][0-9])\.([0-9]{1,3})$/;
-const SWIM_STYLES = [
-  "自由形",
-  "背泳ぎ",
-  "平泳ぎ",
-  "バタフライ",
-  "個人メドレー"
-] as const;
+// Available pool lengths
+const poolLengths = [15, 25, 50];
 
-// Validation functions
-const validatePoolLength = (value: number): value is PoolLength => {
-  return POOL_LENGTHS.includes(value as PoolLength);
-};
-
-// Helper functions
-const getAvailableDistances = (poolLength: PoolLength): number[] => {
+// Get available distances based on pool length
+const getAvailableDistances = (poolLength: number) => {
   switch (poolLength) {
     case 15:
       return [15, 30, 60, 90, 120, 240];
@@ -70,29 +54,14 @@ const getAvailableDistances = (poolLength: PoolLength): number[] => {
   }
 };
 
-// Schema definition
 const editRecordSchema = z.object({
   style: z.string().min(1, "種目を選択してください"),
   distance: z.number().min(1, "距離を選択してください"),
-  time: z.string().regex(TIME_FORMAT_REGEX, "タイム形式は MM:SS.ms である必要があります"),
+  time: z.string().regex(timeRegex, "タイム形式は MM:SS.ms である必要があります"),
   date: z.string().min(1, "日付を選択してください"),
   isCompetition: z.boolean().default(false),
-  poolLength: z.number().refine(
-    validatePoolLength,
-    val => ({
-      message: `プール長は ${POOL_LENGTHS.join(', ')}m のいずれかである必要があります。入力値: ${val}m`
-    })
-  ),
-  competitionId: z.number().nullable(),
-  studentId: z.number({
-    required_error: "選手を選択してください",
-    invalid_type_error: "無効な選手IDです"
-  })
-  .positive("選手を選択してください")
-  .int("無効な選手IDです")
-  .refine((val) => val !== undefined && val !== null && val > 0, {
-    message: "記録を登録するには、選手を選択してください"
-  }),
+  poolLength: z.number().refine(val => poolLengths.includes(val), "有効なプール長を選択してください"),
+  competitionId: z.number().nullable()
 });
 
 type EditRecordFormProps = {
@@ -105,86 +74,57 @@ type EditRecordFormProps = {
 
 export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }: EditRecordFormProps) {
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
   const { data: competitions } = useSWR<Competition[]>("/api/competitions");
-  const { athletes } = useAthletes();
 
-  const defaultPoolLength: PoolLength = 25;
-
-  const form = useForm<z.infer<typeof editRecordSchema>>({
+  const form = useForm({
     resolver: zodResolver(editRecordSchema),
     defaultValues: {
       style: record?.style ?? "",
       distance: record?.distance ?? 50,
       time: record?.time ?? "",
-      date: record?.date 
-        ? new Date(record.date).toISOString().split('T')[0] 
-        : new Date().toISOString().split('T')[0],
+      date: record ? new Date(record.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       isCompetition: record?.isCompetition ?? false,
-      poolLength: (record?.poolLength && POOL_LENGTHS.includes(record.poolLength as PoolLength))
-        ? record.poolLength as PoolLength
-        : defaultPoolLength,
-      competitionId: record?.competitionId ?? null,
-      studentId: record?.studentId ?? studentId ?? undefined,
+      poolLength: record?.poolLength ?? 25,
+      competitionId: record?.competitionId ?? null
     },
-    mode: "onChange",
   });
 
   const watchIsCompetition = form.watch('isCompetition');
-  const watchedPoolLength = form.watch('poolLength') as PoolLength;
 
-  const { mutate } = useSwimRecords();
-
-const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
-  try {
-    setIsSubmitting(true);
-    
-    // Validate student ID
-    const selectedAthlete = athletes?.find(a => a.id === values.studentId);
-    if (!selectedAthlete) {
+  const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
+    try {
+      setIsSubmitting(true);
+      // If not a competition, ensure competitionId is null
+      if (!values.isCompetition) {
+        values.competitionId = null;
+      }
+      await onSubmit({ ...values, studentId });
+      toast({
+        title: record ? "更新成功" : "記録追加成功",
+        description: record ? "記録が更新されました" : "新しい記録が追加されました",
+      });
+      onClose();
+    } catch (error) {
       toast({
         variant: "destructive",
         title: "エラー",
-        description: "選手が選択されていません。記録を登録するには、有効な選手を選択してください。",
+        description: record ? "記録の更新に失敗しました" : "記録の追加に失敗しました",
       });
-      return;
+    } finally {
+      setIsSubmitting(false);
     }
+  };
 
-    if (!values.style || !values.distance || !values.time) {
-      toast({
-        variant: "destructive",
-        title: "入力エラー",
-        description: "必須項目（種目、距離、タイム）をすべて入力してください。",
-      });
-      return;
-    }
-    
-    // Perform API call
-    await onSubmit(values);
-    
-    // Force immediate cache refresh
-    await mutate(undefined, { revalidate: true });
-    
-    toast({
-      title: record ? "更新成功" : "記録追加成功",
-      description: `${selectedAthlete.username}の記録が${record ? '更新' : '追加'}されました`,
-    });
-    
-    onClose();
-  } catch (error) {
-    console.error('[Records] Submit error:', error);
-    toast({
-      variant: "destructive",
-      title: "エラー",
-      description: error instanceof Error ? error.message : `記録の${record ? '更新' : '追加'}に失敗しました。入力内容を確認してください。`,
-    });
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+  const swimStyles = [
+    "自由形",
+    "背泳ぎ",
+    "平泳ぎ",
+    "バタフライ",
+    "個人メドレー"
+  ];
 
-  const watchStudentId = form.watch('studentId');
-  const isStudentSelected = !!watchStudentId;
+  const watchedPoolLength = form.watch('poolLength');
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -192,72 +132,29 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
         <DialogHeader>
           <DialogTitle>{record ? "記録の編集" : "新規記録追加"}</DialogTitle>
           <DialogDescription>
-            {record ? "記録を編集" : "新しい記録を追加"}します。続行するには選手を選択してください。
+            選手の{record ? "記録を編集" : "新しい記録を追加"}します
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
             <FormField
               control={form.control}
-              name="studentId"
-              render={({ field }) => (
-                <FormItem className="border-2 border-primary/20 p-4 rounded-lg">
-                  <FormLabel className="text-lg font-semibold">
-                    選手を選択
-                    <span className="text-destructive ml-1">*</span>
-                  </FormLabel>
-                  <Select
-                    value={field.value?.toString() ?? ""}
-                    onValueChange={(value) => field.onChange(Number(value))}
-                    disabled={isSubmitting}
-                  >
-                    <FormControl>
-                      <SelectTrigger className="h-12">
-                        <SelectValue placeholder="最初に選手を選択してください" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {athletes?.map((athlete) => (
-                        <SelectItem
-                          key={athlete.id}
-                          value={athlete.id.toString()}
-                        >
-                          {athlete.username}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription className="text-sm mt-2">
-                    ※ 記録を登録するには、必ず選手を選択してください
-                  </FormDescription>
-                  <FormMessage className="font-medium">
-                    {field.value ? "" : "選手を選択してください"}
-                  </FormMessage>
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
               name="style"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>種目</FormLabel>
-                  <Select
-                    value={field.value}
-                    onValueChange={field.onChange}
-                    disabled={isSubmitting || !isStudentSelected}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder={isStudentSelected ? "種目を選択" : "選手を選択してください"} />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {SWIM_STYLES.map(style => (
-                        <SelectItem key={style} value={style}>{style}</SelectItem>
+                  <FormControl>
+                    <select
+                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                      {...field}
+                      disabled={isSubmitting}
+                    >
+                      <option value="">種目を選択</option>
+                      {swimStyles.map(style => (
+                        <option key={style} value={style}>{style}</option>
                       ))}
-                    </SelectContent>
-                  </Select>
+                    </select>
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -268,35 +165,26 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>プール長 (m)</FormLabel>
-                  <Select
-                    value={field.value.toString()}
-                    onValueChange={(value) => {
-                      const poolLength = Number(value) as PoolLength;
-                      field.onChange(poolLength);
-                      const availableDistances = getAvailableDistances(poolLength);
-                      if (!availableDistances.includes(form.getValues('distance'))) {
-                        const newDistance = availableDistances[0];
-                        form.setValue('distance', newDistance);
-                      }
-                    }}
-                    disabled={isSubmitting || !isStudentSelected}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder={isStudentSelected ? "プール長を選択" : "選手を選択してください"} />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {POOL_LENGTHS.map(length => (
-                        <SelectItem key={length} value={length.toString()}>
-                          {length}mプール
-                        </SelectItem>
+                  <FormControl>
+                    <select
+                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                      {...field}
+                      onChange={e => {
+                        const value = Number(e.target.value);
+                        field.onChange(value);
+                        // Reset distance when pool length changes
+                        const availableDistances = getAvailableDistances(value);
+                        if (!availableDistances.includes(form.getValues('distance'))) {
+                          form.setValue('distance', availableDistances[0]);
+                        }
+                      }}
+                      disabled={isSubmitting}
+                    >
+                      {poolLengths.map(length => (
+                        <option key={length} value={length}>{length}mプール</option>
                       ))}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    選択可能なプール長: {POOL_LENGTHS.join(', ')}m
-                  </FormDescription>
+                    </select>
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -307,25 +195,19 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>距離 (m)</FormLabel>
-                  <Select
-                    value={field.value.toString()}
-                    onValueChange={(value) => {
-                      const distance = Number(value);
-                      field.onChange(distance);
-                    }}
-                    disabled={isSubmitting || !isStudentSelected}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder={isStudentSelected ? "距離を選択" : "選手を選択してください"} />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
+                  <FormControl>
+                    <select
+                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                      {...field}
+                      onChange={e => field.onChange(Number(e.target.value))}
+                      disabled={isSubmitting}
+                    >
+                      <option value="">距離を選択</option>
                       {getAvailableDistances(watchedPoolLength).map(d => (
-                        <SelectItem key={d} value={d.toString()}>{d}m</SelectItem>
+                        <option key={d} value={d}>{d}m</option>
                       ))}
-                    </SelectContent>
-                  </Select>
+                    </select>
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -340,7 +222,7 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
                     <Input
                       placeholder="01:23.45"
                       {...field}
-                      disabled={isSubmitting || !isStudentSelected}
+                      disabled={isSubmitting}
                     />
                   </FormControl>
                   <FormDescription>
@@ -360,7 +242,7 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
                     <Input
                       type="date"
                       {...field}
-                      disabled={isSubmitting || !isStudentSelected}
+                      disabled={isSubmitting}
                     />
                   </FormControl>
                   <FormMessage />
@@ -375,13 +257,8 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
                   <FormControl>
                     <Checkbox
                       checked={field.value}
-                      onCheckedChange={(checked) => {
-                        field.onChange(checked);
-                        if (!checked) {
-                          form.setValue('competitionId', null);
-                        }
-                      }}
-                      disabled={isSubmitting || !isStudentSelected}
+                      onCheckedChange={field.onChange}
+                      disabled={isSubmitting}
                     />
                   </FormControl>
                   <div className="space-y-1 leading-none">
@@ -393,7 +270,6 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
                 </FormItem>
               )}
             />
-            
             {watchIsCompetition && (
               <FormField
                 control={form.control}
@@ -404,11 +280,10 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
                     <Select
                       value={field.value?.toString()}
                       onValueChange={(value) => field.onChange(Number(value))}
-                      disabled={isSubmitting || !isStudentSelected}
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder={isStudentSelected ? "大会を選択" : "選手を選択してください"} />
+                          <SelectValue placeholder="大会を選択" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
