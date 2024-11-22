@@ -125,7 +125,7 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
         ? record.poolLength as PoolLength
         : defaultPoolLength,
       competitionId: record?.competitionId ?? null,
-      studentId: record?.studentId ?? studentId ?? undefined,
+      studentId: record?.studentId ?? studentId ?? null,
     },
     mode: "onChange",
   });
