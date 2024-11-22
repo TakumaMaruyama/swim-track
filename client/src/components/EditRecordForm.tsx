@@ -85,9 +85,9 @@ const editRecordSchema = z.object({
   ),
   competitionId: z.number().nullable(),
   studentId: z.number({
-    required_error: "選手IDは必須です",
+    required_error: "選手を選択してください",
     invalid_type_error: "選手IDは数値である必要があります"
-  }),
+  }).positive("選手を選択してください"),
 });
 
 type EditRecordFormProps = {
@@ -120,8 +120,9 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
         ? record.poolLength as PoolLength
         : defaultPoolLength,
       competitionId: record?.competitionId ?? null,
-      studentId: studentId ?? record?.studentId,
+      studentId: record ? record.studentId : (studentId ?? undefined),
     },
+    mode: "onChange",
   });
 
   const watchIsCompetition = form.watch('isCompetition');
@@ -131,18 +132,20 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
 
 const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
   try {
-    if (!values.studentId) {
+    setIsSubmitting(true);
+    
+    // Validate student ID
+    const selectedAthlete = athletes?.find(a => a.id === values.studentId);
+    if (!selectedAthlete) {
       toast({
         variant: "destructive",
         title: "エラー",
-        description: "選手IDが設定されていません",
+        description: "選手が正しく選択されていません",
       });
       return;
     }
-
-    setIsSubmitting(true);
     
-    // Perform API call first
+    // Perform API call
     await onSubmit(values);
     
     // Force immediate cache refresh
@@ -159,7 +162,7 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
     toast({
       variant: "destructive",
       title: "エラー",
-      description: record ? "記録の更新に失敗しました" : "記録の追加に失敗しました",
+      description: error instanceof Error ? error.message : (record ? "記録の更新に失敗しました" : "記録の追加に失敗しました"),
     });
   } finally {
     setIsSubmitting(false);
@@ -334,39 +337,38 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
                 </FormItem>
               )}
             />
-            {!record && (
-              <FormField
-                control={form.control}
-                name="studentId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>選手</FormLabel>
-                    <Select
-                      value={field.value?.toString()}
-                      onValueChange={(value) => field.onChange(Number(value))}
-                      disabled={isSubmitting || !!record}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="選手を選択" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {athletes?.map((athlete) => (
-                          <SelectItem
-                            key={athlete.id}
-                            value={athlete.id.toString()}
-                          >
-                            {athlete.username}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
+            <FormField
+              control={form.control}
+              name="studentId"
+              rules={{ required: "選手を選択してください" }}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>選手 <span className="text-destructive">*</span></FormLabel>
+                  <Select
+                    value={field.value?.toString()}
+                    onValueChange={(value) => field.onChange(Number(value))}
+                    disabled={isSubmitting || !!record}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="選手を選択" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {athletes?.map((athlete) => (
+                        <SelectItem
+                          key={athlete.id}
+                          value={athlete.id.toString()}
+                        >
+                          {athlete.username}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             {watchIsCompetition && (
               <FormField
                 control={form.control}
