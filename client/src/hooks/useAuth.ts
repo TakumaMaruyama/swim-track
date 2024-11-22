@@ -19,9 +19,10 @@ export function useAuth() {
   const addError = useErrorStore((state) => state.addError)
   const navigate = useNavigate()
 
-  // セッションの定期的なチェック
+  // セッションとトークンの管理
   useEffect(() => {
     if (isAuthenticated) {
+      // セッションチェック
       const sessionCheck = setInterval(() => {
         if (!validateSession()) {
           handleLogout()
@@ -35,6 +36,22 @@ export function useAuth() {
 
       return () => clearInterval(sessionCheck)
     }
+      // トークンリフレッシュ
+      const tokenRefresh = setInterval(() => {
+        refreshToken().catch(() => {
+          handleLogout();
+          addToast({
+            type: 'error',
+            message: 'セッションの更新に失敗しました。再度ログインしてください。',
+            duration: 5000,
+          });
+        });
+      }, TOKEN_REFRESH_INTERVAL);
+
+      return () => {
+        clearInterval(sessionCheck);
+        clearInterval(tokenRefresh);
+      };
   }, [isAuthenticated])
 
   // アクティビティの監視

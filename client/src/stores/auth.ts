@@ -20,10 +20,13 @@ interface AuthState {
   login: (credentials: { username: string; password: string }) => Promise<void>
   logout: () => Promise<void>
   checkSession: () => Promise<void>
+  refreshToken: () => Promise<void>
 }
 
 // セッションの有効期限（30分）
 const SESSION_TIMEOUT = 30 * 60 * 1000;
+const TOKEN_REFRESH_INTERVAL = 15 * 60 * 1000; // 15分ごとにトークンをリフレッシュ
+const SESSION_CHECK_INTERVAL = 60 * 1000; // 1分ごとにセッションをチェック
 
 export const useAuthStore = create<AuthState>()(
   devtools(
@@ -97,6 +100,34 @@ export const useAuthStore = create<AuthState>()(
               token: null,
               isAuthenticated: false,
               isLoading: false,
+              sessionExpiry: null,
+            });
+          }
+        },
+        refreshToken: async () => {
+          try {
+            const response = await fetch('/api/auth/refresh', {
+              method: 'POST',
+              credentials: 'include',
+            });
+            
+            if (!response.ok) {
+              throw new Error('トークンの更新に失敗しました');
+            }
+            
+            const data = await response.json();
+            const expiry = Date.now() + SESSION_TIMEOUT;
+            set({
+              token: data.token,
+              sessionExpiry: expiry,
+              lastActivity: Date.now(),
+            });
+          } catch (error) {
+            set({
+              error: error instanceof Error ? error.message : 'トークンの更新に失敗しました',
+              user: null,
+              token: null,
+              isAuthenticated: false,
               sessionExpiry: null,
             });
           }

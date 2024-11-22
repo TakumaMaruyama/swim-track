@@ -424,6 +424,61 @@ export function setupAuth(app: Express): void {
     next();
   });
   app.use(passport.initialize());
+  // トークンリフレッシュエンドポイント
+  app.post('/api/auth/refresh', async (req, res) => {
+    try {
+      const session = req.session as SessionWithPassport;
+      
+      if (!session?.passport?.user) {
+        return res.status(401).json({
+          code: 'SESSION_INVALID',
+          message: 'セッションが無効です',
+          action: '再度ログインしてください'
+        });
+      }
+
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, session.passport.user))
+        .limit(1);
+
+      if (!user || !user.isActive) {
+        return res.status(401).json({
+          code: 'USER_INVALID',
+          message: 'ユーザーが無効です',
+          action: '管理者に連絡してください'
+        });
+      }
+
+      // セッションを更新
+      req.session.touch();
+      req.session.user = user;
+
+      // 新しいトークンを生成
+      const token = randomBytes(32).toString('hex');
+      
+      res.json({
+        token,
+        user: {
+          id: user.id,
+          username: user.username,
+          role: user.role,
+          isActive: user.isActive
+        }
+      });
+    } catch (error) {
+      logAuth(LogLevel.ERROR, 'token_refresh', 'トークンの更新に失敗しました', {
+        error: error instanceof Error ? error.message : String(error),
+        critical: true
+      });
+      res.status(500).json({
+        code: 'REFRESH_ERROR',
+        message: 'トークンの更新に失敗しました',
+        action: 'しばらく待ってから再試行してください'
+      });
+    }
+  });
   app.use(passport.session());
 
   // Rate limiting configuration
