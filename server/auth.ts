@@ -298,46 +298,112 @@ export function setupAuth(app: Express): void {
 
   // Add session keep-alive middleware with proper typing
   // Enhanced session validation middleware
+  // Enhanced session validation middleware with retry mechanism
   app.use(async (req, res, next) => {
-    try {
-      const session = req.session as SessionWithPassport;
-      
-      // Check if session exists and is valid
-      if (!session?.passport?.user) {
-        logAuth(LogLevel.WARN, 'session_validation', 'Invalid or expired session', {
-          path: req.path,
-          method: req.method,
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY = 1000; // 1 second
+
+    const validateSession = async (attempt: number = 1): Promise<void> => {
+      try {
+        const session = req.session as SessionWithPassport;
+        
+        // Enhanced session validation
+        if (!session?.passport?.user) {
+          const error = {
+            code: 'SESSION_INVALID',
+            message: "セッションが無効または期限切れです",
+            action: "再ログインが必要です"
+          };
+          
+          logAuth(LogLevel.WARN, 'session_validation', error.message, {
+            path: req.path,
+            method: req.method,
+            attempt,
+            critical: true
+          });
+          
+          return res.status(401).json(error);
+        }
+
+        // Enhanced user validation with detailed error reporting
+        const [user] = await db
+          .select()
+          .from(users)
+          .where(eq(users.id, session.passport.user))
+          .limit(1);
+
+        if (!user) {
+          const error = {
+            code: 'USER_NOT_FOUND',
+            message: "ユーザーが見つかりません",
+            action: "アカウントの確認が必要です"
+          };
+          
+          logAuth(LogLevel.WARN, 'session_validation', error.message, {
+            userId: session.passport.user,
+            attempt,
+            critical: true
+          });
+          
+          req.logout(() => {
+            res.status(401).json(error);
+          });
+          return;
+        }
+
+        if (!user.isActive) {
+          const error = {
+            code: 'USER_INACTIVE',
+            message: "アカウントが無効になっています",
+            action: "管理者に連絡してください"
+          };
+          
+          logAuth(LogLevel.WARN, 'session_validation', error.message, {
+            userId: session.passport.user,
+            attempt,
+            critical: true
+          });
+          
+          req.logout(() => {
+            res.status(401).json(error);
+          });
+          return;
+        }
+
+        // Update session with latest user data
+        req.session.user = user;
+        next();
+
+      } catch (error) {
+        // Implement retry mechanism for transient errors
+        if (attempt < MAX_RETRIES) {
+          logAuth(LogLevel.WARN, 'session_validation', 'Retrying session validation', {
+            attempt,
+            error: error instanceof Error ? error.message : String(error),
+            critical: true
+          });
+          
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * attempt));
+          return validateSession(attempt + 1);
+        }
+
+        logAuth(LogLevel.ERROR, 'session_validation', 'Session validation failed after retries', {
+          error: error instanceof Error ? error.message : String(error),
+          attempts: attempt,
           critical: true
         });
-        return res.status(401).json({ message: "セッションが無効または期限切れです" });
+
+        const errorResponse = {
+          code: 'SYSTEM_ERROR',
+          message: "システムエラーが発生しました",
+          action: "しばらく待ってから再試行してください"
+        };
+
+        res.status(500).json(errorResponse);
       }
+    };
 
-      // Check if user still exists and is active
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, session.passport.user))
-        .limit(1);
-
-      if (!user || !user.isActive) {
-        logAuth(LogLevel.WARN, 'session_validation', 'User not found or inactive', {
-          userId: session.passport.user,
-          critical: true
-        });
-        req.logout(() => {
-          res.status(401).json({ message: "ユーザーが見つからないか、無効になっています" });
-        });
-        return;
-      }
-
-      next();
-    } catch (error) {
-      logAuth(LogLevel.ERROR, 'session_validation', 'Session validation error', {
-        error: error instanceof Error ? error.message : String(error),
-        critical: true
-      });
-      next(error);
-    }
+    await validateSession();
   });
   app.use((req, res, next) => {
     const session = req.session as SessionWithPassport;
