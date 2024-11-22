@@ -33,10 +33,17 @@ function getErrorContext(error: Error, errorInfo?: React.ErrorInfo): ErrorContex
     browserInfo: {
       userAgent: navigator.userAgent,
       language: navigator.language,
-      platform: navigator.platform
+      platform: navigator.platform,
+      screenSize: `${window.innerWidth}x${window.innerHeight}`,
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
     },
     timestamp: new Date().toISOString(),
-    componentStack: errorInfo?.componentStack
+    componentStack: errorInfo?.componentStack,
+    errorType: error.name,
+    errorMessage: error.message,
+    stackTrace: error.stack,
+    url: window.location.href,
+    networkStatus: navigator.onLine ? 'online' : 'offline'
   };
 }
 
@@ -62,8 +69,44 @@ function logError(error: Error, errorInfo?: React.ErrorInfo, componentName?: str
   });
 }
 
-// Error recovery strategies
+/** Enhanced error recovery strategies with improved logging and recovery mechanisms */
 const ErrorRecoveryStrategies = {
+  // Handle authentication and session errors
+  async handleAuthError(error: Error): Promise<boolean> {
+    if (error.message.toLowerCase().includes('auth') || 
+        error.message.toLowerCase().includes('session') ||
+        error.message.toLowerCase().includes('token')) {
+      // Clear auth state and redirect to login
+      try {
+        localStorage.removeItem('auth');
+        sessionStorage.removeItem('auth');
+        window.location.href = '/login';
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  },
+
+  // Handle API and data fetching errors
+  async handleAPIError(error: Error): Promise<boolean> {
+    if (error.message.toLowerCase().includes('api') || 
+        error.message.toLowerCase().includes('fetch') ||
+        error.message.includes('SWR')) {
+      // Clear SWR cache and retry
+      try {
+        const cache = 'mutate' in window ? (window as any).mutate : null;
+        if (cache) {
+          await cache();
+          return true;
+        }
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  },
   // Attempt to recover from network errors
   async handleNetworkError(error: Error): Promise<boolean> {
     if (error.message.toLowerCase().includes('network') || error.message.toLowerCase().includes('failed to fetch')) {
@@ -93,6 +136,8 @@ const ErrorRecoveryStrategies = {
   async attemptRecovery(error: Error): Promise<boolean> {
     try {
       const strategies = [
+        ErrorRecoveryStrategies.handleAuthError,
+        ErrorRecoveryStrategies.handleAPIError,
         ErrorRecoveryStrategies.handleNetworkError,
         ErrorRecoveryStrategies.handleStateError
       ];

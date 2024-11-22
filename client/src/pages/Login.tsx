@@ -88,7 +88,7 @@ function logLogin(level: LogLevel, operation: string, message: string, context?:
  * Login Page Component
  * Handles user authentication and login functionality
  */
-export default function Login(): JSX.Element {
+function Login(): JSX.Element {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { 
@@ -278,3 +278,5 @@ export default function Login(): JSX.Element {
     </div>
   );
 }
+
+export default withErrorBoundary(Login, "LoginPage");
