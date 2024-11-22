@@ -459,6 +459,143 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ message: "大会が見つかりません" });
       }
 
+  // Record creation endpoint with enhanced validation
+  app.post("/api/records", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { style, distance, time, date, isCompetition, poolLength, studentId } = req.body;
+
+      // Validate required fields
+      if (!style || !distance || !time || !studentId) {
+        return res.status(400).json({
+          message: "必須フィールドが不足しています",
+          errors: {
+            style: !style ? "種目は必須です" : null,
+            distance: !distance ? "距離は必須です" : null,
+            time: !time ? "タイムは必須です" : null,
+            studentId: !studentId ? "選手IDは必須です" : null
+          }
+        });
+      }
+
+      // Validate pool length
+      if (!validatePoolLength(poolLength)) {
+        return res.status(400).json({
+          message: "無効なプール長です",
+          errors: {
+            poolLength: `プール長は ${POOL_LENGTHS.join(', ')}m のいずれかである必要があります`
+          }
+        });
+      }
+
+      const [record] = await db
+        .insert(swimRecords)
+        .values({
+          style,
+          distance: Number(distance),
+          time,
+          date: date ? new Date(date) : new Date(),
+          isCompetition: isCompetition || false,
+          poolLength: Number(poolLength),
+          studentId: Number(studentId)
+        })
+        .returning();
+
+      // Join with user data to return athlete name
+      const [recordWithAthlete] = await db
+        .select({
+          id: swimRecords.id,
+          style: swimRecords.style,
+          distance: swimRecords.distance,
+          time: swimRecords.time,
+          date: swimRecords.date,
+          isCompetition: swimRecords.isCompetition,
+          poolLength: swimRecords.poolLength,
+          studentId: swimRecords.studentId,
+          athleteName: users.username
+        })
+        .from(swimRecords)
+        .where(eq(swimRecords.id, record.id))
+        .leftJoin(users, eq(swimRecords.studentId, users.id))
+        .limit(1);
+
+      res.json(recordWithAthlete);
+    } catch (error) {
+      logServer(LogLevel.ERROR, 'records', 'Failed to create record', { error });
+      res.status(500).json({ message: "記録の作成に失敗しました" });
+    }
+  });
+
+  // Record update endpoint with enhanced validation
+  app.put("/api/records/:id", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { style, distance, time, date, isCompetition, poolLength, studentId } = req.body;
+
+      // Validate required fields
+      if (!style || !distance || !time || !studentId) {
+        return res.status(400).json({
+          message: "必須フィールドが不足しています",
+          errors: {
+            style: !style ? "種目は必須です" : null,
+            distance: !distance ? "距離は必須です" : null,
+            time: !time ? "タイムは必須です" : null,
+            studentId: !studentId ? "選手IDは必須です" : null
+          }
+        });
+      }
+
+      // Validate pool length
+      if (!validatePoolLength(poolLength)) {
+        return res.status(400).json({
+          message: "無効なプール長です",
+          errors: {
+            poolLength: `プール長は ${POOL_LENGTHS.join(', ')}m のいずれかである必要があります`
+          }
+        });
+      }
+
+      const [updatedRecord] = await db
+        .update(swimRecords)
+        .set({
+          style,
+          distance: Number(distance),
+          time,
+          date: date ? new Date(date) : new Date(),
+          isCompetition: isCompetition || false,
+          poolLength: Number(poolLength),
+          studentId: Number(studentId)
+        })
+        .where(eq(swimRecords.id, parseInt(id)))
+        .returning();
+
+      if (!updatedRecord) {
+        return res.status(404).json({ message: "記録が見つかりません" });
+      }
+
+      // Join with user data to return athlete name
+      const [recordWithAthlete] = await db
+        .select({
+          id: swimRecords.id,
+          style: swimRecords.style,
+          distance: swimRecords.distance,
+          time: swimRecords.time,
+          date: swimRecords.date,
+          isCompetition: swimRecords.isCompetition,
+          poolLength: swimRecords.poolLength,
+          studentId: swimRecords.studentId,
+          athleteName: users.username
+        })
+        .from(swimRecords)
+        .where(eq(swimRecords.id, updatedRecord.id))
+        .leftJoin(users, eq(swimRecords.studentId, users.id))
+        .limit(1);
+
+      res.json(recordWithAthlete);
+    } catch (error) {
+      logServer(LogLevel.ERROR, 'records', 'Failed to update record', { error });
+      res.status(500).json({ message: "記録の更新に失敗しました" });
+    }
+  });
       res.json({ message: "大会を削除しました" });
     } catch (error) {
       logServer(LogLevel.ERROR, 'competitions', 'Failed to delete competition', { error });

@@ -3,8 +3,7 @@ import useSWR from "swr";
 import type { SwimRecord } from "db/schema";
 import { ErrorBoundaryContext } from "../components/ErrorBoundary";
 
-export interface ExtendedSwimRecord extends Omit<SwimRecord, 'studentId'> {
-  studentId: number;
+export interface ExtendedSwimRecord extends SwimRecord {
   athleteName: string;
 }
 
