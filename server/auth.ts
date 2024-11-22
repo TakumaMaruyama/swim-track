@@ -295,6 +295,48 @@ export function setupAuth(app: Express): void {
   app.use(session(sessionSettings));
 
   // Add session keep-alive middleware with proper typing
+  // Enhanced session validation middleware
+  app.use(async (req, res, next) => {
+    try {
+      const session = req.session as SessionWithPassport;
+      
+      // Check if session exists and is valid
+      if (!session?.passport?.user) {
+        logAuth(LogLevel.WARN, 'session_validation', 'Invalid or expired session', {
+          path: req.path,
+          method: req.method,
+          critical: true
+        });
+        return res.status(401).json({ message: "セッションが無効または期限切れです" });
+      }
+
+      // Check if user still exists and is active
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, session.passport.user))
+        .limit(1);
+
+      if (!user || !user.isActive) {
+        logAuth(LogLevel.WARN, 'session_validation', 'User not found or inactive', {
+          userId: session.passport.user,
+          critical: true
+        });
+        req.logout(() => {
+          res.status(401).json({ message: "ユーザーが見つからないか、無効になっています" });
+        });
+        return;
+      }
+
+      next();
+    } catch (error) {
+      logAuth(LogLevel.ERROR, 'session_validation', 'Session validation error', {
+        error: error instanceof Error ? error.message : String(error),
+        critical: true
+      });
+      next(error);
+    }
+  });
   app.use((req, res, next) => {
     const session = req.session as SessionWithPassport;
     if (session?.cookie && !session.touch) {

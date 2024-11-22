@@ -23,9 +23,18 @@ interface ErrorContext {
     userAgent: string;
     language: string;
     platform: string;
+    screenSize: string;
+    timeZone: string;
+    networkStatus: string;
   };
   timestamp: string;
   componentStack?: string;
+  errorType: string;
+  errorMessage: string;
+  stackTrace?: string;
+  url: string;
+  sessionStatus?: string;
+  retryCount?: number;
 }
 
 function getErrorContext(error: Error, errorInfo?: React.ErrorInfo): ErrorContext {
@@ -70,7 +79,32 @@ function logError(error: Error, errorInfo?: React.ErrorInfo, componentName?: str
 }
 
 /** Enhanced error recovery strategies with improved logging and recovery mechanisms */
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000; // 1 second
+
 const ErrorRecoveryStrategies = {
+  // Delay helper for retries
+  async delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  },
+
+  // Enhanced retry mechanism
+  async retryOperation<T>(
+    operation: () => Promise<T>,
+    maxRetries: number = MAX_RETRIES,
+    initialDelay: number = RETRY_DELAY
+  ): Promise<T> {
+    let lastError: Error;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        await this.delay(initialDelay * Math.pow(2, attempt)); // Exponential backoff
+      }
+    }
+    throw lastError!;
+  },
   // Handle authentication and session errors
   async handleAuthError(error: Error): Promise<boolean> {
     if (error.message.toLowerCase().includes('auth') || 
