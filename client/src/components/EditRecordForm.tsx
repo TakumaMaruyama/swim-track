@@ -120,7 +120,7 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
         ? record.poolLength as PoolLength
         : defaultPoolLength,
       competitionId: record?.competitionId ?? null,
-      studentId: record ? record.studentId : studentId,
+      studentId: record?.studentId ?? studentId ?? null,
     },
     mode: "onChange",
   });
@@ -340,18 +340,20 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
             <FormField
               control={form.control}
               name="studentId"
-              rules={{ required: "選手を選択してください" }}
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>選手 <span className="text-destructive">*</span></FormLabel>
+                  <FormLabel>
+                    選手
+                    <span className="text-destructive ml-1">*</span>
+                  </FormLabel>
                   <Select
-                    value={field.value?.toString()}
+                    value={field.value?.toString() ?? ""}
                     onValueChange={(value) => field.onChange(Number(value))}
                     disabled={isSubmitting}
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="選手を選択" />
+                        <SelectValue placeholder="選手を選択してください" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -365,7 +367,12 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
                       ))}
                     </SelectContent>
                   </Select>
-                  <FormMessage />
+                  <FormDescription>
+                    記録を登録する選手を選択してください
+                  </FormDescription>
+                  <FormMessage>
+                    {field.value ? "" : "選手の選択は必須です"}
+                  </FormMessage>
                 </FormItem>
               )}
             />
