@@ -85,9 +85,14 @@ const editRecordSchema = z.object({
   ),
   competitionId: z.number().nullable(),
   studentId: z.number({
-    required_error: "選手を選択してください",
+    required_error: "記録を登録するには選手を選択してください",
     invalid_type_error: "選手IDは数値である必要があります"
-  }).positive("選手を選択してください"),
+  })
+  .positive("有効な選手を選択してください")
+  .int("選手IDは整数である必要があります")
+  .refine((val) => val !== undefined && val !== null && val > 0, {
+    message: "記録を登録するには選手を選択してください"
+  }),
 });
 
 type EditRecordFormProps = {
@@ -120,7 +125,7 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
         ? record.poolLength as PoolLength
         : defaultPoolLength,
       competitionId: record?.competitionId ?? null,
-      studentId: record?.studentId ?? studentId ?? null,
+      studentId: record?.studentId ?? studentId,
     },
     mode: "onChange",
   });
@@ -169,17 +174,59 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
   }
 };
 
+  const watchStudentId = form.watch('studentId');
+  const isStudentSelected = !!watchStudentId;
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{record ? "記録の編集" : "新規記録追加"}</DialogTitle>
           <DialogDescription>
-            選手の{record ? "記録を編集" : "新しい記録を追加"}します
+            {record ? "記録を編集" : "新しい記録を追加"}します。続行するには選手を選択してください。
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="studentId"
+              render={({ field }) => (
+                <FormItem className="border-2 border-primary/20 p-4 rounded-lg">
+                  <FormLabel className="text-lg font-semibold">
+                    選手を選択
+                    <span className="text-destructive ml-1">*</span>
+                  </FormLabel>
+                  <Select
+                    value={field.value?.toString() ?? ""}
+                    onValueChange={(value) => field.onChange(Number(value))}
+                    disabled={isSubmitting}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="h-12">
+                        <SelectValue placeholder="最初に選手を選択してください" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {athletes?.map((athlete) => (
+                        <SelectItem
+                          key={athlete.id}
+                          value={athlete.id.toString()}
+                        >
+                          {athlete.username}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription className="text-sm mt-2">
+                    ※ 記録を登録するには、必ず選手を選択してください
+                  </FormDescription>
+                  <FormMessage className="font-medium">
+                    {field.value ? "" : "選手を選択してください"}
+                  </FormMessage>
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="style"
@@ -189,11 +236,11 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
                   <Select
                     value={field.value}
                     onValueChange={field.onChange}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || !isStudentSelected}
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="種目を選択" />
+                        <SelectValue placeholder={isStudentSelected ? "種目を選択" : "選手を選択してください"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -223,11 +270,11 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
                         form.setValue('distance', newDistance);
                       }
                     }}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || !isStudentSelected}
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="プール長を選択" />
+                        <SelectValue placeholder={isStudentSelected ? "プール長を選択" : "選手を選択してください"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -257,11 +304,11 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
                       const distance = Number(value);
                       field.onChange(distance);
                     }}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || !isStudentSelected}
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="距離を選択" />
+                        <SelectValue placeholder={isStudentSelected ? "距離を選択" : "選手を選択してください"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -284,7 +331,7 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
                     <Input
                       placeholder="01:23.45"
                       {...field}
-                      disabled={isSubmitting}
+                      disabled={isSubmitting || !isStudentSelected}
                     />
                   </FormControl>
                   <FormDescription>
@@ -304,7 +351,7 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
                     <Input
                       type="date"
                       {...field}
-                      disabled={isSubmitting}
+                      disabled={isSubmitting || !isStudentSelected}
                     />
                   </FormControl>
                   <FormMessage />
@@ -325,7 +372,7 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
                           form.setValue('competitionId', null);
                         }
                       }}
-                      disabled={isSubmitting}
+                      disabled={isSubmitting || !isStudentSelected}
                     />
                   </FormControl>
                   <div className="space-y-1 leading-none">
@@ -337,45 +384,7 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="studentId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    選手
-                    <span className="text-destructive ml-1">*</span>
-                  </FormLabel>
-                  <Select
-                    value={field.value?.toString() ?? ""}
-                    onValueChange={(value) => field.onChange(Number(value))}
-                    disabled={isSubmitting}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="選手を選択してください" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {athletes?.map((athlete) => (
-                        <SelectItem
-                          key={athlete.id}
-                          value={athlete.id.toString()}
-                        >
-                          {athlete.username}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    記録を登録する選手を選択してください
-                  </FormDescription>
-                  <FormMessage>
-                    {field.value ? "" : "選手の選択は必須です"}
-                  </FormMessage>
-                </FormItem>
-              )}
-            />
+            
             {watchIsCompetition && (
               <FormField
                 control={form.control}
@@ -386,10 +395,11 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
                     <Select
                       value={field.value?.toString()}
                       onValueChange={(value) => field.onChange(Number(value))}
+                      disabled={isSubmitting || !isStudentSelected}
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="大会を選択" />
+                          <SelectValue placeholder={isStudentSelected ? "大会を選択" : "選手を選択してください"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
