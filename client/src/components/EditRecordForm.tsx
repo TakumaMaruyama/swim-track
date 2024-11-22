@@ -85,13 +85,20 @@ const editRecordSchema = z.object({
   ),
   competitionId: z.number().nullable(),
   studentId: z.number({
-    required_error: "記録を登録するには選手を選択してください",
-    invalid_type_error: "選手IDは数値である必要があります"
+    required_error: "選手の選択は必須です",
+    invalid_type_error: "無効な選手IDです"
   })
   .positive("有効な選手を選択してください")
-  .int("選手IDは整数である必要があります")
+  .int("無効な選手IDです")
   .refine((val) => val !== undefined && val !== null && val > 0, {
-    message: "記録を登録するには選手を選択してください"
+    message: "選手を選択してください"
+  })
+  .refine((val) => {
+    if (typeof window === 'undefined') return true;
+    const athletes = form?.getValues()?.athletes;
+    return athletes?.some((athlete) => athlete.id === val) ?? false;
+  }, {
+    message: "選択された選手が見つかりません"
   }),
 });
 
@@ -145,7 +152,16 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
       toast({
         variant: "destructive",
         title: "エラー",
-        description: "選手が正しく選択されていません",
+        description: "選手が選択されていません。記録を登録するには、有効な選手を選択してください。",
+      });
+      return;
+    }
+
+    if (!values.style || !values.distance || !values.time) {
+      toast({
+        variant: "destructive",
+        title: "入力エラー",
+        description: "必須項目（種目、距離、タイム）をすべて入力してください。",
       });
       return;
     }
@@ -158,7 +174,7 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
     
     toast({
       title: record ? "更新成功" : "記録追加成功",
-      description: record ? "記録が更新されました" : "新しい記録が追加されました",
+      description: `${selectedAthlete.username}の記録が${record ? '更新' : '追加'}されました`,
     });
     
     onClose();
@@ -167,7 +183,7 @@ const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
     toast({
       variant: "destructive",
       title: "エラー",
-      description: error instanceof Error ? error.message : (record ? "記録の更新に失敗しました" : "記録の追加に失敗しました"),
+      description: error instanceof Error ? error.message : `記録の${record ? '更新' : '追加'}に失敗しました。入力内容を確認してください。`,
     });
   } finally {
     setIsSubmitting(false);
