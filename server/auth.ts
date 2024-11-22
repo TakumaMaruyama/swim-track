@@ -29,11 +29,37 @@ const AUTH_CONSTANTS = {
 const scryptAsync = promisify(scrypt);
 
 /** Interface for login attempt tracking */
+// Type definitions for enhanced session handling
+interface SessionStore extends session.Store {
+  pool?: pg.Pool;
+}
+
+interface SessionWithPassport extends session.Session {
+  passport?: {
+    user?: number;
+  };
+}
+
 interface LoginAttempt {
   count: number;
   lastAttempt: number;
   lastSuccess?: number;
   lockoutUntil?: number;
+}
+
+// Extend Express types for proper typing
+declare module 'express-session' {
+  interface SessionData {
+    passport?: {
+      user?: number;
+    };
+  }
+}
+
+declare module 'connect-pg-simple' {
+  interface PGStore extends session.Store {
+    pool?: pg.Pool;
+  }
 }
 
 /**
@@ -116,37 +142,67 @@ declare global {
 export function setupAuth(app: Express): void {
   const PgSession = pgSession(session);
   
-  // Enhanced PostgreSQL session store with robust error handling and connection management
-  const sessionStore = new PgSession({
-    pool: new pg.Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-      max: 20,
-      min: 5,
-      idleTimeoutMillis: 300000, // 5 minutes idle timeout
-      connectionTimeoutMillis: 10000, // 10 seconds connection timeout
-      allowExitOnIdle: false,
-    }),
-    tableName: 'session',
-    createTableIfMissing: true,
-    pruneSessionInterval: 3600000, // Prune expired sessions every hour
-    errorLog: (err) => {
-      logAuth(LogLevel.ERROR, 'session_store', 'Session store error occurred', { error: err });
-    },
-    schemaName: 'public',
-    disableTouch: false,
-    ttl: 30 * 24 * 60 * 60 // 30 days in seconds
+  // Create PostgreSQL pool for session store
+  const pgPool = new pg.Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    max: 20,
+    min: 5,
+    idleTimeoutMillis: 300000, // 5 minutes idle timeout
+    connectionTimeoutMillis: 10000, // 10 seconds connection timeout
+    keepAlive: true,
+    allowExitOnIdle: false,
   });
 
-  // Implement session store error handling and reconnection
-  sessionStore.on('error', (error: Error) => {
-    logAuth(LogLevel.ERROR, 'session_store', 'Session store error, attempting recovery', { error });
-    setTimeout(() => {
-      sessionStore.connect().catch(err => {
-        logAuth(LogLevel.ERROR, 'session_store', 'Session store reconnection failed', { error: err });
+  // Enhanced PostgreSQL session store with robust error handling
+  const sessionStore = new PgSession({
+    pool: pgPool,
+    tableName: 'session',
+    createTableIfMissing: true,
+    pruneSessionInterval: 1800000, // Prune expired sessions every 30 minutes
+    schemaName: 'public',
+    errorLog: (err: Error) => {
+      logAuth(LogLevel.ERROR, 'session_store', 'Session store error occurred', { 
+        error: err instanceof Error ? err.message : String(err) 
       });
-    }, 5000);
-  });
+    }
+  }) as SessionStore;
+
+  // Enhanced error handling for session store
+  const handleSessionStoreError = async (error: Error): Promise<void> => {
+    logAuth(LogLevel.ERROR, 'session_store', 'Session store error, attempting recovery', {
+      error: error instanceof Error ? error.message : String(error)
+    });
+
+    // Safely handle pool cleanup
+    const pool = (sessionStore as SessionStore).pool;
+    if (pool && !pool.ended) {
+      try {
+        await pool.end();
+      } catch (err) {
+        logAuth(LogLevel.ERROR, 'session_store', 'Failed to close pool connections', {
+          error: err instanceof Error ? err.message : String(err)
+        });
+      }
+    }
+  };
+
+  // Attach error handler
+  sessionStore.on('error', handleSessionStoreError);
+
+  // Set up periodic session store health check with proper error handling
+  const healthCheck = async (): Promise<void> => {
+    const pool = (sessionStore as SessionStore).pool;
+    if (pool && !pool.ended) {
+      try {
+        await pool.query('SELECT 1');
+      } catch (error) {
+        await handleSessionStoreError(error as Error);
+      }
+    }
+  };
+
+  setInterval(healthCheck, 300000); // Check every 5 minutes
 
   // Enhanced session configuration with improved security and persistence
   const sessionSettings: session.SessionOptions = {
@@ -168,20 +224,51 @@ export function setupAuth(app: Express): void {
     unset: 'destroy',
   };
 
-  // Session cleanup interval
-  setInterval(() => {
-    try {
-      sessionStore.clear((err) => {
-        if (err) {
-          logAuth(LogLevel.ERROR, 'session_cleanup', 'Failed to clean expired sessions', { error: err });
-        }
-      });
-    } catch (error) {
-      logAuth(LogLevel.ERROR, 'session_cleanup', 'Session cleanup error', { error });
-    }
-  }, 6 * 60 * 60 * 1000); // Run cleanup every 6 hours
+  // Enhanced session cleanup with better error handling
+  const cleanupSessions = async (): Promise<void> => {
+    const pool = (sessionStore as SessionStore).pool;
+    if (!pool || pool.ended) return;
 
+    try {
+      await pool.query(`
+        DELETE FROM "session" 
+        WHERE "expire" < NOW() 
+        OR "sess" IS NULL 
+        OR "sess"->>'passport' IS NULL
+      `);
+      logAuth(LogLevel.INFO, 'session_cleanup', 'Successfully cleaned expired sessions');
+    } catch (error) {
+      logAuth(LogLevel.ERROR, 'session_cleanup', 'Session cleanup error', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  };
+
+  // Run cleanup every hour
+  setInterval(cleanupSessions, 3600000);
+
+  // Initialize session middleware with enhanced configuration
   app.use(session(sessionSettings));
+
+  // Add session keep-alive middleware with proper typing
+  app.use((req, res, next) => {
+    const session = req.session as SessionWithPassport;
+    if (session?.cookie && !session.touch) {
+      const hour = 3600000;
+      const originalMaxAge = session.cookie.maxAge || hour * 24;
+      const expires = session.cookie.expires;
+      
+      // Safely handle session extension
+      if (expires instanceof Date) {
+        const timeUntilExpiry = expires.getTime() - Date.now();
+        if (timeUntilExpiry < hour * 2) {
+          session.cookie.maxAge = originalMaxAge;
+          logAuth(LogLevel.INFO, 'session_refresh', 'Extended session lifetime');
+        }
+      }
+    }
+    next();
+  });
   app.use(passport.initialize());
   app.use(passport.session());
 

@@ -80,6 +80,14 @@ export function useUser() {
     error: null
   });
 
+  const SESSION_CONFIG = {
+    REFRESH_INTERVAL: 300000, // 5 minutes
+    RETRY_COUNT: 5,
+    RETRY_INTERVAL: 5000,
+    ERROR_THRESHOLD: 3,
+  } as const;
+
+  // Session refresh and error handling
   const { 
     data, 
     error: swrError, 
@@ -89,36 +97,87 @@ export function useUser() {
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
     shouldRetryOnError: true,
-    errorRetryCount: 5,
-    refreshInterval: 300000, // 5 minutes
-    dedupingInterval: 5000,
+    errorRetryCount: SESSION_CONFIG.RETRY_COUNT,
+    refreshInterval: SESSION_CONFIG.REFRESH_INTERVAL,
+    dedupingInterval: 2000,
     refreshWhenHidden: true,
     refreshWhenOffline: false,
     onSuccess: (data) => {
       if (data) {
         logAuthEvent(LogLevel.INFO, 'session', 'Session validated successfully');
+        // Reset error count on successful validation
+        sessionStorage.removeItem('authErrorCount');
       }
     },
     onError: async (error) => {
+      // Track consecutive errors
+      const errorCount = Number(sessionStorage.getItem('authErrorCount') || 0) + 1;
+      sessionStorage.setItem('authErrorCount', String(errorCount));
+
       if (error.status === 401) {
-        logAuthEvent(LogLevel.INFO, 'session', 'Session expired or invalid', { critical: true });
-        // Clear auth state
+        logAuthEvent(LogLevel.INFO, 'session', 'Session expired or invalid', { 
+          critical: true,
+          errorCount 
+        });
+
+        // Implement exponential backoff for retries
+        const retryDelay = Math.min(1000 * Math.pow(2, errorCount - 1), 30000);
+
+        // Clear auth state but maintain retry capability
         mutate(undefined, false);
-        // Attempt to refresh session
-        try {
-          const refreshResponse = await fetch('/api/refresh-session', { 
-            credentials: 'include',
-            headers: { 'Cache-Control': 'no-cache' }
-          });
-          if (refreshResponse.ok) {
-            // Revalidate after successful refresh
-            mutate();
+
+        // Enhanced session refresh with retry mechanism
+        const refreshSession = async (attempt: number = 1): Promise<boolean> => {
+          try {
+            const refreshResponse = await fetch('/api/refresh-session', { 
+              credentials: 'include',
+              headers: {
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
+              }
+            });
+
+            if (refreshResponse.ok) {
+              // Reset error count on successful refresh
+              sessionStorage.removeItem('authErrorCount');
+              await mutate();
+              return true;
+            }
+
+            // Implement retry with backoff
+            if (attempt < SESSION_CONFIG.RETRY_COUNT) {
+              await new Promise(resolve => setTimeout(resolve, retryDelay));
+              return refreshSession(attempt + 1);
+            }
+
+            return false;
+          } catch (refreshError) {
+            logAuthEvent(LogLevel.ERROR, 'session', 'Session refresh failed', { 
+              error: refreshError instanceof Error ? refreshError.message : String(refreshError),
+              attempt,
+              maxAttempts: SESSION_CONFIG.RETRY_COUNT
+            });
+
+            if (attempt < SESSION_CONFIG.RETRY_COUNT) {
+              await new Promise(resolve => setTimeout(resolve, retryDelay));
+              return refreshSession(attempt + 1);
+            }
+
+            return false;
           }
-        } catch (refreshError) {
-          logAuthEvent(LogLevel.ERROR, 'session', 'Session refresh failed', { 
-            error: refreshError instanceof Error ? refreshError.message : String(refreshError)
-          });
-        }
+        };
+
+        // Start refresh attempt
+        refreshSession();
+      }
+
+      // Handle critical error threshold
+      if (errorCount >= SESSION_CONFIG.ERROR_THRESHOLD) {
+        logAuthEvent(LogLevel.ERROR, 'session', 'Critical error threshold reached', {
+          errorCount,
+          threshold: SESSION_CONFIG.ERROR_THRESHOLD,
+          critical: true
+        });
       }
     }
   });
