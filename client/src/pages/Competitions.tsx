@@ -290,16 +290,11 @@ export default function Competitions() {
                       <div className="flex items-center gap-2">
                         <CardTitle className="text-xl">
                           {(() => {
-                            // デバッグログ
-                            console.log('Records:', records);
                             const firstRecord = Object.values(records)[0]?.[0];
-                            console.log('First record:', firstRecord);
-                            console.log('Competitions:', competitions);
-
-                            if (!firstRecord?.competitionId || !competitions) return '';
+                            if (!firstRecord?.competitionId || !competitions) return date;
                             
                             const competition = competitions.find(c => c.id === firstRecord.competitionId);
-                            return competition?.name || '';
+                            return competition?.name || date;
                           })()}
                         </CardTitle>
                         <Badge variant="outline">{poolLength}mプール</Badge>
