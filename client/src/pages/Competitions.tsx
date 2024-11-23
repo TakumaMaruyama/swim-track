@@ -102,6 +102,7 @@ export default function Competitions() {
         isCompetition: record.isCompetition ?? false,
         athleteName: record.athleteName,
         date: record.date ? new Date(record.date) : null,
+        competitionId: record.competitionId,
       };
       
       if (!acc[date].records[record.style]) {
@@ -288,8 +289,12 @@ export default function Competitions() {
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-2">
                         <CardTitle className="text-xl">
-                          {records[Object.keys(records)[0]]?.[0]?.competitionId && 
-                           competitions?.find(c => records[Object.keys(records)[0]][0].competitionId === c.id)?.name}
+                          {(() => {
+                            const firstRecord = records[Object.keys(records)[0]]?.[0];
+                            if (!firstRecord?.competitionId || !competitions) return '';
+                            const competition = competitions.find(c => c.id === firstRecord.competitionId);
+                            return competition?.name || '';
+                          })()}
                         </CardTitle>
                         <Badge variant="outline">{poolLength}mプール</Badge>
                       </div>
