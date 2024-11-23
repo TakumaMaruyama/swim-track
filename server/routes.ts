@@ -418,6 +418,115 @@ export function registerRoutes(app: Express) {
   // Athletes API
   app.get("/api/athletes", requireAuth, async (req, res) => {
     try {
+  // Records API endpoints
+  app.get("/api/records", requireAuth, async (req, res) => {
+    try {
+      const allRecords = await db
+        .select({
+          id: swimRecords.id,
+          style: swimRecords.style,
+          distance: swimRecords.distance,
+          time: swimRecords.time,
+          date: swimRecords.date,
+          isCompetition: swimRecords.isCompetition,
+          poolLength: swimRecords.poolLength,
+          competitionId: swimRecords.competitionId,
+          studentId: swimRecords.studentId,
+          athleteName: users.username,
+        })
+        .from(swimRecords)
+        .leftJoin(users, eq(swimRecords.studentId, users.id))
+        .orderBy(desc(swimRecords.date));
+
+      res.json(allRecords);
+    } catch (error) {
+      console.error('Error fetching records:', error);
+      res.status(500).json({ message: "記録の取得に失敗しました" });
+    }
+  });
+
+  app.post("/api/records", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { style, distance, time, date, isCompetition, poolLength, competitionId, studentId } = req.body;
+
+      const [record] = await db
+        .insert(swimRecords)
+        .values({
+          style,
+          distance,
+          time,
+          date: new Date(date),
+          isCompetition,
+          poolLength,
+          competitionId,
+          studentId
+        })
+        .returning();
+
+      res.json(record);
+    } catch (error) {
+      console.error('Error creating record:', error);
+      res.status(500).json({ message: "記録の作成に失敗しました" });
+    }
+  });
+
+  app.put("/api/records/:id", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { style, distance, time, date, isCompetition, poolLength, competitionId, studentId } = req.body;
+
+      const [record] = await db
+        .update(swimRecords)
+        .set({
+          style,
+          distance,
+          time,
+          date: new Date(date),
+          isCompetition,
+          poolLength,
+          competitionId,
+          studentId
+        })
+        .where(eq(swimRecords.id, parseInt(id)))
+        .returning();
+
+      if (!record) {
+        return res.status(404).json({ message: "記録が見つかりません" });
+      }
+
+      res.json(record);
+    } catch (error) {
+      console.error('Error updating record:', error);
+      res.status(500).json({ message: "記録の更新に失敗しました" });
+    }
+  });
+
+  app.get("/api/records/competitions", requireAuth, async (req, res) => {
+    try {
+      const competitionRecords = await db
+        .select({
+          id: swimRecords.id,
+          style: swimRecords.style,
+          distance: swimRecords.distance,
+          time: swimRecords.time,
+          date: swimRecords.date,
+          isCompetition: swimRecords.isCompetition,
+          poolLength: swimRecords.poolLength,
+          competitionId: swimRecords.competitionId,
+          studentId: swimRecords.studentId,
+          athleteName: users.username,
+        })
+        .from(swimRecords)
+        .leftJoin(users, eq(swimRecords.studentId, users.id))
+        .where(eq(swimRecords.isCompetition, true))
+        .orderBy(desc(swimRecords.date));
+
+      res.json(competitionRecords);
+    } catch (error) {
+      console.error('Error fetching competition records:', error);
+      res.status(500).json({ message: "大会記録の取得に失敗しました" });
+    }
+  });
       const { isActive } = req.query;
       const query = db
         .select()
