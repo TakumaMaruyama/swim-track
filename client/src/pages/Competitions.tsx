@@ -148,12 +148,22 @@ export default function Competitions() {
 
   const handleCreate = async (data: any) => {
     try {
+      // 大会IDが正しく設定されていることを確認
+      if (!data.competitionId) {
+        throw new Error('Competition ID is required');
+      }
+
       const response = await fetch('/api/records', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ ...data, isCompetition: true }),
+        body: JSON.stringify({
+          ...data,
+          isCompetition: true,
+          // 明示的にcompetitionIdを含める
+          competitionId: data.competitionId
+        }),
         credentials: 'include',
       });
 
@@ -171,7 +181,7 @@ export default function Competitions() {
       toast({
         variant: "destructive",
         title: "エラー",
-        description: "記録の追加に失敗しました",
+        description: error.message || "記録の追加に失敗しました",
       });
       throw error;
     }
@@ -291,10 +301,14 @@ export default function Competitions() {
                         <CardTitle className="text-xl">
                           {(() => {
                             const firstRecord = Object.values(records)[0]?.[0];
-                            if (!firstRecord?.competitionId || !competitions?.length) return date;
+                            if (!firstRecord?.competitionId) return date;
                             
-                            const competition = competitions.find(c => c.id === firstRecord.competitionId);
-                            return competition?.name || formatDate(firstRecord.date);
+                            const competition = competitions?.find(c => c.id === firstRecord.competitionId);
+                            if (!competition?.name) {
+                              console.log('Competition not found:', firstRecord.competitionId);
+                              return date;
+                            }
+                            return competition.name;
                           })()}
                         </CardTitle>
                         {/* 日付を1回だけ表示 */}
