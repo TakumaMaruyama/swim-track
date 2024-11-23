@@ -28,6 +28,7 @@ interface CompetitionRecord {
   isCompetition: boolean;
   athleteName?: string;
   date: Date | null;
+  competitionId: number | null;
 }
 
 interface GroupedRecordsByStyle {
@@ -287,7 +288,8 @@ export default function Competitions() {
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-2">
                         <CardTitle className="text-xl">
-                          {competitions?.find(c => records[Object.keys(records)[0]]?.[0]?.competitionId === c.id)?.name || '大会記録'}
+                          {records[Object.keys(records)[0]]?.[0]?.competitionId && 
+                           competitions?.find(c => records[Object.keys(records)[0]][0].competitionId === c.id)?.name}
                         </CardTitle>
                         <Badge variant="outline">{poolLength}mプール</Badge>
                       </div>
