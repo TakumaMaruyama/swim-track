@@ -703,7 +703,7 @@ export function registerRoutes(app: Express) {
   // Create new record
   app.post("/api/records", requireAuth, requireCoach, async (req, res) => {
     try {
-      const { studentId, style, distance, time, date, isCompetition } = req.body;
+      const { studentId, style, distance, time, date, isCompetition, poolLength } = req.body;
       
       // Verify student exists
       const [student] = await db
