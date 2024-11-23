@@ -17,17 +17,27 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 
+interface CompetitionRecord {
+  id: number;
+  style: string;
+  distance: number;
+  poolLength?: number;
+  time: string;
+  studentId: number;
+  isCompetition: boolean;
+  athleteName?: string;
+  date: Date | null;
+}
+
+interface GroupedRecordsByStyle {
+  [style: string]: CompetitionRecord[];
+}
+
 type GroupedCompetitions = {
   [date: string]: {
-    id: number;
-    style: string;
-    distance: number;
-    poolLength?: number;
-    time: string;
-    studentId: number;
-    isCompetition: boolean;
-    athleteName?: string;
-  }[];
+    poolLength: number;
+    records: GroupedRecordsByStyle;
+  };
 };
 
 const formatDate = (date: Date | null) => {
@@ -71,10 +81,13 @@ export default function Competitions() {
       if (!date) return acc;
       
       if (!acc[date]) {
-        acc[date] = [];
+        acc[date] = {
+          poolLength: record.poolLength || 25,
+          records: {},
+        };
       }
-      
-      acc[date].push({
+
+      const competitionRecord: CompetitionRecord = {
         id: record.id,
         style: record.style,
         distance: record.distance,
@@ -83,7 +96,14 @@ export default function Competitions() {
         studentId: record.studentId,
         isCompetition: record.isCompetition ?? false,
         athleteName: record.athleteName,
-      });
+        date: record.date ? new Date(record.date) : null,
+      };
+      
+      if (!acc[date].records[record.style]) {
+        acc[date].records[record.style] = [];
+      }
+      
+      acc[date].records[record.style].push(competitionRecord);
       
       return acc;
     }, {} as GroupedCompetitions);
@@ -256,47 +276,74 @@ export default function Competitions() {
         <div className="space-y-6">
           {Object.entries(groupedRecords)
             .sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime())
-            .map(([date, records]) => (
+            .map(([date, { poolLength, records }]) => (
               <Card key={date} className="hover:shadow-lg transition-shadow">
                 <CardHeader>
-                  <CardTitle className="text-xl">{date}</CardTitle>
+                  <div className="flex flex-col space-y-2">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-2">
+                        <CardTitle className="text-xl">大会記録</CardTitle>
+                        <Badge variant="outline">{poolLength}mプール</Badge>
+                      </div>
+                      {user?.role === 'coach' && (
+                        <Button onClick={() => setEditingRecord(-1)}>
+                          <Plus className="mr-2 h-4 w-4" />
+                          記録追加
+                        </Button>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">{date}</p>
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    {records.map((record) => (
-                      <div 
-                        key={record.id} 
-                        className="flex flex-col p-4 rounded-lg bg-muted/50"
-                      >
-                        <div className="flex justify-between items-start mb-4">
-                          <div className="space-y-1">
-                            <p className="font-medium text-lg">{record.style}</p>
-                            <p className="font-medium">
-                              {record.distance}m {record.poolLength ? `(${record.poolLength}mプール)` : ''}
-                            </p>
-                          </div>
-                          {user?.role === 'coach' && (
-                            <div className="flex gap-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setEditingRecord(record.id)}
-                              >
-                                <Edit2 className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDelete(record.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <p className="text-xl font-semibold">{record.athleteName}</p>
-                          <p className="text-2xl font-bold text-primary">{record.time}</p>
+                  <div className="space-y-6">
+                    {Object.entries(records).map(([style, styleRecords]) => (
+                      <div key={style} className="space-y-2">
+                        <h3 className="text-lg font-semibold">{style}</h3>
+                        <div className="bg-muted/50 rounded-lg overflow-hidden">
+                          <table className="w-full">
+                            <thead>
+                              <tr className="border-b">
+                                <th className="px-4 py-2 text-left">距離</th>
+                                <th className="px-4 py-2 text-left">選手名</th>
+                                <th className="px-4 py-2 text-left">タイム</th>
+                                {user?.role === 'coach' && (
+                                  <th className="px-4 py-2 text-right">操作</th>
+                                )}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {styleRecords.map((record) => (
+                                <tr key={record.id} className="border-b last:border-0">
+                                  <td className="px-4 py-2">{record.distance}m</td>
+                                  <td className="px-4 py-2">{record.athleteName}</td>
+                                  <td className="px-4 py-2 font-semibold text-primary">
+                                    {record.time}
+                                  </td>
+                                  {user?.role === 'coach' && (
+                                    <td className="px-4 py-2">
+                                      <div className="flex gap-2 justify-end">
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => setEditingRecord(record.id)}
+                                        >
+                                          <Edit2 className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => handleDelete(record.id)}
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    </td>
+                                  )}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
                       </div>
                     ))}
