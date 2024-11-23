@@ -2,12 +2,20 @@ import React from 'react';
 import { useSwimRecords } from '../hooks/use-swim-records';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Edit2, Trash2, Plus } from "lucide-react";
+import { AlertCircle, Edit2, Trash2, Plus, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EditRecordForm } from '../components/EditRecordForm';
 import { useUser } from '../hooks/use-user';
 import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '../components/PageHeader';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 
 type GroupedCompetitions = {
   [date: string]: {
@@ -36,11 +44,29 @@ export default function Competitions() {
   const { toast } = useToast();
   const { records, isLoading, error, mutate } = useSwimRecords(true);
   const [editingRecord, setEditingRecord] = React.useState<number | null>(null);
+  const [styleFilter, setStyleFilter] = React.useState<string>("all");
+  const [poolLengthFilter, setPoolLengthFilter] = React.useState<string>("all");
+
+  const swimStyles = [
+    "自由形",
+    "背泳ぎ",
+    "平泳ぎ",
+    "バタフライ",
+    "個人メドレー"
+  ];
+
+  const poolLengths = [15, 25, 50];
 
   const groupedRecords: GroupedCompetitions = React.useMemo(() => {
     if (!records) return {};
 
-    return records.reduce((acc, record) => {
+    const filtered = records.filter(record => {
+      const styleMatch = styleFilter === "all" || record.style === styleFilter;
+      const poolMatch = poolLengthFilter === "all" || record.poolLength === Number(poolLengthFilter);
+      return styleMatch && poolMatch;
+    });
+
+    return filtered.reduce((acc, record) => {
       const date = formatDate(record.date ? new Date(record.date) : null);
       if (!date) return acc;
       
@@ -61,7 +87,7 @@ export default function Competitions() {
       
       return acc;
     }, {} as GroupedCompetitions);
-  }, [records]);
+  }, [records, styleFilter, poolLengthFilter]);
 
   const handleEdit = async (recordId: number, data: any) => {
     try {
@@ -191,12 +217,38 @@ export default function Competitions() {
       <PageHeader 
         title="大会記録"
         children={
-          user?.role === 'coach' && (
-            <Button onClick={() => setEditingRecord(-1)}>
-              <Plus className="mr-2 h-4 w-4" />
-              新規記録追加
-            </Button>
-          )
+          <div className="flex gap-4 items-center">
+            <div className="flex gap-2">
+              <Select value={styleFilter} onValueChange={setStyleFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="種目で絞り込み" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">すべての種目</SelectItem>
+                  {swimStyles.map(style => (
+                    <SelectItem key={style} value={style}>{style}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={poolLengthFilter} onValueChange={setPoolLengthFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="プール長で絞り込み" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">すべてのプール</SelectItem>
+                  {poolLengths.map(length => (
+                    <SelectItem key={length} value={length.toString()}>{length}mプール</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {user?.role === 'coach' && (
+              <Button onClick={() => setEditingRecord(-1)}>
+                <Plus className="mr-2 h-4 w-4" />
+                新規記録追加
+              </Button>
+            )}
+          </div>
         }
       />
       
