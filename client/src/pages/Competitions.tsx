@@ -294,19 +294,13 @@ export default function Competitions() {
                             if (!firstRecord?.competitionId || !competitions?.length) return date;
                             
                             const competition = competitions.find(c => c.id === firstRecord.competitionId);
-                            if (!competition?.name) return formatDate(competition?.date || null);
-                            return competition.name;
+                            return competition?.name || formatDate(firstRecord.date);
                           })()}
                         </CardTitle>
-                        <p className="text-sm text-muted-foreground">
-                          {(() => {
-                            const firstRecord = Object.values(records)[0]?.[0];
-                            if (!firstRecord?.competitionId || !competitions?.length) return date;
-                            
-                            const competition = competitions.find(c => c.id === firstRecord.competitionId);
-                            return formatDate(competition?.date || null);
-                          })()}
-                        </p>
+                        {/* 日付を1回だけ表示 */}
+                        <div className="text-sm text-muted-foreground">
+                          {formatDate(Object.values(records)[0]?.[0]?.date)}
+                        </div>
                         <Badge variant="outline">{poolLength}mプール</Badge>
                       </div>
                       {user?.role === 'coach' && (
@@ -316,7 +310,7 @@ export default function Competitions() {
                         </Button>
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground">{date}</p>
+                    
                   </div>
                 </CardHeader>
                 <CardContent>
