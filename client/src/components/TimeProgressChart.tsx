@@ -107,7 +107,7 @@ export function TimeProgressChart({ records, style, distance }: TimeProgressChar
   };
 
   return (
-    <div className="w-full h-[500px] sm:h-[600px] md:h-[400px]">
+    <div className="w-full h-[700px] sm:h-[800px] md:h-[400px]">
       <Line data={data} options={{
         ...options,
         maintainAspectRatio: false,
