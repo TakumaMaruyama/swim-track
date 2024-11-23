@@ -294,7 +294,8 @@ export default function Competitions() {
                             if (!firstRecord?.competitionId || !competitions) return date;
                             
                             const competition = competitions.find(c => c.id === firstRecord.competitionId);
-                            return competition?.name || date;
+                            if (!competition?.name) return date;
+                            return competition.name;
                           })()}
                         </CardTitle>
                         <Badge variant="outline">{poolLength}mプール</Badge>
