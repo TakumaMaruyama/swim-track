@@ -7,7 +7,12 @@ import {
   LineElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  ChartOptions,
+  TooltipItem,
+  Scale,
+  CoreScaleOptions,
+  Tick
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import type { ExtendedSwimRecord } from "../hooks/use-swim-records";
@@ -67,7 +72,7 @@ export function TimeProgressChart({ records, style, distance }: TimeProgressChar
     ],
   };
 
-  const options = {
+  const options: ChartOptions<'line'> = {
     responsive: true,
     plugins: {
       legend: {
@@ -79,8 +84,8 @@ export function TimeProgressChart({ records, style, distance }: TimeProgressChar
       },
       tooltip: {
         callbacks: {
-          label: (context: any) => {
-            const seconds = context.raw;
+          label: (context: TooltipItem<'line'>) => {
+            const seconds = context.raw as number;
             const minutes = Math.floor(seconds / 60);
             const remainingSeconds = (seconds % 60).toFixed(2);
             return `${minutes}:${remainingSeconds.padStart(5, '0')}`;
@@ -96,7 +101,8 @@ export function TimeProgressChart({ records, style, distance }: TimeProgressChar
           text: 'タイム (秒)',
         },
         ticks: {
-          callback: (value: number) => {
+          callback: function(this: Scale<CoreScaleOptions>, value: number | string): string {
+            value = Number(value);
             const minutes = Math.floor(value / 60);
             const seconds = (value % 60).toFixed(2);
             return `${minutes}:${seconds.padStart(5, '0')}`;
@@ -107,12 +113,15 @@ export function TimeProgressChart({ records, style, distance }: TimeProgressChar
   };
 
   return (
-    <div className="w-full h-[500px] sm:h-[600px] md:h-[400px]">
-      <Line data={data} options={{
-        ...options,
-        maintainAspectRatio: false,
-        responsive: true,
-      }} />
+    <div className="w-full h-[800px] sm:h-[700px] md:h-[400px]">
+      <Line 
+        data={data} 
+        options={{
+          ...options,
+          maintainAspectRatio: false,
+          responsive: true
+        }} 
+      />
     </div>
   );
 }
