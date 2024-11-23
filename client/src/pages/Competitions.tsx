@@ -290,19 +290,15 @@ export default function Competitions() {
                       <div className="flex items-center gap-2">
                         <CardTitle className="text-xl">
                           {(() => {
-                            // 最初のrecordを取得
-                            const firstStyle = Object.keys(records)[0];
-                            if (!firstStyle || !records[firstStyle][0]) return '';
-                            
-                            const firstRecord = records[firstStyle][0];
-                            if (!firstRecord.competitionId) return '';
-                            
-                            // デバッグ用ログ
+                            // デバッグログ
+                            console.log('Records:', records);
+                            const firstRecord = Object.values(records)[0]?.[0];
                             console.log('First record:', firstRecord);
                             console.log('Competitions:', competitions);
+
+                            if (!firstRecord?.competitionId || !competitions) return '';
                             
-                            // competitionsから該当する大会を検索
-                            const competition = competitions?.find(c => c.id === firstRecord.competitionId);
+                            const competition = competitions.find(c => c.id === firstRecord.competitionId);
                             return competition?.name || '';
                           })()}
                         </CardTitle>
