@@ -725,7 +725,7 @@ export function registerRoutes(app: Express) {
           time,
           date: new Date(date),
           isCompetition,
-          poolLength: 15, // Force 15m pool length
+          poolLength: poolLength,
         })
         .returning();
 
