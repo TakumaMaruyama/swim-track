@@ -31,10 +31,10 @@ interface TimeProgressChartProps {
   records: ExtendedSwimRecord[];
   style: string;
   distance: number;
-  poolLength?: number;
+  poolLength: number;
 }
 
-export function TimeProgressChart({ records, style, distance }: TimeProgressChartProps) {
+export function TimeProgressChart({ records, style, distance, poolLength }: TimeProgressChartProps) {
   const filteredRecords = records
     .filter(r => {
       return r.style === style &&
