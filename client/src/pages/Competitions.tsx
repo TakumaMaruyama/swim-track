@@ -291,22 +291,12 @@ export default function Competitions() {
                         <CardTitle className="text-xl">
                           {(() => {
                             const firstRecord = Object.values(records)[0]?.[0];
-                            if (!firstRecord?.competitionId || !competitions?.length) return date;
+                            if (!firstRecord?.competitionId || !competitions) return date;
                             
                             const competition = competitions.find(c => c.id === firstRecord.competitionId);
-                            if (!competition?.name) return formatDate(competition?.date || null);
-                            return competition.name;
+                            return competition?.name || date;
                           })()}
                         </CardTitle>
-                        <p className="text-sm text-muted-foreground">
-                          {(() => {
-                            const firstRecord = Object.values(records)[0]?.[0];
-                            if (!firstRecord?.competitionId || !competitions?.length) return date;
-                            
-                            const competition = competitions.find(c => c.id === firstRecord.competitionId);
-                            return formatDate(competition?.date || null);
-                          })()}
-                        </p>
                         <Badge variant="outline">{poolLength}mプール</Badge>
                       </div>
                       {user?.role === 'coach' && (
