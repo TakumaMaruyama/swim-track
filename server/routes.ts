@@ -352,9 +352,7 @@ export function registerRoutes(app: Express) {
           distance: swimRecords.distance,
           time: swimRecords.time,
           date: swimRecords.date,
-          isCompetition: swimRecords.isCompetition,
           poolLength: swimRecords.poolLength,
-          competitionId: swimRecords.competitionId,
           studentId: swimRecords.studentId,
           athleteName: users.username,
         })
@@ -371,7 +369,7 @@ export function registerRoutes(app: Express) {
 
   app.post("/api/records", requireAuth, requireCoach, async (req, res) => {
     try {
-      const { style, distance, time, date, isCompetition, poolLength, competitionId, studentId } = req.body;
+      const { style, distance, time, date, poolLength, studentId } = req.body;
 
       const [record] = await db
         .insert(swimRecords)
@@ -380,9 +378,7 @@ export function registerRoutes(app: Express) {
           distance,
           time,
           date: new Date(date),
-          isCompetition,
           poolLength,
-          competitionId,
           studentId
         })
         .returning();
@@ -397,7 +393,7 @@ export function registerRoutes(app: Express) {
   app.put("/api/records/:id", requireAuth, requireCoach, async (req, res) => {
     try {
       const { id } = req.params;
-      const { style, distance, time, date, isCompetition, poolLength, competitionId, studentId } = req.body;
+      const { style, distance, time, date, poolLength, studentId } = req.body;
 
       const [record] = await db
         .update(swimRecords)
@@ -406,9 +402,7 @@ export function registerRoutes(app: Express) {
           distance,
           time,
           date: new Date(date),
-          isCompetition,
           poolLength,
-          competitionId,
           studentId
         })
         .where(eq(swimRecords.id, parseInt(id)))
