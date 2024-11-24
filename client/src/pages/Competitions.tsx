@@ -148,22 +148,12 @@ export default function Competitions() {
 
   const handleCreate = async (data: any) => {
     try {
-      // 大会IDが正しく設定されていることを確認
-      if (!data.competitionId) {
-        throw new Error('Competition ID is required');
-      }
-
       const response = await fetch('/api/records', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          ...data,
-          isCompetition: true,
-          // 明示的にcompetitionIdを含める
-          competitionId: data.competitionId
-        }),
+        body: JSON.stringify({ ...data, isCompetition: true }),
         credentials: 'include',
       });
 
@@ -181,7 +171,7 @@ export default function Competitions() {
       toast({
         variant: "destructive",
         title: "エラー",
-        description: error.message || "記録の追加に失敗しました",
+        description: "記録の追加に失敗しました",
       });
       throw error;
     }
@@ -301,20 +291,22 @@ export default function Competitions() {
                         <CardTitle className="text-xl">
                           {(() => {
                             const firstRecord = Object.values(records)[0]?.[0];
-                            if (!firstRecord?.competitionId) return date;
+                            if (!firstRecord?.competitionId || !competitions?.length) return date;
                             
-                            const competition = competitions?.find(c => c.id === firstRecord.competitionId);
-                            if (!competition?.name) {
-                              console.log('Competition not found:', firstRecord.competitionId);
-                              return date;
-                            }
+                            const competition = competitions.find(c => c.id === firstRecord.competitionId);
+                            if (!competition?.name) return formatDate(competition?.date || null);
                             return competition.name;
                           })()}
                         </CardTitle>
-                        {/* 日付を1回だけ表示 */}
-                        <div className="text-sm text-muted-foreground">
-                          {formatDate(Object.values(records)[0]?.[0]?.date)}
-                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {(() => {
+                            const firstRecord = Object.values(records)[0]?.[0];
+                            if (!firstRecord?.competitionId || !competitions?.length) return date;
+                            
+                            const competition = competitions.find(c => c.id === firstRecord.competitionId);
+                            return formatDate(competition?.date || null);
+                          })()}
+                        </p>
                         <Badge variant="outline">{poolLength}mプール</Badge>
                       </div>
                       {user?.role === 'coach' && (
@@ -324,7 +316,7 @@ export default function Competitions() {
                         </Button>
                       )}
                     </div>
-                    
+                    <p className="text-sm text-muted-foreground">{date}</p>
                   </div>
                 </CardHeader>
                 <CardContent>
