@@ -6,8 +6,9 @@ export interface ExtendedSwimRecord extends Omit<SwimRecord, 'studentId'> {
   athleteName: string;
 }
 
-export function useSwimRecords() {
-  const { data: records, error, mutate } = useSWR<ExtendedSwimRecord[]>('/api/records');
+export function useSwimRecords(isCompetition?: boolean) {
+  const endpoint = isCompetition ? '/api/records/competitions' : '/api/records';
+  const { data: records, error, mutate } = useSWR<ExtendedSwimRecord[]>(endpoint);
 
   return {
     records,

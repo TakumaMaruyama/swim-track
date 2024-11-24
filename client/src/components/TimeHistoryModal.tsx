@@ -227,7 +227,12 @@ export function TimeHistoryModal({
                                     自己ベスト
                                   </Badge>
                                 )}
-                                
+                                {record.isCompetition && (
+                                  <Badge className="flex items-center gap-1">
+                                    <TrendingUp className="h-3 w-3" />
+                                    {competitionName || '大会記録'}
+                                  </Badge>
+                                )}
                               </div>
                             </div>
                             <div className="flex flex-col items-start md:items-end gap-1">

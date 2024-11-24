@@ -2,7 +2,7 @@ import { Express } from "express";
 import { setupAuth } from "./auth";
 import multer from "multer";
 import { db } from "db";
-import { documents, users, swimRecords, categories } from "db/schema";
+import { documents, users, swimRecords, competitions, categories } from "db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import path from "path";
 import fs from "fs/promises";
@@ -337,7 +337,83 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Competition-related endpoints have been removed as part of the refactoring
+  // Competition Management API endpoints
+  app.get("/api/competitions", requireAuth, async (req, res) => {
+    try {
+      const allCompetitions = await db
+        .select()
+        .from(competitions)
+        .orderBy(desc(competitions.date));
+      res.json(allCompetitions);
+    } catch (error) {
+      console.error('Error fetching competitions:', error);
+      res.status(500).json({ message: "大会情報の取得に失敗しました" });
+    }
+  });
+
+  app.post("/api/competitions", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { name, date, location } = req.body;
+      const [competition] = await db
+        .insert(competitions)
+        .values({
+          name,
+          date: new Date(date),
+          location,
+        })
+        .returning();
+      res.json(competition);
+    } catch (error) {
+      console.error('Error creating competition:', error);
+      res.status(500).json({ message: "大会の作成に失敗しました" });
+    }
+  });
+
+  app.put("/api/competitions/:id", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, date, location } = req.body;
+      
+      const [competition] = await db
+        .update(competitions)
+        .set({
+          name,
+          date: new Date(date),
+          location,
+        })
+        .where(eq(competitions.id, parseInt(id)))
+        .returning();
+
+      if (!competition) {
+        return res.status(404).json({ message: "大会が見つかりません" });
+      }
+
+      res.json(competition);
+    } catch (error) {
+      console.error('Error updating competition:', error);
+      res.status(500).json({ message: "大会の更新に失敗しました" });
+    }
+  });
+
+  app.delete("/api/competitions/:id", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const [deletedCompetition] = await db
+        .delete(competitions)
+        .where(eq(competitions.id, parseInt(id)))
+        .returning();
+
+      if (!deletedCompetition) {
+        return res.status(404).json({ message: "大会が見つかりません" });
+      }
+
+      res.json({ message: "大会を削除しました" });
+    } catch (error) {
+      console.error('Error deleting competition:', error);
+      res.status(500).json({ message: "大会の削除に失敗しました" });
+    }
+  });
 
   // Athletes API
   app.get("/api/athletes", requireAuth, async (req, res) => {
@@ -352,7 +428,9 @@ export function registerRoutes(app: Express) {
           distance: swimRecords.distance,
           time: swimRecords.time,
           date: swimRecords.date,
+          isCompetition: swimRecords.isCompetition,
           poolLength: swimRecords.poolLength,
+          competitionId: swimRecords.competitionId,
           studentId: swimRecords.studentId,
           athleteName: users.username,
         })
@@ -369,7 +447,7 @@ export function registerRoutes(app: Express) {
 
   app.post("/api/records", requireAuth, requireCoach, async (req, res) => {
     try {
-      const { style, distance, time, date, poolLength, studentId } = req.body;
+      const { style, distance, time, date, isCompetition, poolLength, competitionId, studentId } = req.body;
 
       const [record] = await db
         .insert(swimRecords)
@@ -378,7 +456,9 @@ export function registerRoutes(app: Express) {
           distance,
           time,
           date: new Date(date),
+          isCompetition,
           poolLength,
+          competitionId,
           studentId
         })
         .returning();
@@ -393,7 +473,7 @@ export function registerRoutes(app: Express) {
   app.put("/api/records/:id", requireAuth, requireCoach, async (req, res) => {
     try {
       const { id } = req.params;
-      const { style, distance, time, date, poolLength, studentId } = req.body;
+      const { style, distance, time, date, isCompetition, poolLength, competitionId, studentId } = req.body;
 
       const [record] = await db
         .update(swimRecords)
@@ -402,7 +482,9 @@ export function registerRoutes(app: Express) {
           distance,
           time,
           date: new Date(date),
+          isCompetition,
           poolLength,
+          competitionId,
           studentId
         })
         .where(eq(swimRecords.id, parseInt(id)))
