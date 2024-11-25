@@ -1,11 +1,17 @@
 import useSWR from "swr";
 import type { SwimRecord } from "db/schema";
 
-export interface ExtendedSwimRecord extends Omit<SwimRecord, 'studentId'> {
+export interface ExtendedSwimRecord {
+  id: number;
   studentId: number;
+  style: string;
+  distance: number;
+  time: string;
+  date: Date | null;
+  isCompetition: boolean | null;
+  poolLength: number;
+  competitionId: number | null;
   athleteName: string;
-  isCompetition?: boolean;
-  competitionId?: number | null;
 }
 
 export function useSwimRecords(isCompetition?: boolean) {

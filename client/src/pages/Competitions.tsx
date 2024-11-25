@@ -3,6 +3,16 @@ import { useSwimRecords } from '../hooks/use-swim-records';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Edit2, Trash2, Plus, Filter } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { EditRecordForm } from '../components/EditRecordForm';
 import { useUser } from '../hooks/use-user';
@@ -171,11 +181,9 @@ export default function Competitions() {
     }
   };
 
-  const handleDelete = async (recordId: number) => {
-    if (!confirm('この記録を削除してもよろしいですか？')) {
-      return;
-    }
+  const [deletingRecord, setDeletingRecord] = React.useState<number | null>(null);
 
+  const handleDelete = async (recordId: number) => {
     try {
       const response = await fetch(`/api/records/${recordId}`, {
         method: 'DELETE',
@@ -198,6 +206,8 @@ export default function Competitions() {
         title: "エラー",
         description: "記録の削除に失敗しました",
       });
+    } finally {
+      setDeletingRecord(null);
     }
   };
 
@@ -333,9 +343,9 @@ export default function Competitions() {
                                         <Button
                                           variant="ghost"
                                           size="icon"
-                                          onClick={() => handleDelete(record.id)}
+                                          onClick={() => setDeletingRecord(record.id)}
                                         >
-                                          <Trash2 className="h-4 w-4" />
+                                          <Trash2 className="h-4 w-4 text-red-500" />
                                         </Button>
                                       </div>
                                     </td>
@@ -366,6 +376,33 @@ export default function Competitions() {
           }
         }}
       />
+
+      <AlertDialog 
+        open={!!deletingRecord} 
+        onOpenChange={(open) => !open && setDeletingRecord(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>記録を削除しますか？</AlertDialogTitle>
+            <AlertDialogDescription>
+              この操作は取り消せません。本当にこの記録を削除してもよろしいですか？
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>キャンセル</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deletingRecord) {
+                  handleDelete(deletingRecord);
+                }
+              }}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              削除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
