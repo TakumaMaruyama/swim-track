@@ -262,8 +262,8 @@ export default function Athletes() {
                         <div>
                           <span className="text-lg">{athlete.username}</span>
                           {athlete.furigana && (
-                            <span className="text-sm text-muted-foreground ml-2">
-                              ({athlete.furigana})
+                            <span className="block text-xs text-muted-foreground mt-0.5">
+                              {athlete.furigana}
                             </span>
                           )}
                         </div>

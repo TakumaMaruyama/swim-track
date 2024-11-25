@@ -422,6 +422,7 @@ export function registerRoutes(app: Express) {
         .select({
           id: users.id,
           username: users.username,
+          furigana: users.furigana,
           isActive: users.isActive,
           role: users.role,
         })
