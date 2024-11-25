@@ -26,11 +26,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, TrendingUp, Trash2 } from "lucide-react";
+import { Trophy, TrendingUp, Trash2, Edit2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
 import type { ExtendedSwimRecord } from "../hooks/use-swim-records";
 import { TimeProgressChart } from './TimeProgressChart';
+import { EditRecordForm } from './EditRecordForm';
 import useSWR from "swr";
 import type { Competition } from "db/schema";
 
@@ -71,6 +72,7 @@ export function TimeHistoryModal({
   const [styleFilter, setStyleFilter] = React.useState<string>("all");
   const [sortBy, setSortBy] = React.useState<string>("date_desc");
   const [deletingRecord, setDeletingRecord] = React.useState<number | null>(null);
+  const [editingRecord, setEditingRecord] = React.useState<ExtendedSwimRecord | null>(null);
   const { data: competitions } = useSWR<Competition[]>("/api/competitions");
 
   const groupedAndFilteredRecords: GroupedRecords = React.useMemo(() => {
@@ -154,7 +156,10 @@ export function TimeHistoryModal({
 
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={onClose}>
+      <Dialog open={isOpen} onOpenChange={() => {
+        setEditingRecord(null);
+        onClose();
+      }}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{athleteName}の記録履歴</DialogTitle>
@@ -284,6 +289,47 @@ export function TimeHistoryModal({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {editingRecord && (
+        <EditRecordForm
+          record={editingRecord}
+          isOpen={!!editingRecord}
+          onClose={() => setEditingRecord(null)}
+          onSubmit={async (values) => {
+            try {
+              const response = await fetch(`/api/records/${editingRecord.id}`, {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(values),
+                credentials: 'include',
+              });
+
+              if (!response.ok) {
+                throw new Error('記録の更新に失敗しました');
+              }
+
+              toast({
+                title: "更新成功",
+                description: "記録が更新されました",
+              });
+
+              if (onRecordDeleted) {
+                onRecordDeleted();
+              }
+            } catch (error) {
+              console.error('Error updating record:', error);
+              toast({
+                variant: "destructive",
+                title: "エラー",
+                description: "記録の更新に失敗しました",
+              });
+              throw error;
+            }
+          }}
+        />
+      )}
     </>
   );
 }
