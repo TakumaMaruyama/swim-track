@@ -594,32 +594,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/records/competitions", requireAuth, async (req, res) => {
-    try {
-      const competitionRecords = await db
-        .select({
-          id: swimRecords.id,
-          style: swimRecords.style,
-          distance: swimRecords.distance,
-          time: swimRecords.time,
-          date: swimRecords.date,
-          poolLength: swimRecords.poolLength,
-          competitionId: swimRecords.competitionId,
-          studentId: swimRecords.studentId,
-          athleteName: users.username,
-          isCompetition: swimRecords.isCompetition
-        })
-        .from(swimRecords)
-        .leftJoin(users, eq(swimRecords.studentId, users.id))
-        .where(eq(swimRecords.isCompetition, true))
-        .orderBy(desc(swimRecords.date));
-
-      res.json(competitionRecords);
-    } catch (error) {
-      console.error('Error fetching competition records:', error);
-      res.status(500).json({ message: "大会記録の取得に失敗しました" });
-    }
-  });
+  // Competition records endpoint removed as competition tracking is no longer supported
       app.get("/api/athletes", requireAuth, async (req, res) => {
     try {
       const { isActive } = req.query;
@@ -795,7 +770,7 @@ export function registerRoutes(app: Express) {
   // Create new record
   app.post("/api/records", requireAuth, requireCoach, async (req, res) => {
     try {
-      const { studentId, style, distance, time, date, isCompetition, poolLength } = req.body;
+      const { studentId, style, distance, time, date, poolLength } = req.body;
       
       // Verify student exists
       const [student] = await db
@@ -816,7 +791,6 @@ export function registerRoutes(app: Express) {
           distance,
           time,
           date: new Date(date),
-          isCompetition,
           poolLength: poolLength,
         })
         .returning();
