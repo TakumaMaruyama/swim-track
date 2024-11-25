@@ -418,6 +418,24 @@ export function registerRoutes(app: Express) {
   // Athletes API
   app.get("/api/athletes", requireAuth, async (req, res) => {
     try {
+      const athletes = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          isActive: users.isActive,
+          role: users.role,
+        })
+        .from(users)
+        .where(eq(users.role, 'student'))
+        .orderBy(users.username);
+
+      res.json(athletes);
+    } catch (error) {
+      console.error('Error fetching athletes:', error);
+      res.status(500).json({ message: "選手情報の取得に失敗しました" });
+    }
+  });
+
   // Records API endpoints
   app.get("/api/records", requireAuth, async (req, res) => {
     try {
@@ -442,6 +460,72 @@ export function registerRoutes(app: Express) {
     } catch (error) {
       console.error('Error fetching records:', error);
       res.status(500).json({ message: "記録の取得に失敗しました" });
+    }
+  });
+
+  // Update record endpoint
+  app.put("/api/records/:id", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { style, distance, time, date, isCompetition, poolLength, competitionId, studentId } = req.body;
+
+      // Validate required fields
+      if (!style || !distance || !time || !date) {
+        return res.status(400).json({ message: "必須フィールドが不足しています" });
+      }
+
+      // First check if the record exists
+      const [existingRecord] = await db
+        .select()
+        .from(swimRecords)
+        .where(eq(swimRecords.id, parseInt(id)))
+        .limit(1);
+
+      if (!existingRecord) {
+        return res.status(404).json({ message: "記録が見つかりません" });
+      }
+
+      // Then update the record
+      const [updatedRecord] = await db
+        .update(swimRecords)
+        .set({
+          style,
+          distance,
+          time,
+          date: new Date(date),
+          isCompetition,
+          poolLength,
+          competitionId,
+          studentId
+        })
+        .where(eq(swimRecords.id, parseInt(id)))
+        .returning();
+
+      res.json(updatedRecord);
+    } catch (error) {
+      console.error('Error updating record:', error);
+      res.status(500).json({ message: "記録の更新に失敗しました" });
+    }
+  });
+
+  // Delete record endpoint
+  app.delete("/api/records/:id", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const [deletedRecord] = await db
+        .delete(swimRecords)
+        .where(eq(swimRecords.id, parseInt(id)))
+        .returning();
+
+      if (!deletedRecord) {
+        return res.status(404).json({ message: "記録が見つかりません" });
+      }
+
+      res.json({ message: "記録が削除されました" });
+    } catch (error) {
+      console.error('Error deleting record:', error);
+      res.status(500).json({ message: "記録の削除に失敗しました" });
     }
   });
 
@@ -470,12 +554,25 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Update record
   app.put("/api/records/:id", requireAuth, requireCoach, async (req, res) => {
     try {
       const { id } = req.params;
       const { style, distance, time, date, isCompetition, poolLength, competitionId, studentId } = req.body;
 
-      const [record] = await db
+      // First check if the record exists
+      const [existingRecord] = await db
+        .select()
+        .from(swimRecords)
+        .where(eq(swimRecords.id, parseInt(id)))
+        .limit(1);
+
+      if (!existingRecord) {
+        return res.status(404).json({ message: "記録が見つかりません" });
+      }
+
+      // Then update the record
+      const [updatedRecord] = await db
         .update(swimRecords)
         .set({
           style,
@@ -490,11 +587,7 @@ export function registerRoutes(app: Express) {
         .where(eq(swimRecords.id, parseInt(id)))
         .returning();
 
-      if (!record) {
-        return res.status(404).json({ message: "記録が見つかりません" });
-      }
-
-      res.json(record);
+      res.json(updatedRecord);
     } catch (error) {
       console.error('Error updating record:', error);
       res.status(500).json({ message: "記録の更新に失敗しました" });
@@ -527,24 +620,23 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ message: "大会記録の取得に失敗しました" });
     }
   });
+      app.get("/api/athletes", requireAuth, async (req, res) => {
+    try {
       const { isActive } = req.query;
-      const query = db
+      let query = db
         .select()
         .from(users)
         .where(eq(users.role, "student"));
 
       // Add optional isActive filter
       if (isActive !== undefined) {
-        const filteredAthletes = await query.where(
-          eq(users.isActive, isActive === 'true')
-        );
-        res.json(filteredAthletes);
-        return;
+        query = query.where(eq(users.isActive, isActive === 'true'));
       }
 
       const athletes = await query;
       res.json(athletes);
     } catch (error) {
+      console.error('Error fetching athletes:', error);
       res.status(500).json({ message: "選手の取得に失敗しました" });
     }
   });
@@ -737,41 +829,11 @@ export function registerRoutes(app: Express) {
   });
 
   // Update record
-  app.put("/api/records/:id", requireAuth, requireCoach, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { style, distance, time, date, isCompetition, poolLength } = req.body;
-
-      const [record] = await db
-        .update(swimRecords)
-        .set({
-          style,
-          distance,
-          time,
-          date: new Date(date),
-          isCompetition,
-          poolLength,
-        })
-        .where(eq(swimRecords.id, parseInt(id)))
-        .returning();
-
-      if (!record) {
-        return res.status(404).json({ message: "記録が見つかりません" });
-      }
-
-      res.json(record);
-    } catch (error) {
-      console.error('Error updating record:', error);
-      res.status(500).json({ message: "記録の更新に失敗しました" });
-    }
-  });
-
   // Delete record
   app.delete("/api/records/:id", requireAuth, requireCoach, async (req, res) => {
     try {
       const { id } = req.params;
       
-      // Check if record exists before deletion
       const [record] = await db
         .select()
         .from(swimRecords)
@@ -782,7 +844,6 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ message: "記録が見つかりません" });
       }
 
-      // Delete the record
       await db
         .delete(swimRecords)
         .where(eq(swimRecords.id, parseInt(id)));

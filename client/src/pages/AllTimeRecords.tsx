@@ -60,8 +60,15 @@ export default function AllTimeRecords() {
       const key = `${record.style}-${record.distance}-${record.poolLength}`;
       if (!acc[key] || record.time < acc[key].time) {
         acc[key] = {
-          ...record,
-          date: new Date(record.date)
+          id: record.id,
+          style: record.style,
+          distance: record.distance,
+          time: record.time,
+          date: new Date(record.date || Date.now()),
+          studentId: record.studentId,
+          isCompetition: record.isCompetition ?? false,
+          poolLength: record.poolLength,
+          athleteName: record.athleteName || ''
         };
       }
       return acc;

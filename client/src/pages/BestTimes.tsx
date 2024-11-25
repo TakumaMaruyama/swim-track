@@ -50,11 +50,11 @@ export default function BestTimes() {
         acc[record.style][record.distance] = {
           id: record.id,
           time: record.time,
-          date: new Date(record.date),
+          date: new Date(record.date || Date.now()),
           studentId: record.studentId,
-          isCompetition: record.isCompetition,
+          isCompetition: record.isCompetition ?? false,
           poolLength: record.poolLength,
-          athleteName: record.athleteName,
+          athleteName: record.athleteName || '',
         };
       }
       
