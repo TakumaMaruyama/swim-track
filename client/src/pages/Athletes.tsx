@@ -259,7 +259,14 @@ export default function Athletes() {
                     </Avatar>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-lg">{athlete.username}</span>
+                        <div>
+                          <span className="text-lg">{athlete.username}</span>
+                          {athlete.furigana && (
+                            <span className="text-sm text-muted-foreground ml-2">
+                              ({athlete.furigana})
+                            </span>
+                          )}
+                        </div>
                         <Badge variant={athlete.isActive ? "default" : "secondary"}>
                           {athlete.isActive ? '有効' : '無効'}
                         </Badge>
