@@ -243,13 +243,22 @@ export function TimeHistoryModal({
                               </div>
                             </div>
                             {user?.role === 'coach' && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setDeletingRecord(record.id)}
-                              >
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                              </Button>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setEditingRecord(record)}
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setDeletingRecord(record.id)}
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
+                              </div>
                             )}
                           </div>
                         );
