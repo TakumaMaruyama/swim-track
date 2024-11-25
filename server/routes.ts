@@ -594,7 +594,32 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Competition records endpoint removed as competition tracking is no longer supported
+  app.get("/api/records/competitions", requireAuth, async (req, res) => {
+    try {
+      const competitionRecords = await db
+        .select({
+          id: swimRecords.id,
+          style: swimRecords.style,
+          distance: swimRecords.distance,
+          time: swimRecords.time,
+          date: swimRecords.date,
+          poolLength: swimRecords.poolLength,
+          competitionId: swimRecords.competitionId,
+          studentId: swimRecords.studentId,
+          athleteName: users.username,
+          isCompetition: swimRecords.isCompetition
+        })
+        .from(swimRecords)
+        .leftJoin(users, eq(swimRecords.studentId, users.id))
+        .where(eq(swimRecords.isCompetition, true))
+        .orderBy(desc(swimRecords.date));
+
+      res.json(competitionRecords);
+    } catch (error) {
+      console.error('Error fetching competition records:', error);
+      res.status(500).json({ message: "大会記録の取得に失敗しました" });
+    }
+  });
       app.get("/api/athletes", requireAuth, async (req, res) => {
     try {
       const { isActive } = req.query;
