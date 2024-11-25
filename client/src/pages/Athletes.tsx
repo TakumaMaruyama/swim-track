@@ -261,11 +261,6 @@ export default function Athletes() {
                       <div className="flex items-center gap-2">
                         <div>
                           <span className="text-lg">{athlete.username}</span>
-                          {athlete.furigana && (
-                            <span className="block text-xs text-muted-foreground mt-0.5">
-                              {athlete.furigana}
-                            </span>
-                          )}
                         </div>
                         <Badge variant={athlete.isActive ? "default" : "secondary"}>
                           {athlete.isActive ? '有効' : '無効'}
