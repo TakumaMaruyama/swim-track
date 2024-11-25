@@ -7,7 +7,8 @@ export function useAthletes() {
   const sortedAthletes = athletes?.slice().sort((a, b) => {
     return a.username.localeCompare(b.username, 'ja-JP', { 
       sensitivity: 'base',
-      ignorePunctuation: true 
+      ignorePunctuation: true,
+      usage: 'sort'
     });
   });
 
