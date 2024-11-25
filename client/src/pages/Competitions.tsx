@@ -1,6 +1,5 @@
 import React from 'react';
 import { useSwimRecords } from '../hooks/use-swim-records';
-import { useCompetitions } from '../hooks/use-competitions';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Edit2, Trash2, Plus, Filter } from "lucide-react";
@@ -28,7 +27,6 @@ interface CompetitionRecord {
   isCompetition: boolean;
   athleteName?: string;
   date: Date | null;
-  competitionId: number | null;
 }
 
 interface GroupedRecordsByStyle {
@@ -54,10 +52,7 @@ const formatDate = (date: Date | null) => {
 export default function Competitions() {
   const { user } = useUser();
   const { toast } = useToast();
-  const { records, isLoading: recordsLoading, error: recordsError, mutate } = useSwimRecords(true);
-  const { competitions, isLoading: competitionsLoading, error: competitionsError } = useCompetitions();
-  const isLoading = recordsLoading || competitionsLoading;
-  const error = recordsError || competitionsError;
+  const { records, isLoading, error, mutate } = useSwimRecords(true);
   const [editingRecord, setEditingRecord] = React.useState<number | null>(null);
   const [styleFilter, setStyleFilter] = React.useState<string>("all");
   const [poolLengthFilter, setPoolLengthFilter] = React.useState<string>("all");
@@ -102,7 +97,6 @@ export default function Competitions() {
         isCompetition: record.isCompetition ?? false,
         athleteName: record.athleteName,
         date: record.date ? new Date(record.date) : null,
-        competitionId: record.competitionId,
       };
       
       if (!acc[date].records[record.style]) {
@@ -288,15 +282,7 @@ export default function Competitions() {
                   <div className="flex flex-col space-y-2">
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-2">
-                        <CardTitle className="text-xl">
-                          {(() => {
-                            const firstRecord = Object.values(records)[0]?.[0];
-                            if (!firstRecord?.competitionId || !competitions) return date;
-                            
-                            const competition = competitions.find(c => c.id === firstRecord.competitionId);
-                            return competition?.name || date;
-                          })()}
-                        </CardTitle>
+                        <CardTitle className="text-xl">大会記録</CardTitle>
                         <Badge variant="outline">{poolLength}mプール</Badge>
                       </div>
                       {user?.role === 'coach' && (
@@ -327,16 +313,7 @@ export default function Competitions() {
                               </tr>
                             </thead>
                             <tbody>
-                              {[...styleRecords]
-                                .sort((a, b) => {
-                                  // まず距離で降順ソート
-                                  if (b.distance !== a.distance) {
-                                    return b.distance - a.distance;
-                                  }
-                                  // 同じ距離内ではタイムで昇順ソート
-                                  return a.time.localeCompare(b.time);
-                                })
-                                .map((record) => (
+                              {styleRecords.map((record) => (
                                 <tr key={record.id} className="border-b last:border-0">
                                   <td className="px-4 py-2">{record.distance}m</td>
                                   <td className="px-4 py-2">{record.athleteName}</td>
