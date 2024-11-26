@@ -22,16 +22,12 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-const competitionSchema = z.object({
-  name: z.string().min(1, "大会名を入力してください"),
-  location: z.string().min(1, "開催場所を入力してください"),
-  date: z.string().min(1, "開催日を選択してください"),
-});
+import { competitionSchema } from "@/lib/schema";
 
 type CompetitionFormProps = {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: () => Promise<void>;
+  onSubmit: (values: z.infer<typeof competitionSchema>) => Promise<void>;
 };
 
 export function CompetitionForm({ isOpen, onClose, onSubmit }: CompetitionFormProps) {
@@ -55,26 +51,25 @@ export function CompetitionForm({ isOpen, onClose, onSubmit }: CompetitionFormPr
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          name: values.name,
-          date: values.date,
-          location: values.location,
-        }),
+        body: JSON.stringify(values),
         credentials: 'include',
       });
 
       if (!response.ok) {
-        throw new Error('大会情報の追加に失敗しました');
+        const error = await response.json();
+        throw new Error(error.message || '大会情報の追加に失敗しました');
       }
 
-      await onSubmit();
+      await onSubmit(values);
       form.reset();
     } catch (error) {
+      console.error('Error adding competition:', error);
       toast({
         variant: "destructive",
         title: "エラー",
-        description: "大会情報の追加に失敗しました",
+        description: error instanceof Error ? error.message : "大会情報の追加に失敗しました",
       });
+      throw error;
     } finally {
       setIsSubmitting(false);
     }

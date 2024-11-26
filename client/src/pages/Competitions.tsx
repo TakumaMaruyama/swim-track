@@ -11,6 +11,7 @@ import {
 import { Trophy, Plus } from "lucide-react";
 import useSWR from 'swr';
 import { CompetitionForm } from '@/components/CompetitionForm';
+import { competitionSchema } from '@/lib/schema';
 
 type Competition = {
   name: string;
@@ -24,12 +25,12 @@ export default function CompetitionsPage() {
   const [isAddingCompetition, setIsAddingCompetition] = React.useState(false);
   const { data: competitions, mutate } = useSWR<Competition[]>('/api/competitions');
 
-  const handleCompetitionAdded = async () => {
+  const handleCompetitionAdded = async (values: z.infer<typeof competitionSchema>) => {
     await mutate();
     setIsAddingCompetition(false);
     toast({
-      title: "大会情報を追加しました",
-      description: "大会情報が正常に追加されました",
+      title: "追加成功",
+      description: `${values.name}が正常に追加されました`,
     });
   };
 
