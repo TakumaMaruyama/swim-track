@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -30,9 +29,8 @@ import {
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { SwimRecord, Competition } from "db/schema";
+import type { SwimRecord } from "db/schema";
 import * as z from "zod";
-import useSWR from "swr";
 
 // Time format validation regex: MM:SS.ms
 const timeRegex = /^([0-5]?[0-9]):([0-5][0-9])\.([0-9]{1,3})$/;
@@ -59,9 +57,7 @@ const editRecordSchema = z.object({
   distance: z.number().min(1, "距離を選択してください"),
   time: z.string().regex(timeRegex, "タイム形式は MM:SS.ms である必要があります"),
   date: z.string().min(1, "日付を選択してください"),
-  isCompetition: z.boolean().default(false),
   poolLength: z.number().refine(val => poolLengths.includes(val), "有効なプール長を選択してください"),
-  competitionId: z.number().nullable()
 });
 
 type EditRecordFormProps = {
@@ -75,7 +71,6 @@ type EditRecordFormProps = {
 export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }: EditRecordFormProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const { data: competitions } = useSWR<Competition[]>("/api/competitions");
 
   const form = useForm({
     resolver: zodResolver(editRecordSchema),
@@ -84,9 +79,7 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
       distance: record?.distance ?? 50,
       time: record?.time ?? "",
       date: record ? new Date(record.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-      isCompetition: record?.isCompetition ?? false,
       poolLength: record?.poolLength ?? 25,
-      competitionId: record?.competitionId ?? null
     },
   });
 
@@ -249,59 +242,7 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="isCompetition"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                      disabled={isSubmitting}
-                    />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel>大会記録</FormLabel>
-                    <FormDescription>
-                      この記録が公式大会での記録の場合はチェックしてください
-                    </FormDescription>
-                  </div>
-                </FormItem>
-              )}
-            />
-            {watchIsCompetition && (
-              <FormField
-                control={form.control}
-                name="competitionId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>大会</FormLabel>
-                    <Select
-                      value={field.value?.toString()}
-                      onValueChange={(value) => field.onChange(Number(value))}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="大会を選択" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {competitions?.map((competition) => (
-                          <SelectItem
-                            key={competition.id}
-                            value={competition.id.toString()}
-                          >
-                            {competition.name} ({new Date(competition.date).toLocaleDateString()})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
+            
             <DialogFooter>
               <Button
                 type="button"

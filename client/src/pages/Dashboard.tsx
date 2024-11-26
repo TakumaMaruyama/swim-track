@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { 
   Users, 
-  Trophy, 
   ClipboardList,
   LogOut,
   UserX,
@@ -101,7 +100,6 @@ export default function Dashboard() {
 
   const navItems = [
     { label: '選手一覧', icon: <Users className="h-4 w-4" />, href: '/athletes' },
-    { label: '歴代記録', icon: <Trophy className="h-4 w-4" />, href: '/all-time-records' },
     { label: '資料', icon: <ClipboardList className="h-4 w-4" />, href: '/documents' },
   ];
 

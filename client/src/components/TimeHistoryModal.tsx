@@ -26,14 +26,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, TrendingUp, Trash2, Edit2 } from "lucide-react";
+import { Trophy, Trash2, Edit2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
 import type { ExtendedSwimRecord } from "../hooks/use-swim-records";
 import { TimeProgressChart } from './TimeProgressChart';
 import { EditRecordForm } from './EditRecordForm';
-import useSWR from "swr";
-import type { Competition } from "db/schema";
 
 type TimeHistoryModalProps = {
   isOpen: boolean;
@@ -73,8 +71,6 @@ export function TimeHistoryModal({
   const [sortBy, setSortBy] = React.useState<string>("date_desc");
   const [deletingRecord, setDeletingRecord] = React.useState<number | null>(null);
   const [editingRecord, setEditingRecord] = React.useState<ExtendedSwimRecord | null>(null);
-  const { data: competitions } = useSWR<Competition[]>("/api/competitions");
-
   const groupedAndFilteredRecords: GroupedRecords = React.useMemo(() => {
     const filtered = records.filter(record => 
       styleFilter === "all" || record.style === styleFilter
@@ -148,11 +144,7 @@ export function TimeHistoryModal({
     }
   };
 
-  const getCompetitionName = (competitionId: number | null) => {
-    if (!competitionId || !competitions) return null;
-    const competition = competitions.find(c => c.id === competitionId);
-    return competition ? competition.name : null;
-  };
+  
 
   return (
     <>
@@ -217,7 +209,6 @@ export function TimeHistoryModal({
 
                     <div className="space-y-3 mt-4">
                       {records.map((record) => {
-                        const competitionName = getCompetitionName(record.competitionId);
                         return (
                           <div
                             key={record.id}

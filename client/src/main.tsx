@@ -13,7 +13,7 @@ import Register from "./pages/Register";
 import Documents from "./pages/Documents";
 import Athletes from "./pages/Athletes";
 import AllTimeRecords from "./pages/AllTimeRecords";
-import Competitions from "./pages/Competitions";
+
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -25,7 +25,7 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/documents" component={Documents} />
         <Route path="/athletes" component={Athletes} />
         <Route path="/all-time-records" component={AllTimeRecords} />
-        <Route path="/competitions" component={Competitions} />
+        
         <Route>404 ページが見つかりません</Route>
       </Switch>
       <Toaster />
