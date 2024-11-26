@@ -117,12 +117,26 @@ export default function Dashboard() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create competition');
+        const errorData = await response.json().catch(() => ({ message: '大会の作成に失敗しました' }));
+        throw new Error(errorData.message || '大会の作成に失敗しました');
       }
 
+      const newCompetition = await response.json();
       await mutateCompetitions();
+      
+      toast({
+        title: "作成成功",
+        description: "新しい大会が追加されました",
+      });
+
+      return newCompetition;
     } catch (error) {
       console.error('Error creating competition:', error);
+      toast({
+        variant: "destructive",
+        title: "エラー",
+        description: error instanceof Error ? error.message : "大会の作成に失敗しました",
+      });
       throw error;
     }
   };
