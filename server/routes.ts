@@ -342,19 +342,21 @@ export function registerRoutes(app: Express) {
   // Competitions API
   app.get("/api/competitions", requireAuth, async (req, res) => {
     try {
-      const competitionRecords = await db
+      const competitionsData = await db
         .select({
-          name: swimRecords.competitionName,
-          location: swimRecords.competitionLocation,
-          date: swimRecords.date,
-          recordCount: sql<number>`count(*)::int`,
+          id: competitions.id,
+          name: competitions.name,
+          location: competitions.location,
+          date: competitions.date,
+          recordCount: sql<number>`(
+            SELECT COUNT(*) FROM swim_records 
+            WHERE competition_id = competitions.id
+          )::int`,
         })
-        .from(swimRecords)
-        .where(eq(swimRecords.isCompetition, true))
-        .groupBy(swimRecords.competitionName, swimRecords.competitionLocation, swimRecords.date)
-        .orderBy(desc(swimRecords.date));
+        .from(competitions)
+        .orderBy(desc(competitions.date));
 
-      res.json(competitionRecords);
+      res.json(competitionsData);
     } catch (error) {
       console.error('Error fetching competitions:', error);
       res.status(500).json({ message: "大会情報の取得に失敗しました" });
@@ -369,8 +371,16 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ message: "必須フィールドが不足しています" });
       }
 
-      // We'll store this information when adding records
-      res.json({ name, location, date });
+      const [competition] = await db
+        .insert(competitions)
+        .values({
+          name,
+          location,
+          date: new Date(date),
+        })
+        .returning();
+
+      res.json(competition);
     } catch (error) {
       console.error('Error creating competition:', error);
       res.status(500).json({ message: "大会情報の作成に失敗しました" });

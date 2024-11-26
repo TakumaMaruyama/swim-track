@@ -59,8 +59,7 @@ const editRecordSchema = z.object({
   date: z.string().min(1, "日付を選択してください"),
   poolLength: z.number().refine(val => poolLengths.includes(val), "有効なプール長を選択してください"),
   isCompetition: z.boolean().default(false),
-  competitionName: z.string().optional(),
-  competitionLocation: z.string().optional(),
+  competitionId: z.number().optional(),
 });
 
 type EditRecordFormProps = {

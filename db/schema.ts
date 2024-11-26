@@ -30,6 +30,14 @@ export const documents = pgTable("documents", {
   createdAt: timestamp("created_at").defaultNow()
 });
 
+export const competitions = pgTable("competitions", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  name: text("name").notNull(),
+  date: timestamp("date").notNull(),
+  location: text("location").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const swimRecords = pgTable("swim_records", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   studentId: integer("student_id").references(() => users.id),
@@ -39,6 +47,7 @@ export const swimRecords = pgTable("swim_records", {
   date: timestamp("date").defaultNow(),
   poolLength: integer("pool_length").notNull().default(25),
   isCompetition: boolean("is_competition").default(false),
+  competitionId: integer("competition_id").references(() => competitions.id),
   competitionName: text("competition_name"),
   competitionLocation: text("competition_location")
 });
