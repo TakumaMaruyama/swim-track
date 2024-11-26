@@ -582,6 +582,43 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  app.post("/api/competitions", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { name, location, date } = req.body;
+
+      // Check for duplicate competition
+      const existingCompetition = await db
+        .select()
+        .from(competitions)
+        .where(and(
+          eq(competitions.name, name),
+          eq(competitions.location, location),
+          eq(competitions.date, new Date(date))
+        ))
+        .limit(1);
+
+      if (existingCompetition.length > 0) {
+        return res.status(400).json({
+          message: "同じ名前、場所、日付の大会が既に存在します"
+        });
+      }
+
+      const [competition] = await db
+        .insert(competitions)
+        .values({
+          name,
+          location,
+          date: new Date(date),
+        })
+        .returning();
+
+      res.json(competition);
+    } catch (error) {
+      console.error('Error creating competition:', error);
+      res.status(500).json({ message: "大会情報の作成に失敗しました" });
+    }
+  });
+
   app.put("/api/competitions/:id", requireAuth, requireCoach, async (req, res) => {
     try {
       const { id } = req.params;

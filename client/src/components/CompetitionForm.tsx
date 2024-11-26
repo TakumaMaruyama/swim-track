@@ -55,12 +55,24 @@ export function CompetitionForm({ competition, isOpen, onClose, onSubmit }: Comp
       const url = competition ? `/api/competitions/${competition.id}` : '/api/competitions';
       const method = competition ? 'PUT' : 'POST';
       
+      // Convert local date to UTC
+      const dateObj = new Date(values.date);
+      const utcDate = new Date(Date.UTC(
+        dateObj.getFullYear(),
+        dateObj.getMonth(),
+        dateObj.getDate(),
+        0, 0, 0
+      ));
+
       const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(values),
+        body: JSON.stringify({
+          ...values,
+          date: utcDate.toISOString(),
+        }),
         credentials: 'include',
       });
 
