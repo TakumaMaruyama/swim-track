@@ -446,9 +446,7 @@ export function registerRoutes(app: Express) {
           distance: swimRecords.distance,
           time: swimRecords.time,
           date: swimRecords.date,
-          isCompetition: swimRecords.isCompetition,
           poolLength: swimRecords.poolLength,
-          competitionId: swimRecords.competitionId,
           studentId: swimRecords.studentId,
           athleteName: users.username,
         })

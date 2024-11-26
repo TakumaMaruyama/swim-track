@@ -14,9 +14,8 @@ export interface ExtendedSwimRecord {
   athleteName: string;
 }
 
-export function useSwimRecords(isCompetition?: boolean) {
-  const endpoint = isCompetition ? '/api/records/competitions' : '/api/records';
-  const { data: records, error, mutate } = useSWR<ExtendedSwimRecord[]>(endpoint);
+export function useSwimRecords() {
+  const { data: records, error, mutate } = useSWR<ExtendedSwimRecord[]>('/api/records');
 
   return {
     records,
