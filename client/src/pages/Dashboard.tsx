@@ -204,8 +204,8 @@ export default function Dashboard() {
   }
 
   const upcomingCompetitions = competitions
-    ?.filter(comp => new Date(comp.date) > new Date())
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) ?? [];
+    ?.filter(comp => comp.date && new Date(comp.date) > new Date())
+    .sort((a, b) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime()) ?? [];
 
   const nextCompetition = upcomingCompetitions[0];
   const { days, hours } = nextCompetition 

@@ -354,14 +354,22 @@ export function registerRoutes(app: Express) {
   app.post("/api/competitions", requireAuth, requireCoach, async (req, res) => {
     try {
       const { name, date, location } = req.body;
+      
+      // 日付が文字列で来た場合にDate型に変換
+      const competitionDate = date ? new Date(date) : null;
+      
       const [competition] = await db
         .insert(competitions)
         .values({
           name,
-          date: new Date(date),
+          date: competitionDate,  // nullを許容
           location,
         })
         .returning();
+      
+      // レスポンスの前にログを追加
+      console.log('Created competition:', competition);
+      
       res.json(competition);
     } catch (error) {
       console.error('Error creating competition:', error);

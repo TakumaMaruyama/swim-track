@@ -1,0 +1,125 @@
+セッション検証失敗の問題に対しては、以下のアプローチを推奨します：
+
+認証ミドルウェアの確認
+
+typescriptCopy// pages/api/competitions.ts または middleware.ts
+export async function validateSession(req) {
+  try {
+    // セッション検証のロジックを詳細に
+    const session = await getServerSession(req);
+    if (!session) {
+      return { valid: false, message: "セッションが無効です" };
+    }
+    return { valid: true, user: session.user };
+  } catch (error) {
+    console.error("セッション検証エラー:", error);
+    return { valid: false, message: "セッション検証中にエラーが発生しました" };
+  }
+}
+
+APIエンドポイントの修正
+
+typescriptCopy// pages/api/competitions.ts
+export default async function handler(req, res) {
+  // セッション検証を明示的に行う
+  const sessionValidation = await validateSession(req);
+  
+  if (!sessionValidation.valid) {
+    return res.status(401).json({ 
+      error: "認証エラー", 
+      message: sessionValidation.message 
+    });
+  }
+
+  // 以降の通常の処理
+  try {
+    const competitions = await fetchCompetitions();
+    res.status(200).json(competitions);
+  } catch (error) {
+    res.status(500).json({ 
+      error: "データ取得エラー", 
+      details: error.message 
+    });
+  }
+}
+
+クライアント側のエラーハンドリング強化
+
+typescriptCopyexport function useCompetitions() {
+  const { data: competitions, error, mutate } = useSWR<Competition[]>(
+    "/api/competitions", 
+    async (url) => {
+      const res = await fetch(url, { credentials: 'include' });
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "データ取得に失敗しました");
+      }
+      
+      return res.json();
+    },
+    {
+      onError: (error) => {
+        console.error('Competitions fetch error:', error);
+        // トーストや通知システムでエラーを表示
+        toast.error(error.message);
+      },
+      revalidateOnFocus: true,
+      shouldRetryOnError: true,
+      errorRetryCount: 3
+    }
+  );
+
+  return {
+    competitions,
+    isLoading: !error && !competitions,
+    error,
+    mutate
+  };
+}
+
+追加の診断ステップ
+
+
+ブラウザの開発者ツールでNetwork/Consoleタブを確認
+セッショントークンの有効期限を確認
+CORSの設定を再確認
+
+
+詳細なデバッグログ
+
+typescriptCopy// サーバーサイドのログ
+console.log('Session details:', {
+  user: session?.user,
+  expires: session?.expires,
+  validationTime: new Date()
+});
+
+// クライアントサイドのログ
+console.log('Fetch request details:', {
+  url: "/api/competitions",
+  credentials: 'include',
+  headers: /* 関連ヘッダー情報 */
+});
+
+Next.jsのセッション管理確認
+
+typescriptCopy// next-auth.ts または _app.tsx
+import { SessionProvider } from "next-auth/react"
+
+function MyApp({ Component, pageProps }) {
+  return (
+    <SessionProvider session={pageProps.session} refetchInterval={5 * 60}>
+      <Component {...pageProps} />
+    </SessionProvider>
+  )
+}
+
+潜在的な解決策
+
+
+セッショントークンの再生成
+ミドルウェアの認証ロジックの見直し
+環境変数（SECRET, NEXTAUTH_URL）の確認
+
+これらの対応で、セッション検証の問題と大会情報取得の課題に対処できるはずです。具体的なエラーメッセージや追加のコンテキストがあれば、さらに詳細な診断が可能です。 CopyRetryClaude does not have the ability to run the code it generates yet.Claude can make mistakes. Please double-check responses. HaikuSubscribe to Pro for 5x more usage with Claude 3.5 Sonnet.
