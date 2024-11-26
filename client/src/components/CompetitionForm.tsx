@@ -55,15 +55,9 @@ export function CompetitionForm({ competition, isOpen, onClose, onSubmit }: Comp
       const url = competition ? `/api/competitions/${competition.id}` : '/api/competitions';
       const method = competition ? 'PUT' : 'POST';
       
-      // Convert local date to UTC
-      const dateObj = new Date(values.date);
-      const utcDate = new Date(Date.UTC(
-        dateObj.getFullYear(),
-        dateObj.getMonth(),
-        dateObj.getDate(),
-        0, 0, 0
-      ));
-
+      // 日付をJST (UTC+9) として解釈
+      const dateObj = new Date(values.date + 'T00:00:00+09:00');
+      
       const response = await fetch(url, {
         method,
         headers: {
@@ -71,7 +65,7 @@ export function CompetitionForm({ competition, isOpen, onClose, onSubmit }: Comp
         },
         body: JSON.stringify({
           ...values,
-          date: utcDate.toISOString(),
+          date: dateObj.toISOString(),
         }),
         credentials: 'include',
       });

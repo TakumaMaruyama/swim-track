@@ -585,7 +585,10 @@ export function registerRoutes(app: Express) {
   app.post("/api/competitions", requireAuth, requireCoach, async (req, res) => {
     try {
       const { name, location, date } = req.body;
-
+      
+      // 日付をJSTとして解釈
+      const jstDate = new Date(date);
+      
       // Check for duplicate competition
       const existingCompetition = await db
         .select()
@@ -593,7 +596,7 @@ export function registerRoutes(app: Express) {
         .where(and(
           eq(competitions.name, name),
           eq(competitions.location, location),
-          eq(competitions.date, new Date(date))
+          eq(competitions.date, jstDate)
         ))
         .limit(1);
 
@@ -608,7 +611,7 @@ export function registerRoutes(app: Express) {
         .values({
           name,
           location,
-          date: new Date(date),
+          date: jstDate,
         })
         .returning();
 
