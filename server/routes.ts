@@ -339,6 +339,44 @@ export function registerRoutes(app: Express) {
 
   
 
+  // Competitions API
+  app.get("/api/competitions", requireAuth, async (req, res) => {
+    try {
+      const competitionRecords = await db
+        .select({
+          name: swimRecords.competitionName,
+          location: swimRecords.competitionLocation,
+          date: swimRecords.date,
+          recordCount: sql<number>`count(*)::int`,
+        })
+        .from(swimRecords)
+        .where(eq(swimRecords.isCompetition, true))
+        .groupBy(swimRecords.competitionName, swimRecords.competitionLocation, swimRecords.date)
+        .orderBy(desc(swimRecords.date));
+
+      res.json(competitionRecords);
+    } catch (error) {
+      console.error('Error fetching competitions:', error);
+      res.status(500).json({ message: "大会情報の取得に失敗しました" });
+    }
+  });
+
+  app.post("/api/competitions", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { name, location, date } = req.body;
+      
+      if (!name || !location || !date) {
+        return res.status(400).json({ message: "必須フィールドが不足しています" });
+      }
+
+      // We'll store this information when adding records
+      res.json({ name, location, date });
+    } catch (error) {
+      console.error('Error creating competition:', error);
+      res.status(500).json({ message: "大会情報の作成に失敗しました" });
+    }
+  });
+
   // Athletes API
   app.get("/api/athletes", requireAuth, async (req, res) => {
     try {
