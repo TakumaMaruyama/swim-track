@@ -55,8 +55,14 @@ export function CompetitionForm({ competition, isOpen, onClose, onSubmit }: Comp
       const url = competition ? `/api/competitions/${competition.id}` : '/api/competitions';
       const method = competition ? 'PUT' : 'POST';
       
-      // 日付をJST (UTC+9) として解釈
-      const dateObj = new Date(values.date + 'T00:00:00+09:00');
+      // 日付をJST (UTC+9) として正しく解釈
+      // 入力された日付文字列に時刻とタイムゾーンを追加
+      const jstDate = new Date(`${values.date}T00:00:00+09:00`);
+      
+      // 日付が無効な場合はエラー
+      if (isNaN(jstDate.getTime())) {
+        throw new Error('無効な日付形式です');
+      }
       
       const response = await fetch(url, {
         method,
@@ -64,8 +70,9 @@ export function CompetitionForm({ competition, isOpen, onClose, onSubmit }: Comp
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          ...values,
-          date: dateObj.toISOString(),
+          name: values.name.trim(),
+          location: values.location.trim(),
+          date: jstDate.toISOString(), // ISOString形式で送信
         }),
         credentials: 'include',
       });
@@ -77,12 +84,17 @@ export function CompetitionForm({ competition, isOpen, onClose, onSubmit }: Comp
 
       await onSubmit(values, competition?.id);
       form.reset();
+      
+      toast({
+        title: competition ? "更新成功" : "追加成功",
+        description: `大会情報が${competition ? '更新' : '追加'}されました`,
+      });
     } catch (error) {
-      console.error('Error adding competition:', error);
+      console.error('Error adding/updating competition:', error);
       toast({
         variant: "destructive",
         title: "エラー",
-        description: error instanceof Error ? error.message : "大会情報の追加に失敗しました",
+        description: error instanceof Error ? error.message : "大会情報の処理に失敗しました",
       });
       throw error;
     } finally {
