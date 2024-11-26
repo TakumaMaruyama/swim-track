@@ -37,16 +37,22 @@ export function useUser() {
     revalidateOnReconnect: true,
     shouldRetryOnError: true,
     refreshInterval: 300000, // 5分ごとにセッションを検証
-    retry: 3, // エラー時に3回までリトライ
+    retry: (_, error) => {
+      // ネットワークエラーの場合のみリトライ
+      return error?.message?.includes('network') || error?.message?.includes('Failed to fetch');
+    },
+    retryCount: 3,
     onError: (error) => {
       console.log('[Auth] Session validation failed:', error);
-      // セッションエラーの場合のみユーザーデータをクリア
       if (error?.message?.includes('認証') || error?.message?.includes('セッション')) {
         console.log('[Auth] Clearing user data due to session error');
         mutate(undefined, false);
+      } else {
+        console.error('[Auth] Unexpected error:', error);
       }
     },
     dedupingInterval: 5000, // 5秒間は重複リクエストを防ぐ
+    keepPreviousData: true, // 新しいデータの取得中は古いデータを保持
   });
 
   const register = useCallback(async (user: InsertUser): Promise<AuthResult> => {

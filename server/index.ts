@@ -11,7 +11,8 @@ app.use(cors({
   origin: process.env.NODE_ENV === "development" ? "http://localhost:5000" : true,
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
+  exposedHeaders: ["set-cookie"],
 }));
 
 app.use(express.json());
