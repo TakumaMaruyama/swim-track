@@ -354,30 +354,14 @@ export function registerRoutes(app: Express) {
   app.post("/api/competitions", requireAuth, requireCoach, async (req, res) => {
     try {
       const { name, date, location } = req.body;
-      
-      // 日付の処理を修正
-      let competitionDate = null;
-      if (date) {
-        competitionDate = new Date(date);
-        // タイムゾーンの調整（日本時間）
-        competitionDate.setHours(competitionDate.getHours() + 9);
-      }
-      
       const [competition] = await db
         .insert(competitions)
         .values({
           name,
-          date: competitionDate,
+          date: new Date(date),
           location,
         })
         .returning();
-      
-      console.log('Created competition with date:', {
-        input: date,
-        parsed: competitionDate,
-        saved: competition
-      });
-      
       res.json(competition);
     } catch (error) {
       console.error('Error creating competition:', error);

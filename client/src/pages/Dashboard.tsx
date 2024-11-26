@@ -117,28 +117,12 @@ export default function Dashboard() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: '大会の作成に失敗しました' }));
-        throw new Error(errorData.message || '大会の作成に失敗しました');
+        throw new Error('Failed to create competition');
       }
 
-      const newCompetition = await response.json();
-      
-      // データを完全に再取得
       await mutateCompetitions();
-      
-      toast({
-        title: "作成成功",
-        description: "新しい大会が追加されました",
-      });
-
-      return newCompetition;
     } catch (error) {
       console.error('Error creating competition:', error);
-      toast({
-        variant: "destructive",
-        title: "エラー",
-        description: error instanceof Error ? error.message : "大会の作成に失敗しました",
-      });
       throw error;
     }
   };
@@ -204,8 +188,8 @@ export default function Dashboard() {
   }
 
   const upcomingCompetitions = competitions
-    ?.filter(comp => comp.date && new Date(comp.date) > new Date())
-    .sort((a, b) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime()) ?? [];
+    ?.filter(comp => new Date(comp.date) > new Date())
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) ?? [];
 
   const nextCompetition = upcomingCompetitions[0];
   const { days, hours } = nextCompetition 
