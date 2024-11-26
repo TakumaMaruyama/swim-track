@@ -8,9 +8,7 @@ export interface ExtendedSwimRecord {
   distance: number;
   time: string;
   date: Date | null;
-  isCompetition: boolean | null;
   poolLength: number;
-  competitionId: number | null;
   athleteName: string;
 }
 

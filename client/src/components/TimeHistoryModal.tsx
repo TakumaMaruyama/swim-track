@@ -308,8 +308,6 @@ export function TimeHistoryModal({
                 },
                 body: JSON.stringify({
                   ...values,
-                  isCompetition: editingRecord.isCompetition,
-                  competitionId: editingRecord.competitionId,
                 }),
                 credentials: 'include',
               });

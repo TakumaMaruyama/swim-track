@@ -88,10 +88,6 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
   const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
     try {
       setIsSubmitting(true);
-      // If not a competition, ensure competitionId is null
-      if (!values.isCompetition) {
-        values.competitionId = null;
-      }
       await onSubmit({ ...values, studentId });
       toast({
         title: record ? "更新成功" : "記録追加成功",
