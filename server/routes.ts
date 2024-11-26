@@ -372,7 +372,10 @@ export function registerRoutes(app: Express) {
           date: swimRecords.date,
           poolLength: swimRecords.poolLength,
           studentId: swimRecords.studentId,
-          athleteName: users.username
+          athleteName: users.username,
+          isCompetition: swimRecords.isCompetition,
+          competitionName: swimRecords.competitionName,
+          competitionLocation: swimRecords.competitionLocation
         })
         .from(swimRecords)
         .leftJoin(users, eq(swimRecords.studentId, users.id))
@@ -389,7 +392,7 @@ export function registerRoutes(app: Express) {
   app.put("/api/records/:id", requireAuth, requireCoach, async (req, res) => {
     try {
       const { id } = req.params;
-      const { style, distance, time, date, poolLength, studentId } = req.body;
+      const { style, distance, time, date, poolLength, studentId, isCompetition, competitionName, competitionLocation } = req.body;
 
       // Validate required fields
       if (!style || !distance || !time || !date) {
@@ -416,7 +419,10 @@ export function registerRoutes(app: Express) {
           time,
           date: new Date(date),
           poolLength,
-          studentId
+          studentId,
+          isCompetition: isCompetition ?? false,
+          competitionName: competitionName || null,
+          competitionLocation: competitionLocation || null
         })
         .where(eq(swimRecords.id, parseInt(id)))
         .returning();
@@ -451,7 +457,7 @@ export function registerRoutes(app: Express) {
 
   app.post("/api/records", requireAuth, requireCoach, async (req, res) => {
     try {
-      const { style, distance, time, date, poolLength, studentId } = req.body;
+      const { style, distance, time, date, poolLength, studentId, isCompetition, competitionName, competitionLocation } = req.body;
 
       const [record] = await db
         .insert(swimRecords)
@@ -461,7 +467,10 @@ export function registerRoutes(app: Express) {
           time,
           date: new Date(date),
           poolLength,
-          studentId
+          studentId,
+          isCompetition: isCompetition ?? false,
+          competitionName: competitionName || null,
+          competitionLocation: competitionLocation || null
         })
         .returning();
 

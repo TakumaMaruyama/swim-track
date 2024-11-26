@@ -10,6 +10,9 @@ export interface ExtendedSwimRecord {
   date: Date | null;
   poolLength: number;
   athleteName: string;
+  isCompetition: boolean;
+  competitionName: string | null;
+  competitionLocation: string | null;
 }
 
 export function useSwimRecords() {
