@@ -35,12 +35,18 @@ export function useUser() {
   } = useSWR<User>("/api/user", {
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
-    shouldRetryOnError: false,
-    refreshInterval: 300000,
-    onError: () => {
-      console.log('[Auth] Session validation failed, clearing user data');
-      mutate(undefined, false);
-    }
+    shouldRetryOnError: true,
+    refreshInterval: 300000, // 5分ごとにセッションを検証
+    retry: 3, // エラー時に3回までリトライ
+    onError: (error) => {
+      console.log('[Auth] Session validation failed:', error);
+      // セッションエラーの場合のみユーザーデータをクリア
+      if (error?.message?.includes('認証') || error?.message?.includes('セッション')) {
+        console.log('[Auth] Clearing user data due to session error');
+        mutate(undefined, false);
+      }
+    },
+    dedupingInterval: 5000, // 5秒間は重複リクエストを防ぐ
   });
 
   const register = useCallback(async (user: InsertUser): Promise<AuthResult> => {

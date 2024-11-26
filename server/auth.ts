@@ -50,14 +50,20 @@ export function setupAuth(app: Express) {
   const MemoryStore = createMemoryStore(session);
   const sessionSettings: session.SessionOptions = {
     secret: process.env.REPL_ID || "porygon-supremacy",
-    resave: true,
-    saveUninitialized: true,
+    resave: false,
+    saveUninitialized: false,
     rolling: true,
+    store: new MemoryStore({
+      checkPeriod: 86400000, // 24時間ごとに期限切れのセッションを削除
+      stale: false,
+    }),
+    name: 'swimtrack.sid', // デフォルトのconnect.sidを変更
     cookie: {
-      maxAge: 24 * 60 * 60 * 1000,
+      maxAge: 24 * 60 * 60 * 1000, // 24時間
       httpOnly: true,
-      secure: 'auto',
-      sameSite: 'lax'
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
     }
   };
 
@@ -165,6 +171,7 @@ export function setupAuth(app: Express) {
 
   passport.deserializeUser(async (id: number, done) => {
     try {
+      console.log('[Auth] Deserializing user:', id);
       const [user] = await db
         .select()
         .from(users)
@@ -172,13 +179,20 @@ export function setupAuth(app: Express) {
         .limit(1);
       
       if (!user) {
-        return done(new Error("ユーザーが見つかりません"));
+        console.log('[Auth] User not found during deserialization:', id);
+        return done(new Error("セッションが無効になりました。再度ログインしてください。"));
       }
 
+      if (!user.isActive) {
+        console.log('[Auth] Inactive user attempted access:', id);
+        return done(new Error("アカウントが無効化されています。"));
+      }
+
+      console.log('[Auth] User deserialized successfully:', id);
       done(null, user);
     } catch (err) {
-      console.error('Deserialization error:', err);
-      done(err);
+      console.error('[Auth] Deserialization error:', err);
+      done(new Error("認証エラーが発生しました。再度ログインしてください。"));
     }
   });
 
