@@ -123,16 +123,7 @@ export default function Dashboard() {
 
       const newCompetition = await response.json();
       
-      // 即時に新しいデータを反映
-      await mutateCompetitions((prevData) => {
-        if (!prevData) return [newCompetition];
-        return [...prevData, newCompetition];
-      }, {
-        revalidate: false, // まずローカルの更新
-        populateCache: true
-      });
-      
-      // その後、サーバーからの再取得を強制
+      // データを完全に再取得
       await mutateCompetitions();
       
       toast({

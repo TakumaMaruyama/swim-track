@@ -5,7 +5,7 @@ export function useCompetitions() {
   const { data: competitions, error, mutate } = useSWR<Competition[]>("/api/competitions", {
     revalidateOnFocus: true,
     revalidateOnMount: true,
-    refreshInterval: 0,
+    dedupingInterval: 0,
     shouldRetryOnError: true,
     errorRetryCount: 3
   });
@@ -14,10 +14,6 @@ export function useCompetitions() {
     competitions,
     isLoading: !error && !competitions,
     error,
-    mutate: () => mutate(undefined, { 
-      revalidate: true,
-      populateCache: true,
-      rollbackOnError: true 
-    })
+    mutate
   };
 }
