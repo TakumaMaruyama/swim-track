@@ -48,7 +48,7 @@ export default function CompetitionsPage() {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-6">
         {competitions?.map((competition) => (
-          <Card key={competition.name + competition.date}>
+          <Card key={`${competition.id}-${competition.name}`}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Trophy className="h-5 w-5" />

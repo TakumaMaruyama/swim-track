@@ -55,7 +55,11 @@ export function CompetitionForm({ isOpen, onClose, onSubmit }: CompetitionFormPr
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(values),
+        body: JSON.stringify({
+          name: values.name,
+          date: values.date,
+          location: values.location,
+        }),
         credentials: 'include',
       });
 
