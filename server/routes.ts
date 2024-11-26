@@ -422,17 +422,50 @@ export function registerRoutes(app: Express) {
           studentId: swimRecords.studentId,
           athleteName: users.username,
           isCompetition: swimRecords.isCompetition,
-          competitionName: swimRecords.competitionName,
-          competitionLocation: swimRecords.competitionLocation
+          competitionId: swimRecords.competitionId,
+          competitionName: competitions.name,
+          competitionLocation: competitions.location
         })
         .from(swimRecords)
         .leftJoin(users, eq(swimRecords.studentId, users.id))
+        .leftJoin(competitions, eq(swimRecords.competitionId, competitions.id))
         .orderBy(desc(swimRecords.date));
 
       res.json(allRecords);
     } catch (error) {
       console.error('Error fetching records:', error);
       res.status(500).json({ message: "記録の取得に失敗しました" });
+    }
+  });
+
+  // Create record endpoint
+  app.post("/api/records", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { style, distance, time, date, poolLength, studentId, isCompetition, competitionId } = req.body;
+
+      // Validate required fields
+      if (!style || !distance || !time || !date) {
+        return res.status(400).json({ message: "必須フィールドが不足しています" });
+      }
+
+      const [record] = await db
+        .insert(swimRecords)
+        .values({
+          style,
+          distance,
+          time,
+          date: new Date(date),
+          poolLength,
+          studentId,
+          isCompetition: isCompetition ?? false,
+          competitionId: competitionId || null,
+        })
+        .returning();
+
+      res.json(record);
+    } catch (error) {
+      console.error('Error creating record:', error);
+      res.status(500).json({ message: "記録の作成に失敗しました" });
     }
   });
 
@@ -529,6 +562,25 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Competitions API endpoints
+  app.get("/api/competitions", requireAuth, async (req, res) => {
+    try {
+      const competitionsList = await db
+        .select({
+          id: competitions.id,
+          name: competitions.name,
+          location: competitions.location,
+          date: competitions.date,
+        })
+        .from(competitions)
+        .orderBy(competitions.date);
+
+      res.json(competitionsList);
+    } catch (error) {
+      console.error('Error fetching competitions:', error);
+      res.status(500).json({ message: "大会情報の取得に失敗しました" });
+    }
+  });
   app.get("/health", (req, res) => {
     res.json({ status: "ok" });
   });

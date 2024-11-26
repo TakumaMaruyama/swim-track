@@ -1,22 +1,8 @@
-import React, { useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { 
-  Users, 
-  ClipboardList,
-  LogOut,
-  UserX,
-  Key,
-  Trophy
-} from 'lucide-react'
-import { useUser } from '../hooks/use-user'
-import { useLocation } from 'wouter'
-import { useMobile } from '../hooks/use-mobile'
-import { MobileNav } from '../components/MobileNav'
-import { useSwimRecords } from '../hooks/use-swim-records'
-import { PageHeader } from '../components/PageHeader'
-import { useToast } from '@/hooks/use-toast';
+import React, { useEffect, useState, useMemo } from 'react';
+import { useLocation } from 'wouter';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,18 +13,54 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { useUser } from "../hooks/use-user";
+import { useMobile } from "../hooks/use-mobile";
+import { MobileNav } from "../components/MobileNav";
 import { UserPasswordList } from '../components/UserPasswordList';
+import { LogOut, UserX, ClipboardList, Users, Trophy, Key } from 'lucide-react';
+import useSWR from 'swr';
 
-
+type Competition = {
+  id: number;
+  name: string;
+  location: string;
+  date: string;
+};
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
   const { user, isLoading, logout, deleteAccount } = useUser();
   const isMobile = useMobile();
   const { toast } = useToast();
-  const [showLogoutDialog, setShowLogoutDialog] = React.useState(false);
-  const [showDeleteAccountDialog, setShowDeleteAccountDialog] = React.useState(false);
-  const [showPasswordList, setShowPasswordList] = React.useState(false);
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [showDeleteAccountDialog, setShowDeleteAccountDialog] = useState(false);
+  const [showPasswordList, setShowPasswordList] = useState(false);
+  
+  const { data: competitions } = useSWR<Competition[]>('/api/competitions');
+
+  const { nextCompetition, upcomingCompetitions, daysUntilNextCompetition } = useMemo(() => {
+    if (!competitions?.length) {
+      return { nextCompetition: null, upcomingCompetitions: [], daysUntilNextCompetition: null };
+    }
+
+    const now = new Date();
+    const futureCompetitions = competitions
+      .filter(comp => new Date(comp.date) > now)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    const next = futureCompetitions[0];
+    const upcoming = futureCompetitions.slice(0, 5);
+    const daysUntil = next ? 
+      Math.ceil((new Date(next.date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : 
+      null;
+
+    return {
+      nextCompetition: next,
+      upcomingCompetitions: upcoming,
+      daysUntilNextCompetition: daysUntil
+    };
+  }, [competitions]);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -88,8 +110,6 @@ export default function Dashboard() {
       });
     }
   };
-
-  
 
   if (isLoading) {
     return <div className="flex items-center justify-center min-h-screen">読み込み中...</div>;
@@ -180,22 +200,64 @@ export default function Dashboard() {
 
       <main className="flex-grow">
         <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-4">
+          <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>ダッシュボード</CardTitle>
+                <CardTitle>次回の大会</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground">
-                  SwimTrackへようこそ。メニューから機能を選択してください。
-                </p>
+                {nextCompetition ? (
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-semibold">{nextCompetition.name}</h3>
+                    <p className="text-muted-foreground">
+                      開催場所: {nextCompetition.location}
+                    </p>
+                    <p className="text-muted-foreground">
+                      開催日: {new Date(nextCompetition.date).toLocaleDateString('ja-JP')}
+                    </p>
+                    <p className="text-sm font-medium text-primary">
+                      あと{daysUntilNextCompetition}日
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">
+                    予定されている大会はありません
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>今後の大会スケジュール</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {upcomingCompetitions?.length ? (
+                  <div className="space-y-4">
+                    {upcomingCompetitions.map((competition) => (
+                      <div key={competition.id} className="flex justify-between items-center">
+                        <div>
+                          <p className="font-medium">{competition.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {competition.location}
+                          </p>
+                        </div>
+                        <p className="text-sm">
+                          {new Date(competition.date).toLocaleDateString('ja-JP')}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">
+                    予定されている大会はありません
+                  </p>
+                )}
               </CardContent>
             </Card>
           </div>
         </div>
       </main>
-
-      
 
       <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
         <AlertDialogContent>
