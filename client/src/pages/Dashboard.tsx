@@ -123,13 +123,16 @@ export default function Dashboard() {
 
       const newCompetition = await response.json();
       
-      // mutate を最適化：新しい大会データをローカルで即時に反映
+      // 即時に新しいデータを反映
       await mutateCompetitions((prevData) => {
         if (!prevData) return [newCompetition];
         return [...prevData, newCompetition];
-      }, false);
+      }, {
+        revalidate: false, // まずローカルの更新
+        populateCache: true
+      });
       
-      // 確実にデータを再取得
+      // その後、サーバーからの再取得を強制
       await mutateCompetitions();
       
       toast({

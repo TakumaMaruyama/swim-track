@@ -14,6 +14,10 @@ export function useCompetitions() {
     competitions,
     isLoading: !error && !competitions,
     error,
-    mutate: () => mutate(undefined, { revalidate: true, rollbackOnError: true })
+    mutate: () => mutate(undefined, { 
+      revalidate: true,
+      populateCache: true,
+      rollbackOnError: true 
+    })
   };
 }
