@@ -244,20 +244,24 @@ export function TimeHistoryModal({
                             </div>
                             {user?.role === 'coach' && (
                               <div className="flex gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => setEditingRecord(record)}
-                                >
-                                  <Edit2 className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => setDeletingRecord(record.id)}
-                                >
-                                  <Trash2 className="h-4 w-4 text-red-500" />
-                                </Button>
+                                <div className="flex gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setEditingRecord(record)}
+                                    className="hover:bg-gray-100"
+                                  >
+                                    <Edit2 className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setDeletingRecord(record.id)}
+                                    className="hover:bg-red-100"
+                                  >
+                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                  </Button>
+                                </div>
                               </div>
                             )}
                           </div>
@@ -311,12 +315,17 @@ export function TimeHistoryModal({
                 headers: {
                   'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(values),
+                body: JSON.stringify({
+                  ...values,
+                  isCompetition: editingRecord.isCompetition,
+                  competitionId: editingRecord.competitionId,
+                }),
                 credentials: 'include',
               });
 
               if (!response.ok) {
-                throw new Error('記録の更新に失敗しました');
+                const error = await response.json();
+                throw new Error(error.message || '記録の更新に失敗しました');
               }
 
               toast({
@@ -324,6 +333,8 @@ export function TimeHistoryModal({
                 description: "記録が更新されました",
               });
 
+              setEditingRecord(null);
+              
               if (onRecordDeleted) {
                 onRecordDeleted();
               }
@@ -332,7 +343,7 @@ export function TimeHistoryModal({
               toast({
                 variant: "destructive",
                 title: "エラー",
-                description: "記録の更新に失敗しました",
+                description: error instanceof Error ? error.message : "記録の更新に失敗しました",
               });
               throw error;
             }
