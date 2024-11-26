@@ -1,0 +1,96 @@
+このコードを見る限り、いくつかの懸念点や確認すべき点があります：
+
+エラーハンドリング
+typescript
+
+Copy
+isLoading: !error && !competitions
+この条件は少し問題があります。competitionsがundefinedの場合とnullの場合を同じように扱っているため、データ取得中の状態と、データがない状態を区別できていない可能性があります。
+
+APIエンドポイント "/api/competitions"が正しく実装されているか確認してください。
+エンドポイントが正しいURLになっているか
+サーバーサイドで正しくデータを返しているか
+fetcher関数の確認 useSWRには通常、fetcher関数が必要です。デフォルトのfetcherを使用している場合は問題ありませんが、明示的に定義することをおすすめします：
+typescript
+
+Copy
+const fetcher = (url: string) => fetch(url).then(res => res.json());
+
+export function useCompetitions() {
+  const { data: competitions, error, mutate } = useSWR<Competition[]>(
+    "/api/competitions", 
+    fetcher,
+    {
+      revalidateOnFocus: true,
+      revalidateOnMount: true,
+      dedupingInterval: 0,
+      shouldRetryOnError: true,
+      errorRetryCount: 3
+    }
+  );
+  
+  return {
+    competitions,
+    isLoading: !error && !competitions,
+    error,
+    mutate
+  };
+}
+デバッグのためのログ追加 トラブルシューティングのため、以下のようにログを追加することをおすすめします：
+typescript
+
+Copy
+export function useCompetitions() {
+  const { data: competitions, error, mutate } = useSWR<Competition[]>(
+    "/api/competitions", 
+    {
+      // ... 既存のオプション
+      onError: (error) => {
+        console.error('Competitions fetch error:', error);
+      },
+      onSuccess: (data) => {
+        console.log('Competitions data:', data);
+      }
+    }
+  );
+  
+  return {
+    competitions,
+    isLoading: !error && !competitions,
+    error,
+    mutate
+  };
+}
+コンポーネントでの使用例 データ取得と表示の例：
+typescript
+
+Copy
+function CompetitionList() {
+  const { competitions, isLoading, error } = useCompetitions();
+
+  if (isLoading) return <div>Loading...</div>;
+  if (error) return <div>Error loading competitions</div>;
+  if (!competitions || competitions.length === 0) return <div>No competitions found</div>;
+
+  return (
+    <div>
+      {competitions.map((competition) => (
+        <div key={competition.id}>
+          {/* 大会情報を表示 */}
+        </div>
+      ))}
+    </div>
+  );
+}
+追加で確認すべき点：
+
+APIエンドポイントが正しく実装されているか
+ネットワークタブでリクエストの状態を確認
+サーバーサイドのレスポンスを確認
+これらの点を確認することで、フロントエンドに大会情報が表示されない原因を特定できるでしょう。
+
+Copy
+Retry
+
+
+
