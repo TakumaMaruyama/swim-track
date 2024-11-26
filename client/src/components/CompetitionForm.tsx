@@ -25,29 +25,38 @@ import { useToast } from "@/hooks/use-toast";
 import { competitionSchema } from "@/lib/schema";
 
 type CompetitionFormProps = {
+  competition?: {
+    id: number;
+    name: string;
+    location: string;
+    date: string;
+  };
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (values: z.infer<typeof competitionSchema>) => Promise<void>;
+  onSubmit: (values: z.infer<typeof competitionSchema>, id?: number) => Promise<void>;
 };
 
-export function CompetitionForm({ isOpen, onClose, onSubmit }: CompetitionFormProps) {
+export function CompetitionForm({ competition, isOpen, onClose, onSubmit }: CompetitionFormProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const form = useForm({
     resolver: zodResolver(competitionSchema),
     defaultValues: {
-      name: "",
-      location: "",
-      date: new Date().toISOString().split('T')[0],
+      name: competition?.name || "",
+      location: competition?.location || "",
+      date: competition?.date ? new Date(competition.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
     },
   });
 
   const handleSubmit = async (values: z.infer<typeof competitionSchema>) => {
     try {
       setIsSubmitting(true);
-      const response = await fetch('/api/competitions', {
-        method: 'POST',
+      const url = competition ? `/api/competitions/${competition.id}` : '/api/competitions';
+      const method = competition ? 'PUT' : 'POST';
+      
+      const response = await fetch(url, {
+        method,
         headers: {
           'Content-Type': 'application/json',
         },
@@ -60,7 +69,7 @@ export function CompetitionForm({ isOpen, onClose, onSubmit }: CompetitionFormPr
         throw new Error(error.message || '大会情報の追加に失敗しました');
       }
 
-      await onSubmit(values);
+      await onSubmit(values, competition?.id);
       form.reset();
     } catch (error) {
       console.error('Error adding competition:', error);
@@ -79,9 +88,9 @@ export function CompetitionForm({ isOpen, onClose, onSubmit }: CompetitionFormPr
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>大会情報の追加</DialogTitle>
+          <DialogTitle>{competition ? '大会情報の編集' : '大会情報の追加'}</DialogTitle>
           <DialogDescription>
-            新しい大会情報を登録します
+            {competition ? '大会情報を編集します' : '新しい大会情報を登録します'}
           </DialogDescription>
         </DialogHeader>
 

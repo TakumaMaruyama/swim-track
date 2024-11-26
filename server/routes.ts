@@ -581,6 +581,59 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ message: "大会情報の取得に失敗しました" });
     }
   });
+
+  app.put("/api/competitions/:id", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, location, date } = req.body;
+
+      const [updatedCompetition] = await db
+        .update(competitions)
+        .set({
+          name,
+          location,
+          date: new Date(date),
+        })
+        .where(eq(competitions.id, parseInt(id)))
+        .returning();
+
+      if (!updatedCompetition) {
+        return res.status(404).json({ message: "大会情報が見つかりません" });
+      }
+
+      res.json(updatedCompetition);
+    } catch (error) {
+      console.error('Error updating competition:', error);
+      res.status(500).json({ message: "大会情報の更新に失敗しました" });
+    }
+  });
+
+  app.delete("/api/competitions/:id", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // First check if the competition exists
+      const [competition] = await db
+        .select()
+        .from(competitions)
+        .where(eq(competitions.id, parseInt(id)))
+        .limit(1);
+
+      if (!competition) {
+        return res.status(404).json({ message: "大会情報が見つかりません" });
+      }
+
+      // Remove competition
+      await db
+        .delete(competitions)
+        .where(eq(competitions.id, parseInt(id)));
+
+      res.json({ message: "大会情報を削除しました" });
+    } catch (error) {
+      console.error('Error deleting competition:', error);
+      res.status(500).json({ message: "大会情報の削除に失敗しました" });
+    }
+  });
   app.get("/health", (req, res) => {
     res.json({ status: "ok" });
   });
