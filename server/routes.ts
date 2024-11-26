@@ -2,7 +2,7 @@ import { Express } from "express";
 import { setupAuth } from "./auth";
 import multer from "multer";
 import { db } from "db";
-import { documents, users, swimRecords, categories } from "db/schema";
+import { documents, users, swimRecords, categories, competitions } from "db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import path from "path";
 import fs from "fs/promises";
