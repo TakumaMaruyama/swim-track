@@ -12,8 +12,10 @@ import { Trophy, Plus } from "lucide-react";
 import useSWR from 'swr';
 import { CompetitionForm } from '@/components/CompetitionForm';
 import { competitionSchema } from '@/lib/schema';
+import * as z from 'zod';
 
 type Competition = {
+  id: number;
   name: string;
   location: string;
   date: string;
@@ -36,20 +38,16 @@ export default function CompetitionsPage() {
 
   return (
     <div className="container mx-auto py-6">
-      <PageHeader
-        heading="大会情報"
-        description="大会情報の管理と記録の閲覧"
-        actions={
-          <Button onClick={() => setIsAddingCompetition(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            大会を追加
-          </Button>
-        }
-      />
+      <PageHeader title="大会情報">
+        <Button onClick={() => setIsAddingCompetition(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          大会を追加
+        </Button>
+      </PageHeader>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-6">
         {competitions?.map((competition) => (
-          <Card key={`${competition.id}-${competition.name}`}>
+          <Card key={competition.id}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Trophy className="h-5 w-5" />

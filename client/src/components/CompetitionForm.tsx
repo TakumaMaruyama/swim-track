@@ -77,7 +77,7 @@ export function CompetitionForm({ isOpen, onClose, onSubmit }: CompetitionFormPr
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>大会情報の追加</DialogTitle>
           <DialogDescription>
