@@ -355,20 +355,28 @@ export function registerRoutes(app: Express) {
     try {
       const { name, date, location } = req.body;
       
-      // 日付が文字列で来た場合にDate型に変換
-      const competitionDate = date ? new Date(date) : null;
+      // 日付の処理を修正
+      let competitionDate = null;
+      if (date) {
+        competitionDate = new Date(date);
+        // タイムゾーンの調整（日本時間）
+        competitionDate.setHours(competitionDate.getHours() + 9);
+      }
       
       const [competition] = await db
         .insert(competitions)
         .values({
           name,
-          date: competitionDate,  // nullを許容
+          date: competitionDate,
           location,
         })
         .returning();
       
-      // レスポンスの前にログを追加
-      console.log('Created competition:', competition);
+      console.log('Created competition with date:', {
+        input: date,
+        parsed: competitionDate,
+        saved: competition
+      });
       
       res.json(competition);
     } catch (error) {
