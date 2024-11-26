@@ -194,18 +194,7 @@ export default function Dashboard() {
         </div>
       </main>
 
-      <EditCompetitionForm
-        competition={editingCompetition === -1 ? undefined : competition}
-        isOpen={!!editingCompetition}
-        onClose={() => setEditingCompetition(null)}
-        onSubmit={async (data) => {
-          if (editingCompetition === -1) {
-            await handleCreateCompetition(data);
-          } else if (competition) {
-            await handleEditCompetition(competition.id, data);
-          }
-        }}
-      />
+      
 
       <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
         <AlertDialogContent>
