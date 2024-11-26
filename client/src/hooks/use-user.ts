@@ -53,6 +53,19 @@ export function useUser() {
     },
     dedupingInterval: 5000, // 5秒間は重複リクエストを防ぐ
     keepPreviousData: true, // 新しいデータの取得中は古いデータを保持
+    fetcher: async (url) => {
+      const response = await fetch(url, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || '認証エラーが発生しました');
+      }
+      return response.json();
+    },
   });
 
   const register = useCallback(async (user: InsertUser): Promise<AuthResult> => {
