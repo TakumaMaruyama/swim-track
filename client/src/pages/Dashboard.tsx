@@ -30,8 +30,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { UserPasswordList } from '../components/UserPasswordList';
 
-
-
 export default function Dashboard() {
   const [, navigate] = useLocation();
   const { user, isLoading, logout, deleteAccount } = useUser();
@@ -40,11 +38,12 @@ export default function Dashboard() {
   const [showLogoutDialog, setShowLogoutDialog] = React.useState(false);
   const [showDeleteAccountDialog, setShowDeleteAccountDialog] = React.useState(false);
   const [showPasswordList, setShowPasswordList] = React.useState(false);
-  const { activities, isActivitiesLoading, activitiesError } = useRecentActivities();
+  const { activities, isLoading: isActivitiesLoading, error: activitiesError } = useRecentActivities();
 
   useEffect(() => {
     if (!isLoading && !user) {
       navigate('/login');
+      return;
     }
   }, [user, isLoading, navigate]);
 
@@ -90,8 +89,6 @@ export default function Dashboard() {
       });
     }
   };
-
-  
 
   if (isLoading) {
     return <div className="flex items-center justify-center min-h-screen">読み込み中...</div>;
@@ -201,19 +198,22 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {isActivitiesLoading ? (
+                    {isActivitiesLoading && (
                       <p className="text-muted-foreground">読み込み中...</p>
-                    ) : activitiesError ? (
+                    )}
+                    {activitiesError && (
                       <p className="text-destructive">データの取得に失敗しました</p>
-                    ) : !activities?.length ? (
+                    )}
+                    {!isActivitiesLoading && !activitiesError && (!activities || activities.length === 0) && (
                       <p className="text-muted-foreground">最近の活動はありません</p>
-                    ) : (
+                    )}
+                    {!isActivitiesLoading && !activitiesError && activities && activities.length > 0 && (
                       activities.map((activity) => (
                         <div
                           key={`${activity.type}-${activity.id}`}
                           className="flex items-center justify-between p-4 rounded-lg border bg-card text-card-foreground shadow-sm"
                         >
-                          {activity.type === 'competition' ? (
+                          {activity.type === 'competition' && activity.details?.name ? (
                             <>
                               <div>
                                 <p className="font-medium">{activity.details.name}</p>
@@ -225,7 +225,7 @@ export default function Dashboard() {
                                 {new Date(activity.date).toLocaleDateString('ja-JP')}
                               </div>
                             </>
-                          ) : (
+                          ) : activity.details?.style && activity.details?.distance ? (
                             <>
                               <div>
                                 <p className="font-medium">
@@ -239,7 +239,7 @@ export default function Dashboard() {
                                 {new Date(activity.date).toLocaleDateString('ja-JP')}
                               </div>
                             </>
-                          )}
+                          ) : null}
                         </div>
                       ))
                     )}
@@ -250,8 +250,6 @@ export default function Dashboard() {
           </div>
         </div>
       </main>
-
-      
 
       <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
         <AlertDialogContent>
