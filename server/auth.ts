@@ -48,20 +48,27 @@ declare global {
 
 export function setupAuth(app: Express) {
   const MemoryStore = createMemoryStore(session);
+  // Session settings with enhanced security and management
+  const SESSION_MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours
+  const SESSION_REFRESH_THRESHOLD = 30 * 60 * 1000; // 30 minutes
+
   const sessionSettings: session.SessionOptions = {
     secret: process.env.REPL_ID || "porygon-supremacy",
     resave: false,
     saveUninitialized: false,
     rolling: true,
     store: new MemoryStore({
-      checkPeriod: 86400000 // Prune expired entries every 24h
+      checkPeriod: 86400000, // Prune expired entries every 24h
+      stale: false, // Don't serve stale sessions
     }),
     cookie: {
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      maxAge: SESSION_MAX_AGE,
       httpOnly: true,
       secure: 'auto',
-      sameSite: 'lax'
-    }
+      sameSite: 'lax',
+      path: '/'
+    },
+    name: 'sessionId', // Custom cookie name
   };
 
   app.use(session(sessionSettings));
@@ -318,43 +325,99 @@ export function setupAuth(app: Express) {
 
   // Session refresh endpoint
   app.post("/api/refresh", async (req, res) => {
+    console.log('[Auth] Processing refresh request');
+
     if (!req.session || !req.sessionID) {
       console.log('[Auth] No session to refresh');
-      return res.status(401).json({ message: "セッションが見つかりません" });
+      return res.status(401).json({ 
+        message: "セッションが見つかりません",
+        code: "SESSION_NOT_FOUND"
+      });
     }
 
-    if (req.isAuthenticated()) {
-      console.log('[Auth] Session still valid, extending');
-      // Touch the session to extend its lifetime
-      req.session.touch();
+    // Check if session is close to expiry
+    const sessionExpiryTime = new Date(req.session.cookie.expires || 0).getTime();
+    const currentTime = Date.now();
+    const timeUntilExpiry = sessionExpiryTime - currentTime;
+
+    if (req.isAuthenticated() && timeUntilExpiry > SESSION_REFRESH_THRESHOLD) {
+      console.log('[Auth] Session still valid, no refresh needed');
       return res.json(req.user);
     }
 
     // Try to revalidate the session
     try {
+      const userId = req.session.passport?.user;
+      
+      if (!userId) {
+        console.log('[Auth] No user ID in session');
+        return res.status(401).json({ 
+          message: "セッション情報が不完全です",
+          code: "INVALID_SESSION"
+        });
+      }
+
       const [user] = await db
         .select()
         .from(users)
-        .where(eq(users.id, req.session.passport?.user))
+        .where(eq(users.id, userId))
         .limit(1);
 
       if (!user) {
         console.log('[Auth] User not found for session refresh');
-        return res.status(401).json({ message: "ユーザーが見つかりません" });
+        req.session.destroy((err) => {
+          if (err) console.error('[Auth] Error destroying invalid session:', err);
+        });
+        return res.status(401).json({ 
+          message: "ユーザーが見つかりません",
+          code: "USER_NOT_FOUND"
+        });
       }
 
-      // Re-establish the session
-      req.login(user, (err) => {
-        if (err) {
-          console.error('[Auth] Session refresh failed:', err);
-          return res.status(500).json({ message: "セッションの更新に失敗しました" });
-        }
-        console.log('[Auth] Session refreshed successfully');
-        res.json(user);
+      if (!user.isActive) {
+        console.log('[Auth] Inactive user attempted refresh');
+        req.session.destroy((err) => {
+          if (err) console.error('[Auth] Error destroying session for inactive user:', err);
+        });
+        return res.status(401).json({ 
+          message: "アカウントが無効化されています",
+          code: "ACCOUNT_INACTIVE"
+        });
+      }
+
+      // Re-establish the session with error handling
+      await new Promise<void>((resolve, reject) => {
+        req.login(user, (err) => {
+          if (err) {
+            console.error('[Auth] Session refresh failed:', err);
+            reject(err);
+            return;
+          }
+          
+          // Explicitly set new expiry
+          if (req.session) {
+            req.session.cookie.maxAge = SESSION_MAX_AGE;
+            req.session.touch();
+          }
+          
+          resolve();
+        });
       });
+
+      console.log('[Auth] Session refreshed successfully');
+      res.json(user);
     } catch (error) {
       console.error('[Auth] Session refresh error:', error);
-      res.status(500).json({ message: "セッションの更新に失敗しました" });
+      
+      // Clean up the session on error
+      req.session.destroy((err) => {
+        if (err) console.error('[Auth] Error destroying session after refresh failure:', err);
+      });
+      
+      res.status(500).json({ 
+        message: "セッションの更新に失敗しました",
+        code: "REFRESH_FAILED"
+      });
     }
   });
 }

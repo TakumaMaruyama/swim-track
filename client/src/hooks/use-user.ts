@@ -27,8 +27,12 @@ export function useUser() {
     error: null
   });
 
+  const [retryCount, setRetryCount] = useState(0);
+  const MAX_RETRY_ATTEMPTS = 3;
+  const RETRY_DELAY = 1000; // 1 second
+
   const { 
-    data, 
+    data: user, 
     error: swrError, 
     isLoading: swrLoading, 
     mutate 
@@ -39,29 +43,59 @@ export function useUser() {
     refreshInterval: 60000, // Check every minute
     onError: async (error) => {
       console.log('[Auth] Session validation failed, attempting refresh');
+      
+      if (retryCount >= MAX_RETRY_ATTEMPTS) {
+        console.log('[Auth] Max retry attempts reached, clearing user data');
+        setRetryCount(0);
+        mutate(undefined, { revalidate: false });
+        return;
+      }
+
       try {
+        // Add exponential backoff delay
+        const delay = RETRY_DELAY * Math.pow(2, retryCount);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        
         const response = await fetch('/api/refresh', {
           method: 'POST',
-          credentials: 'include'
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json'
+          }
         });
         
         if (!response.ok) {
-          console.log('[Auth] Refresh failed, clearing user data');
-          mutate(undefined, false);
-          return;
+          const errorData = await response.json().catch(() => ({}));
+          console.log('[Auth] Refresh failed:', errorData.message || 'Unknown error');
+          
+          if (response.status === 401) {
+            console.log('[Auth] Session expired, clearing user data');
+            mutate(undefined, { revalidate: false });
+            return;
+          }
+          
+          setRetryCount(prev => prev + 1);
+          throw new Error(errorData.message || 'セッションの更新に失敗しました');
         }
 
         const refreshedUser = await response.json();
         console.log('[Auth] Session refreshed successfully');
-        mutate(refreshedUser, false);
+        setRetryCount(0);
+        await mutate(refreshedUser, { revalidate: false });
       } catch (e) {
-        console.log('[Auth] Refresh failed, clearing user data');
-        mutate(undefined, false);
+        console.error('[Auth] Refresh error:', e);
+        setRetryCount(prev => prev + 1);
+        
+        if (retryCount + 1 >= MAX_RETRY_ATTEMPTS) {
+          console.log('[Auth] Max retry attempts reached after error');
+          setRetryCount(0);
+          mutate(undefined, { revalidate: false });
+        }
       }
     }
   });
 
-  const register = useCallback(async (user: InsertUser): Promise<AuthResult> => {
+  const register = useCallback(async (userData: InsertUser): Promise<AuthResult> => {
     if (authState.isLoading) {
       console.log('[Auth] Registration already in progress');
       return { ok: false, message: "登録処理中です" };
@@ -74,7 +108,7 @@ export function useUser() {
       const response = await fetch("/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(user),
+        body: JSON.stringify(userData),
         credentials: "include",
       });
 
@@ -87,33 +121,25 @@ export function useUser() {
           field: data.field,
           errors: data.errors,
         };
-        setAuthState({
-          isLoading: false,
-          error
-        });
+        setAuthState({ isLoading: false, error });
         return { ok: false, ...error };
       }
 
       console.log('[Auth] Registration successful');
-      await mutate();
+      await mutate(data.user, { revalidate: false });
       return { ok: true, user: data.user };
-    } catch (e: any) {
+    } catch (e) {
       console.error('[Auth] Registration error:', e);
       const error = {
         message: "サーバーとの通信に失敗しました",
         field: "network",
       };
-      setAuthState({
-        isLoading: false,
-        error
-      });
+      setAuthState({ isLoading: false, error });
       return { ok: false, ...error };
-    } finally {
-      setAuthState(prev => ({ ...prev, isLoading: false }));
     }
   }, [authState.isLoading, mutate]);
 
-  const login = useCallback(async (user: InsertUser): Promise<AuthResult> => {
+  const login = useCallback(async (credentials: InsertUser): Promise<AuthResult> => {
     if (authState.isLoading) {
       console.log('[Auth] Login already in progress');
       return { ok: false, message: "ログイン処理中です" };
@@ -126,7 +152,7 @@ export function useUser() {
       const response = await fetch("/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(user),
+        body: JSON.stringify(credentials),
         credentials: "include",
       });
 
@@ -139,29 +165,21 @@ export function useUser() {
           field: data.field,
           errors: data.errors,
         };
-        setAuthState({
-          isLoading: false,
-          error
-        });
+        setAuthState({ isLoading: false, error });
         return { ok: false, ...error };
       }
 
       console.log('[Auth] Login successful');
-      await mutate();
+      await mutate(data.user, { revalidate: false });
       return { ok: true, user: data.user };
-    } catch (e: any) {
+    } catch (e) {
       console.error('[Auth] Login error:', e);
       const error = {
         message: "サーバーとの通信に失敗しました",
         field: "network",
       };
-      setAuthState({
-        isLoading: false,
-        error
-      });
+      setAuthState({ isLoading: false, error });
       return { ok: false, ...error };
-    } finally {
-      setAuthState(prev => ({ ...prev, isLoading: false }));
     }
   }, [authState.isLoading, mutate]);
 
@@ -182,25 +200,17 @@ export function useUser() {
 
       if (!response.ok) {
         const error = { message: data.message || "ログアウトに失敗しました" };
-        setAuthState({
-          isLoading: false,
-          error
-        });
+        setAuthState({ isLoading: false, error });
         return { ok: false, ...error };
       }
 
-      await mutate(undefined, false);
+      await mutate(undefined, { revalidate: false });
       return { ok: true };
-    } catch (e: any) {
+    } catch (e) {
       console.error('[Auth] Logout error:', e);
       const error = { message: "サーバーとの通信に失敗しました" };
-      setAuthState({
-        isLoading: false,
-        error
-      });
+      setAuthState({ isLoading: false, error });
       return { ok: false, ...error };
-    } finally {
-      setAuthState(prev => ({ ...prev, isLoading: false }));
     }
   }, [authState.isLoading, mutate]);
 
@@ -220,33 +230,25 @@ export function useUser() {
 
       if (!response.ok) {
         const error = { message: data.message || "アカウントの削除に失敗しました" };
-        setAuthState({
-          isLoading: false,
-          error
-        });
+        setAuthState({ isLoading: false, error });
         return { ok: false, ...error };
       }
 
-      await mutate(undefined, false);
+      await mutate(undefined, { revalidate: false });
       return { ok: true, message: data.message };
     } catch (error) {
-      console.error('Error deleting account:', error);
+      console.error('[Auth] Account deletion error:', error);
       const errorMessage = { message: "サーバーとの通信に失敗しました" };
-      setAuthState({
-        isLoading: false,
-        error: errorMessage
-      });
+      setAuthState({ isLoading: false, error: errorMessage });
       return { ok: false, ...errorMessage };
-    } finally {
-      setAuthState(prev => ({ ...prev, isLoading: false }));
     }
   }, [authState.isLoading, mutate]);
 
   return {
-    user: data,
+    user,
     isLoading: swrLoading || authState.isLoading,
     isLoginPending: authState.isLoading,
-    isAuthenticated: !!data,
+    isAuthenticated: !!user,
     error: authState.error || (swrError ? { message: "認証に失敗しました" } : null),
     register,
     login,
