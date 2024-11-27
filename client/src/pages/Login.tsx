@@ -64,8 +64,8 @@ export default function Login() {
           title: "ログイン成功",
           description: "ダッシュボードに移動します",
         });
-        // Force reload navigation
-        window.location.replace('/');
+        // Use client-side navigation
+        navigate('/');
         return;
       }
 
