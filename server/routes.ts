@@ -2,7 +2,7 @@ import { Express } from "express";
 import { setupAuth } from "./auth";
 import multer from "multer";
 import { db } from "db";
-import { documents, users, swimRecords, categories, competitions } from "db/schema";
+import { documents, users, swimRecords, categories, competitions, announcements } from "db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import path from "path";
 import fs from "fs/promises";
@@ -500,6 +500,103 @@ export function registerRoutes(app: Express) {
     } catch (error) {
       console.error('Error deleting record:', error);
       res.status(500).json({ message: "記録の削除に失敗しました" });
+    }
+  });
+  // Announcements API endpoints
+  app.get("/api/announcements", requireAuth, async (req, res) => {
+    try {
+      const allAnnouncements = await db
+        .select({
+          id: announcements.id,
+          title: announcements.title,
+          content: announcements.content,
+          createdBy: announcements.createdBy,
+          createdAt: announcements.createdAt,
+          updatedAt: announcements.updatedAt,
+          authorName: users.username
+        })
+        .from(announcements)
+        .leftJoin(users, eq(announcements.createdBy, users.id))
+        .orderBy(desc(announcements.createdAt));
+
+      res.json(allAnnouncements);
+    } catch (error) {
+      console.error('Error fetching announcements:', error);
+      res.status(500).json({ message: "お知らせの取得に失敗しました" });
+    }
+  });
+
+  app.post("/api/announcements", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { title, content } = req.body;
+
+      if (!title || !content) {
+        return res.status(400).json({ message: "タイトルと内容は必須です" });
+      }
+
+      const [announcement] = await db
+        .insert(announcements)
+        .values({
+          title,
+          content,
+          createdBy: req.user!.id,
+        })
+        .returning();
+
+      res.json(announcement);
+    } catch (error) {
+      console.error('Error creating announcement:', error);
+      res.status(500).json({ message: "お知らせの作成に失敗しました" });
+    }
+  });
+
+  app.put("/api/announcements/:id", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { title, content } = req.body;
+
+      if (!title || !content) {
+        return res.status(400).json({ message: "タイトルと内容は必須です" });
+      }
+
+      const [announcement] = await db
+        .update(announcements)
+        .set({
+          title,
+          content,
+          updatedAt: new Date(),
+        })
+        .where(eq(announcements.id, parseInt(id)))
+        .returning();
+
+      if (!announcement) {
+        return res.status(404).json({ message: "お知らせが見つかりません" });
+      }
+
+      res.json(announcement);
+    } catch (error) {
+      console.error('Error updating announcement:', error);
+      res.status(500).json({ message: "お知らせの更新に失敗しました" });
+    }
+  });
+
+  app.delete("/api/announcements/:id", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const [deletedAnnouncement] = await db
+        .delete(announcements)
+        .where(eq(announcements.id, parseInt(id)))
+        .returning();
+
+      if (!deletedAnnouncement) {
+        return res.status(404).json({ message: "お知らせが見つかりません" });
+      }
+
+      res.json({ message: "お知らせが削除されました" });
+    } catch (error) {
+      console.error('Error deleting announcement:', error);
+      res.status(500).json({ message: "お知らせの削除に失敗しました" });
     }
   });
 
