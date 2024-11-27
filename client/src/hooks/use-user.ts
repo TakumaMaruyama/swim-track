@@ -35,11 +35,29 @@ export function useUser() {
   } = useSWR<User>("/api/user", {
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
-    shouldRetryOnError: false,
-    refreshInterval: 300000,
-    onError: () => {
-      console.log('[Auth] Session validation failed, clearing user data');
-      mutate(undefined, false);
+    shouldRetryOnError: true,
+    refreshInterval: 60000, // Check every minute
+    onError: async (error) => {
+      console.log('[Auth] Session validation failed, attempting refresh');
+      try {
+        const response = await fetch('/api/refresh', {
+          method: 'POST',
+          credentials: 'include'
+        });
+        
+        if (!response.ok) {
+          console.log('[Auth] Refresh failed, clearing user data');
+          mutate(undefined, false);
+          return;
+        }
+
+        const refreshedUser = await response.json();
+        console.log('[Auth] Session refreshed successfully');
+        mutate(refreshedUser, false);
+      } catch (e) {
+        console.log('[Auth] Refresh failed, clearing user data');
+        mutate(undefined, false);
+      }
     }
   });
 

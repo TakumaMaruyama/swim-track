@@ -50,11 +50,14 @@ export function setupAuth(app: Express) {
   const MemoryStore = createMemoryStore(session);
   const sessionSettings: session.SessionOptions = {
     secret: process.env.REPL_ID || "porygon-supremacy",
-    resave: true,
-    saveUninitialized: true,
+    resave: false,
+    saveUninitialized: false,
     rolling: true,
+    store: new MemoryStore({
+      checkPeriod: 86400000 // Prune expired entries every 24h
+    }),
     cookie: {
-      maxAge: 24 * 60 * 60 * 1000,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
       httpOnly: true,
       secure: 'auto',
       sameSite: 'lax'
@@ -311,5 +314,47 @@ export function setupAuth(app: Express) {
     }
     console.log('[Auth] No valid session found');
     res.status(401).json({ message: "認証が必要です" });
+  });
+
+  // Session refresh endpoint
+  app.post("/api/refresh", async (req, res) => {
+    if (!req.session || !req.sessionID) {
+      console.log('[Auth] No session to refresh');
+      return res.status(401).json({ message: "セッションが見つかりません" });
+    }
+
+    if (req.isAuthenticated()) {
+      console.log('[Auth] Session still valid, extending');
+      // Touch the session to extend its lifetime
+      req.session.touch();
+      return res.json(req.user);
+    }
+
+    // Try to revalidate the session
+    try {
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, req.session.passport?.user))
+        .limit(1);
+
+      if (!user) {
+        console.log('[Auth] User not found for session refresh');
+        return res.status(401).json({ message: "ユーザーが見つかりません" });
+      }
+
+      // Re-establish the session
+      req.login(user, (err) => {
+        if (err) {
+          console.error('[Auth] Session refresh failed:', err);
+          return res.status(500).json({ message: "セッションの更新に失敗しました" });
+        }
+        console.log('[Auth] Session refreshed successfully');
+        res.json(user);
+      });
+    } catch (error) {
+      console.error('[Auth] Session refresh error:', error);
+      res.status(500).json({ message: "セッションの更新に失敗しました" });
+    }
   });
 }
