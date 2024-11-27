@@ -55,12 +55,15 @@ export function setupAuth(app: Express) {
     rolling: true,
     store: new MemoryStore({
       checkPeriod: 86400000, // 24時間
+      ttl: 24 * 60 * 60 * 1000, // 24時間
+      stale: false,
     }),
     name: 'swimtrack.sid',
+    proxy: true,
     cookie: {
       maxAge: 24 * 60 * 60 * 1000, // 24時間
       httpOnly: true,
-      secure: false, // 開発環境ではfalse
+      secure: 'auto',
       sameSite: 'lax',
       path: '/',
     }
@@ -168,9 +171,20 @@ export function setupAuth(app: Express) {
     done(null, user.id);
   });
 
+  // Cache for deserialized users to reduce database queries
+  const userCache = new Map<number, { user: Express.User; timestamp: number }>();
+  const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
   passport.deserializeUser(async (id: number, done) => {
     try {
-      console.log('[Auth] Deserializing user:', id);
+      const now = Date.now();
+      const cached = userCache.get(id);
+      
+      // Return cached user if still valid
+      if (cached && (now - cached.timestamp) < CACHE_TTL) {
+        return done(null, cached.user);
+      }
+
       const [user] = await db
         .select()
         .from(users)
@@ -178,16 +192,17 @@ export function setupAuth(app: Express) {
         .limit(1);
       
       if (!user) {
-        console.log('[Auth] User not found during deserialization:', id);
+        userCache.delete(id);
         return done(new Error("セッションが無効になりました。再度ログインしてください。"));
       }
 
       if (!user.isActive) {
-        console.log('[Auth] Inactive user attempted access:', id);
+        userCache.delete(id);
         return done(new Error("アカウントが無効化されています。"));
       }
 
-      console.log('[Auth] User deserialized successfully:', id);
+      // Cache the user
+      userCache.set(id, { user, timestamp: now });
       done(null, user);
     } catch (err) {
       console.error('[Auth] Deserialization error:', err);
@@ -297,20 +312,33 @@ export function setupAuth(app: Express) {
 
   app.post("/logout", (req, res) => {
     const username = req.user?.username;
+    const userId = req.user?.id;
+    
     req.logout((err) => {
       if (err) {
         console.error('[Auth] Logout error:', err);
         return res.status(500).json({ message: "ログアウトに失敗しました" });
       }
+      
+      // Clear user data
       if (username) {
         loginAttempts.delete(username.toLowerCase());
       }
+      if (userId) {
+        userCache.delete(userId);
+      }
+      
       req.session.destroy((err) => {
         if (err) {
           console.error('[Auth] Session destruction error:', err);
           return res.status(500).json({ message: "セッションの削除に失敗しました" });
         }
-        res.clearCookie('connect.sid');
+        res.clearCookie('swimtrack.sid', {
+          httpOnly: true,
+          secure: 'auto',
+          sameSite: 'lax',
+          path: '/',
+        });
         console.log('[Auth] Logout successful');
         res.json({ message: "ログアウトしました" });
       });
