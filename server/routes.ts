@@ -212,6 +212,50 @@ export function registerRoutes(app: express.Express) {
     }
   });
 
+  // Swimming records endpoints with improved error handling and logging
+  app.get("/api/records", requireAuth, async (req, res) => {
+    const startTime = Date.now();
+    console.log('[DB] Starting records fetch');
+    
+    try {
+      const records = await db.transaction(async (tx) => {
+        console.log('[DB] Beginning transaction for records fetch');
+        
+        const results = await tx
+          .select({
+            id: swimRecords.id,
+            studentId: swimRecords.studentId,
+            style: swimRecords.style,
+            distance: swimRecords.distance,
+            time: swimRecords.time,
+            date: swimRecords.date,
+            isCompetition: swimRecords.isCompetition,
+            poolLength: swimRecords.poolLength,
+            athleteName: users.username,
+            competitionName: competitions.name,
+            competitionLocation: competitions.location,
+          })
+          .from(swimRecords)
+          .leftJoin(users, eq(swimRecords.studentId, users.id))
+          .leftJoin(competitions, eq(swimRecords.competitionId, competitions.id))
+          .orderBy(desc(swimRecords.date));
+
+        const endTime = Date.now();
+        console.log(`[DB] Records fetch completed in ${endTime - startTime}ms`);
+        
+        return results;
+      });
+
+      res.json(records);
+    } catch (error) {
+      console.error('[DB] Error fetching records:', error);
+      res.status(500).json({ 
+        message: "記録の取得中にエラーが発生しました",
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  });
+
   // Add password update endpoint
   app.put("/api/users/:id/password", requireAuth, requireCoach, async (req, res) => {
     try {

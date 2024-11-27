@@ -60,10 +60,12 @@ export function useUser() {
           'Content-Type': 'application/json',
         },
       });
+      
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message || '認証エラーが発生しました');
       }
+      
       return response.json();
     },
   });
