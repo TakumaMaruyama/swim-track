@@ -37,39 +37,28 @@ export default function Login() {
     },
   });
 
-  // Check initial authentication state with cleanup
+  // Optimized authentication state check
   useEffect(() => {
-    let mounted = true;
-    
-    console.log('[Login] Checking initial auth state:', { isAuthenticated, isAuthChecking });
-    
-    if (!isAuthChecking && isAuthenticated && mounted) {
-      console.log('[Login] User is already authenticated, redirecting');
+    // Only redirect if we have confirmed authentication
+    if (!isAuthChecking && isAuthenticated) {
       navigate('/');
     }
-
-    return () => {
-      mounted = false;
-    };
   }, [isAuthChecking, isAuthenticated, navigate]);
 
   async function onSubmit(values: { username: string; password: string }) {
     try {
-      console.log('[Login] Attempting login');
       const result = await login(values);
       
       if (result.ok) {
-        console.log('[Login] Login successful, initiating navigation');
         toast({
           title: "ログイン成功",
           description: "ダッシュボードに移動します",
         });
-        // Use client-side navigation
         navigate('/');
         return;
       }
 
-      console.log('[Login] Login failed:', result.message);
+      // Handle validation errors
       if (result.errors) {
         Object.entries(result.errors).forEach(([field, messages]) => {
           form.setError(field as "username" | "password", {
@@ -77,19 +66,29 @@ export default function Login() {
             message: messages[0],
           });
         });
-      } else {
-        toast({
-          variant: "destructive",
-          title: "エラー",
-          description: result.message,
-        });
+        return;
       }
+
+      // Handle credential errors
+      if (result.field === "credentials") {
+        form.setError("password", {
+          type: "manual",
+          message: result.message,
+        });
+        return;
+      }
+
+      // Handle other errors
+      toast({
+        variant: "destructive",
+        title: "認証エラー",
+        description: result.message,
+      });
     } catch (error) {
-      console.error('[Login] Unexpected error:', error);
       toast({
         variant: "destructive",
         title: "エラー",
-        description: "予期せぬエラーが発生しました",
+        description: "認証中にエラーが発生しました。再度お試しください。",
       });
     }
   }

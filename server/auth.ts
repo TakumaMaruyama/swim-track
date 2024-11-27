@@ -315,12 +315,29 @@ export function setupAuth(app: Express) {
   });
 
   app.get("/api/user", (req, res) => {
-    if (req.isAuthenticated()) {
-      console.log('[Auth] User session validated');
-      return res.json(req.user);
+    if (!req.session) {
+      return res.status(401).json({ 
+        message: "セッションが見つかりません",
+        code: "NO_SESSION"
+      });
     }
-    console.log('[Auth] No valid session found');
-    res.status(401).json({ message: "認証が必要です" });
+
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ 
+        message: "認証が必要です",
+        code: "NOT_AUTHENTICATED"
+      });
+    }
+
+    // Check if user is active
+    if (req.user && !req.user.isActive) {
+      return res.status(401).json({
+        message: "アカウントが無効化されています",
+        code: "ACCOUNT_INACTIVE"
+      });
+    }
+
+    res.json(req.user);
   });
 
   // Session refresh endpoint
