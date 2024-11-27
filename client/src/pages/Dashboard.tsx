@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useMemo, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -47,7 +47,7 @@ export default function Dashboard() {
     }
   }, [user, isLoading, navigate]);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     const result = await logout();
     if (result.ok) {
       toast({
@@ -62,9 +62,9 @@ export default function Dashboard() {
         description: result.message || "ログアウトに失敗しました",
       });
     }
-  };
+  }, [logout, toast, navigate]);
 
-  const handleDeleteAccount = async () => {
+  const handleDeleteAccount = useCallback(async () => {
     try {
       const result = await deleteAccount();
       if (result.ok) {
@@ -88,7 +88,7 @@ export default function Dashboard() {
         description: "予期せぬエラーが発生しました",
       });
     }
-  };
+  }, [deleteAccount, toast, navigate]);
 
   if (isLoading) {
     return <div className="flex items-center justify-center min-h-screen">読み込み中...</div>;
@@ -98,12 +98,12 @@ export default function Dashboard() {
     return null;
   }
 
-  const navItems = [
+  const navItems = useMemo(() => [
     { label: '選手一覧', icon: <Users className="h-4 w-4" />, href: '/athletes' },
     { label: '大会情報', icon: <Trophy className="h-4 w-4" />, href: '/competitions' },
     { label: '歴代記録', icon: <Trophy className="h-4 w-4" />, href: '/all-time-records' },
     { label: '資料', icon: <ClipboardList className="h-4 w-4" />, href: '/documents' },
-  ];
+  ], []);
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-100">
