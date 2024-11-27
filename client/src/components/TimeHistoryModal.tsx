@@ -31,7 +31,12 @@ import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
 import type { ExtendedSwimRecord } from "../hooks/use-swim-records";
 import { lazy, Suspense } from 'react';
-const TimeProgressChart = lazy(() => import('./TimeProgressChart'));
+import { ErrorBoundary } from './ErrorBoundary';
+const TimeProgressChart = lazy(() => 
+  import('./TimeProgressChart').then(module => ({
+    default: module.default
+  }))
+);
 import { EditRecordForm } from './EditRecordForm';
 
 type TimeHistoryModalProps = {
@@ -201,14 +206,31 @@ export function TimeHistoryModal({
                       </h3>
                     </div>
                     
-                    <Suspense fallback={<div className="w-full h-[400px] flex items-center justify-center">グラフを読み込んでいます...</div>}>
-                      <TimeProgressChart 
-                        records={records} 
-                        style={style} 
-                        distance={parseInt(distance)}
-                        poolLength={poolLength}
-                      />
-                    </Suspense>
+                    <ErrorBoundary
+                      fallback={
+                        <div className="w-full h-[400px] flex items-center justify-center text-destructive">
+                          グラフの読み込み中にエラーが発生しました
+                        </div>
+                      }
+                    >
+                      <Suspense 
+                        fallback={
+                          <div className="w-full h-[400px] flex items-center justify-center">
+                            <div className="flex flex-col items-center gap-2">
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                              <p className="text-sm text-muted-foreground">グラフを読み込んでいます...</p>
+                            </div>
+                          </div>
+                        }
+                      >
+                        <TimeProgressChart 
+                          records={records} 
+                          style={style} 
+                          distance={parseInt(distance)}
+                          poolLength={poolLength}
+                        />
+                      </Suspense>
+                    </ErrorBoundary>
 
                     <div className="space-y-3 mt-4">
                       {records.map((record) => {

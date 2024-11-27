@@ -12,7 +12,6 @@ import {
   TooltipItem,
   Scale,
   CoreScaleOptions,
-  Tick
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import type { ExtendedSwimRecord } from "../hooks/use-swim-records";
@@ -34,7 +33,12 @@ interface TimeProgressChartProps {
   poolLength: number;
 }
 
-export function TimeProgressChart({ records, style, distance, poolLength }: TimeProgressChartProps) {
+const TimeProgressChart: React.FC<TimeProgressChartProps> = ({ 
+  records, 
+  style, 
+  distance, 
+  poolLength 
+}) => {
   const filteredRecords = records
     .filter(r => {
       return r.style === style &&
@@ -124,4 +128,6 @@ export function TimeProgressChart({ records, style, distance, poolLength }: Time
       />
     </div>
   );
-}
+};
+
+export default TimeProgressChart;
