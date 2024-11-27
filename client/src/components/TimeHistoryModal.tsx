@@ -111,10 +111,23 @@ export function TimeHistoryModal({
 
   const personalBests = React.useMemo(() => {
     const bests: { [key: string]: string } = {};
-    Object.entries(groupedAndFilteredRecords).forEach(([key, records]) => {
-      bests[key] = records.reduce((best, record) => 
-        record.time < best ? record.time : best
-      , records[0].time);
+    Object.values(groupedAndFilteredRecords).forEach((records) => {
+      // Group records by pool length
+      const recordsByPool = records.reduce((acc, record) => {
+        const key = `${record.style}-${record.distance}-${record.poolLength}`;
+        if (!acc[key]) {
+          acc[key] = [];
+        }
+        acc[key].push(record);
+        return acc;
+      }, {} as { [key: string]: ExtendedSwimRecord[] });
+
+      // Calculate best time for each pool length
+      Object.entries(recordsByPool).forEach(([key, poolRecords]) => {
+        bests[key] = poolRecords.reduce((best, record) => 
+          record.time < best ? record.time : best
+        , poolRecords[0].time);
+      });
     });
     return bests;
   }, [groupedAndFilteredRecords]);
@@ -241,10 +254,10 @@ export function TimeHistoryModal({
                             <div className="flex flex-col gap-2">
                               <span className="text-xl font-bold">{record.time}</span>
                               <div className="flex flex-wrap gap-2">
-                                {record.time === personalBests[key] && (
+                                {record.time === personalBests[`${record.style}-${record.distance}-${record.poolLength}`] && (
                                   <Badge variant="secondary" className="flex items-center gap-1">
                                     <Trophy className="h-3 w-3" />
-                                    自己ベスト
+                                    自己ベスト ({record.poolLength}mプール)
                                   </Badge>
                                 )}
                                 {record.isCompetition && (
