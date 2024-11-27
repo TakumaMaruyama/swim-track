@@ -40,6 +40,7 @@ export default function Dashboard() {
   const [showLogoutDialog, setShowLogoutDialog] = React.useState(false);
   const [showDeleteAccountDialog, setShowDeleteAccountDialog] = React.useState(false);
   const [showPasswordList, setShowPasswordList] = React.useState(false);
+  const { activities, isActivitiesLoading, activitiesError } = useRecentActivities();
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -200,22 +201,14 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {(() => {
-                      const { activities, isLoading, error } = useRecentActivities();
-
-                      if (isLoading) {
-                        return <p className="text-muted-foreground">読み込み中...</p>;
-                      }
-
-                      if (error) {
-                        return <p className="text-destructive">データの取得に失敗しました</p>;
-                      }
-
-                      if (!activities?.length) {
-                        return <p className="text-muted-foreground">最近の活動はありません</p>;
-                      }
-
-                      return activities.map((activity) => (
+                    {isActivitiesLoading ? (
+                      <p className="text-muted-foreground">読み込み中...</p>
+                    ) : activitiesError ? (
+                      <p className="text-destructive">データの取得に失敗しました</p>
+                    ) : !activities?.length ? (
+                      <p className="text-muted-foreground">最近の活動はありません</p>
+                    ) : (
+                      activities.map((activity) => (
                         <div
                           key={`${activity.type}-${activity.id}`}
                           className="flex items-center justify-between p-4 rounded-lg border bg-card text-card-foreground shadow-sm"
@@ -248,8 +241,8 @@ export default function Dashboard() {
                             </>
                           )}
                         </div>
-                      ));
-                    })()}
+                      ))
+                    )}
                   </div>
                 </CardContent>
               </Card>

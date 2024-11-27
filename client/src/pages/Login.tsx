@@ -45,13 +45,13 @@ export default function Login() {
     
     if (!isAuthChecking && isAuthenticated && mounted) {
       console.log('[Login] User is already authenticated, redirecting');
-      window.location.replace('/');
+      navigate('/');
     }
 
     return () => {
       mounted = false;
     };
-  }, [isAuthChecking, isAuthenticated]);
+  }, [isAuthChecking, isAuthenticated, navigate]);
 
   async function onSubmit(values: { username: string; password: string }) {
     try {
