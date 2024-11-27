@@ -8,9 +8,9 @@ const app = express();
 
 // CORS設定
 app.use(cors({
-  origin: process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : true,
+  origin: true,
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
   exposedHeaders: ['Set-Cookie'],
 }));

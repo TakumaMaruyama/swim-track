@@ -50,8 +50,8 @@ export function setupAuth(app: Express) {
   const MemoryStore = createMemoryStore(session);
   const sessionSettings: session.SessionOptions = {
     secret: process.env.REPL_ID || "porygon-supremacy",
-    resave: false,
-    saveUninitialized: false,
+    resave: true,
+    saveUninitialized: true,
     rolling: true,
     store: new MemoryStore({
       checkPeriod: 86400000,
