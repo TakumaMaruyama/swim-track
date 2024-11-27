@@ -35,39 +35,12 @@ export function useUser() {
   } = useSWR<User>("/api/user", {
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
-    shouldRetryOnError: true,
-    refreshInterval: 300000, // 5分ごとにセッションを検証
-    retry: (_, error) => {
-      // ネットワークエラーの場合のみリトライ
-      return error?.message?.includes('network') || error?.message?.includes('Failed to fetch');
-    },
-    retryCount: 3,
-    onError: (error) => {
-      console.log('[Auth] Session validation failed:', error);
-      if (error?.message?.includes('認証') || error?.message?.includes('セッション')) {
-        console.log('[Auth] Clearing user data due to session error');
-        mutate(undefined, false);
-      } else {
-        console.error('[Auth] Unexpected error:', error);
-      }
-    },
-    dedupingInterval: 5000, // 5秒間は重複リクエストを防ぐ
-    keepPreviousData: true, // 新しいデータの取得中は古いデータを保持
-    fetcher: async (url) => {
-      const response = await fetch(url, {
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || '認証エラーが発生しました');
-      }
-      
-      return response.json();
-    },
+    shouldRetryOnError: false,
+    refreshInterval: 300000,
+    onError: () => {
+      console.log('[Auth] Session validation failed, clearing user data');
+      mutate(undefined, false);
+    }
   });
 
   const register = useCallback(async (user: InsertUser): Promise<AuthResult> => {

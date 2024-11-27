@@ -25,55 +25,33 @@ import { useToast } from "@/hooks/use-toast";
 import { competitionSchema } from "@/lib/schema";
 
 type CompetitionFormProps = {
-  competition?: {
-    id: number;
-    name: string;
-    location: string;
-    date: string;
-  };
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (values: z.infer<typeof competitionSchema>, id?: number) => Promise<void>;
+  onSubmit: (values: z.infer<typeof competitionSchema>) => Promise<void>;
 };
 
-export function CompetitionForm({ competition, isOpen, onClose, onSubmit }: CompetitionFormProps) {
+export function CompetitionForm({ isOpen, onClose, onSubmit }: CompetitionFormProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const form = useForm({
     resolver: zodResolver(competitionSchema),
     defaultValues: {
-      name: competition?.name || "",
-      location: competition?.location || "",
-      date: competition?.date ? new Date(competition.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      name: "",
+      location: "",
+      date: new Date().toISOString().split('T')[0],
     },
   });
 
   const handleSubmit = async (values: z.infer<typeof competitionSchema>) => {
     try {
       setIsSubmitting(true);
-      const url = competition ? `/api/competitions/${competition.id}` : '/api/competitions';
-      const method = competition ? 'PUT' : 'POST';
-      
-      // 日付をJST (UTC+9) として正しく解釈
-      // 入力された日付文字列に時刻とタイムゾーンを追加
-      const jstDate = new Date(`${values.date}T00:00:00+09:00`);
-      
-      // 日付が無効な場合はエラー
-      if (isNaN(jstDate.getTime())) {
-        throw new Error('無効な日付形式です');
-      }
-      
-      const response = await fetch(url, {
-        method,
+      const response = await fetch('/api/competitions', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          name: values.name.trim(),
-          location: values.location.trim(),
-          date: jstDate.toISOString(), // ISOString形式で送信
-        }),
+        body: JSON.stringify(values),
         credentials: 'include',
       });
 
@@ -82,19 +60,14 @@ export function CompetitionForm({ competition, isOpen, onClose, onSubmit }: Comp
         throw new Error(error.message || '大会情報の追加に失敗しました');
       }
 
-      await onSubmit(values, competition?.id);
+      await onSubmit(values);
       form.reset();
-      
-      toast({
-        title: competition ? "更新成功" : "追加成功",
-        description: `大会情報が${competition ? '更新' : '追加'}されました`,
-      });
     } catch (error) {
-      console.error('Error adding/updating competition:', error);
+      console.error('Error adding competition:', error);
       toast({
         variant: "destructive",
         title: "エラー",
-        description: error instanceof Error ? error.message : "大会情報の処理に失敗しました",
+        description: error instanceof Error ? error.message : "大会情報の追加に失敗しました",
       });
       throw error;
     } finally {
@@ -106,9 +79,9 @@ export function CompetitionForm({ competition, isOpen, onClose, onSubmit }: Comp
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{competition ? '大会情報の編集' : '大会情報の追加'}</DialogTitle>
+          <DialogTitle>大会情報の追加</DialogTitle>
           <DialogDescription>
-            {competition ? '大会情報を編集します' : '新しい大会情報を登録します'}
+            新しい大会情報を登録します
           </DialogDescription>
         </DialogHeader>
 

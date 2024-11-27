@@ -50,22 +50,14 @@ export function setupAuth(app: Express) {
   const MemoryStore = createMemoryStore(session);
   const sessionSettings: session.SessionOptions = {
     secret: process.env.REPL_ID || "porygon-supremacy",
-    resave: false,
-    saveUninitialized: false,
+    resave: true,
+    saveUninitialized: true,
     rolling: true,
-    store: new MemoryStore({
-      checkPeriod: 86400000, // 24時間
-      ttl: 24 * 60 * 60 * 1000, // 24時間
-      stale: false,
-    }),
-    name: 'swimtrack.sid',
-    proxy: true,
     cookie: {
-      maxAge: 24 * 60 * 60 * 1000, // 24時間
+      maxAge: 24 * 60 * 60 * 1000,
       httpOnly: true,
       secure: 'auto',
-      sameSite: 'lax',
-      path: '/',
+      sameSite: 'lax'
     }
   };
 
@@ -171,77 +163,22 @@ export function setupAuth(app: Express) {
     done(null, user.id);
   });
 
-  // Enhanced cache for deserialized users with background refresh
-  const userCache = new Map<number, { 
-    user: Express.User; 
-    timestamp: number;
-    refreshing?: boolean;
-  }>();
-  const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-  const REFRESH_THRESHOLD = 4 * 60 * 1000; // 4 minutes - refresh before expiry
-
-  const refreshUserData = async (id: number): Promise<Express.User | null> => {
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, id))
-      .limit(1);
-    
-    return user || null;
-  };
-
   passport.deserializeUser(async (id: number, done) => {
     try {
-      const now = Date.now();
-      const cached = userCache.get(id);
-      
-      // Return cached user if still valid
-      if (cached?.user) {
-        // Schedule background refresh if approaching TTL
-        if (!cached.refreshing && (now - cached.timestamp) > REFRESH_THRESHOLD) {
-          cached.refreshing = true;
-          refreshUserData(id).then(user => {
-            if (user) {
-              userCache.set(id, { user, timestamp: Date.now() });
-            } else {
-              userCache.delete(id);
-            }
-          }).catch(err => {
-            console.error('[Auth] Background refresh error:', err);
-          });
-        }
-        
-        if ((now - cached.timestamp) < CACHE_TTL) {
-          return done(null, cached.user);
-        }
-      }
-
-      // Fetch fresh data if cache miss or expired
-      const user = await refreshUserData(id);
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, id))
+        .limit(1);
       
       if (!user) {
-        userCache.delete(id);
-        return done(new Error("セッションが無効になりました。再度ログインしてください。"));
+        return done(new Error("ユーザーが見つかりません"));
       }
 
-      if (!user.isActive) {
-        userCache.delete(id);
-        return done(new Error("アカウントが無効化されています。"));
-      }
-
-      // Update cache
-      userCache.set(id, { user, timestamp: now });
-      console.log('[Auth] User cache updated for:', user.username);
       done(null, user);
     } catch (err) {
-      console.error('[Auth] Deserialization error:', err);
-      // Try to use cached data as fallback if available
-      const cached = userCache.get(id);
-      if (cached?.user && (now - cached.timestamp) < CACHE_TTL * 2) {
-        console.log('[Auth] Using cached data as fallback for:', cached.user.username);
-        return done(null, cached.user);
-      }
-      done(new Error("認証エラーが発生しました。再度ログインしてください。"));
+      console.error('Deserialization error:', err);
+      done(err);
     }
   });
 
@@ -347,88 +284,32 @@ export function setupAuth(app: Express) {
 
   app.post("/logout", (req, res) => {
     const username = req.user?.username;
-    const userId = req.user?.id;
-    
     req.logout((err) => {
       if (err) {
         console.error('[Auth] Logout error:', err);
         return res.status(500).json({ message: "ログアウトに失敗しました" });
       }
-      
-      // Clear user data
       if (username) {
         loginAttempts.delete(username.toLowerCase());
       }
-      if (userId) {
-        userCache.delete(userId);
-      }
-      
       req.session.destroy((err) => {
         if (err) {
           console.error('[Auth] Session destruction error:', err);
           return res.status(500).json({ message: "セッションの削除に失敗しました" });
         }
-        res.clearCookie('swimtrack.sid', {
-          httpOnly: true,
-          secure: 'auto',
-          sameSite: 'lax',
-          path: '/',
-        });
+        res.clearCookie('connect.sid');
         console.log('[Auth] Logout successful');
         res.json({ message: "ログアウトしました" });
       });
     });
   });
 
-  app.get("/api/user", async (req, res) => {
-    try {
-      if (!req.isAuthenticated()) {
-        console.log('[Auth] No valid session found');
-        return res.status(401).json({ 
-          message: "認証が必要です",
-          code: "AUTH_REQUIRED"
-        });
-      }
-
-      // Verify user still exists and is active
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, req.user.id))
-        .limit(1);
-
-      if (!user) {
-        console.log('[Auth] User no longer exists:', req.user.id);
-        req.logout((err) => {
-          if (err) console.error('[Auth] Logout error:', err);
-        });
-        return res.status(401).json({ 
-          message: "ユーザーが見つかりません",
-          code: "USER_NOT_FOUND"
-        });
-      }
-
-      if (!user.isActive) {
-        console.log('[Auth] Inactive user attempted access:', req.user.id);
-        req.logout((err) => {
-          if (err) console.error('[Auth] Logout error:', err);
-        });
-        return res.status(401).json({ 
-          message: "アカウントが無効化されています",
-          code: "ACCOUNT_DISABLED"
-        });
-      }
-
-      // Update cache with fresh data
-      userCache.set(user.id, { user, timestamp: Date.now() });
-      console.log('[Auth] User session validated for:', user.username);
-      return res.json(user);
-    } catch (err) {
-      console.error('[Auth] User validation error:', err);
-      res.status(500).json({ 
-        message: "ユーザー情報の取得中にエラーが発生しました",
-        code: "SERVER_ERROR"
-      });
+  app.get("/api/user", (req, res) => {
+    if (req.isAuthenticated()) {
+      console.log('[Auth] User session validated');
+      return res.json(req.user);
     }
+    console.log('[Auth] No valid session found');
+    res.status(401).json({ message: "認証が必要です" });
   });
 }

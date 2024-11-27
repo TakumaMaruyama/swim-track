@@ -33,7 +33,7 @@ export const documents = pgTable("documents", {
 export const competitions = pgTable("competitions", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   name: text("name").notNull(),
-  date: timestamp("date", { mode: "date" }).notNull(),
+  date: timestamp("date").notNull(),
   location: text("location").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });

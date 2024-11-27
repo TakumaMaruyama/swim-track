@@ -2,19 +2,8 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic } from "./vite";
 import { createServer } from "http";
-import cors from "cors";
 
 const app = express();
-
-// CORS設定
-app.use(cors({
-  origin: true,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
-  exposedHeaders: ['Set-Cookie'],
-}));
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
@@ -22,25 +11,12 @@ app.use(express.urlencoded({ extended: false }));
   registerRoutes(app);
   const server = createServer(app);
 
-  // エラーハンドリングミドルウェア
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    console.error('Error occurred:', err);
-
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-    const errors = err.errors || undefined;
 
-    // 開発環境の場合、より詳細なエラー情報を返す
-    const response = {
-      message,
-      ...(process.env.NODE_ENV === "development" && {
-        stack: err.stack,
-        errors,
-      }),
-      ...(errors && { errors }),
-    };
-
-    res.status(status).json(response);
+    res.status(status).json({ message });
+    throw err;
   });
 
   // importantly only setup vite in development and after
