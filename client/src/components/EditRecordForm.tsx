@@ -31,6 +31,7 @@ import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { SwimRecord } from "db/schema";
 import * as z from "zod";
+import useSWR from "swr";
 
 // Time format validation regex: MM:SS.ms
 const timeRegex = /^([0-5]?[0-9]):([0-5][0-9])\.([0-9]{1,3})$/;
@@ -62,6 +63,13 @@ const editRecordSchema = z.object({
   competitionId: z.number().optional(),
 });
 
+type Competition = {
+  id: number;
+  name: string;
+  location: string;
+  date: string;
+};
+
 type EditRecordFormProps = {
   record?: SwimRecord;
   studentId?: number;
@@ -73,6 +81,7 @@ type EditRecordFormProps = {
 export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }: EditRecordFormProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const { data: competitions } = useSWR<Competition[]>('/api/competitions');
 
   const form = useForm({
     resolver: zodResolver(editRecordSchema),
@@ -83,8 +92,7 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
       date: record ? new Date(record.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       poolLength: record?.poolLength ?? 25,
       isCompetition: record?.isCompetition ?? false,
-      competitionName: record?.competitionName ?? "",
-      competitionLocation: record?.competitionLocation ?? "",
+      competitionId: record?.competitionId ?? undefined,
     },
   });
 
@@ -266,43 +274,32 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
             />
 
             {form.watch("isCompetition") && (
-              <>
-                <FormField
-                  control={form.control}
-                  name="competitionName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>大会名</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="大会名を入力"
-                          {...field}
-                          disabled={isSubmitting}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="competitionLocation"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>開催場所</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="開催場所を入力"
-                          {...field}
-                          disabled={isSubmitting}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </>
+              <FormField
+                control={form.control}
+                name="competitionId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>大会</FormLabel>
+                    <FormControl>
+                      <select
+                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                        {...field}
+                        onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                        value={field.value || ""}
+                        disabled={isSubmitting}
+                      >
+                        <option value="">大会を選択</option>
+                        {competitions?.map((competition) => (
+                          <option key={competition.id} value={competition.id}>
+                            {competition.name} ({new Date(competition.date).toLocaleDateString('ja-JP')})
+                          </option>
+                        ))}
+                      </select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             )}
             
             <DialogFooter>

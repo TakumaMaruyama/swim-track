@@ -502,6 +502,47 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ message: "記録の削除に失敗しました" });
     }
   });
+  // Recent activities endpoint
+  app.get("/api/recent-activities", requireAuth, async (req, res) => {
+    try {
+      const recentCompetitions = await db
+        .select({
+          id: competitions.id,
+          type: sql<'competition'>`'competition'::text`,
+          date: competitions.date,
+          name: competitions.name,
+          location: competitions.location,
+        })
+        .from(competitions)
+        .orderBy(desc(competitions.date))
+        .limit(3);
+
+      const recentRecords = await db
+        .select({
+          id: swimRecords.id,
+          type: sql<'record'>`'record'::text`,
+          date: swimRecords.date,
+          style: swimRecords.style,
+          distance: swimRecords.distance,
+          time: swimRecords.time,
+          athleteName: users.username,
+        })
+        .from(swimRecords)
+        .leftJoin(users, eq(swimRecords.studentId, users.id))
+        .orderBy(desc(swimRecords.date))
+        .limit(5);
+
+      const activities = [...recentCompetitions, ...recentRecords]
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 5);
+
+      res.json(activities);
+    } catch (error) {
+      console.error('Error fetching recent activities:', error);
+      res.status(500).json({ message: "最近の活動の取得に失敗しました" });
+    }
+  });
+
 
   app.post("/api/records", requireAuth, requireCoach, async (req, res) => {
     try {

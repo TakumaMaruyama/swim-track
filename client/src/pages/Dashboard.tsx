@@ -15,6 +15,7 @@ import { useLocation } from 'wouter'
 import { useMobile } from '../hooks/use-mobile'
 import { MobileNav } from '../components/MobileNav'
 import { useSwimRecords } from '../hooks/use-swim-records'
+import { useRecentActivities } from '../hooks/use-recent-activities'
 import { PageHeader } from '../components/PageHeader'
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -191,6 +192,68 @@ export default function Dashboard() {
                 </p>
               </CardContent>
             </Card>
+
+            {user?.role === 'coach' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>最近の大会と記録</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {(() => {
+                      const { activities, isLoading, error } = useRecentActivities();
+
+                      if (isLoading) {
+                        return <p className="text-muted-foreground">読み込み中...</p>;
+                      }
+
+                      if (error) {
+                        return <p className="text-destructive">データの取得に失敗しました</p>;
+                      }
+
+                      if (!activities?.length) {
+                        return <p className="text-muted-foreground">最近の活動はありません</p>;
+                      }
+
+                      return activities.map((activity) => (
+                        <div
+                          key={`${activity.type}-${activity.id}`}
+                          className="flex items-center justify-between p-4 rounded-lg border bg-card text-card-foreground shadow-sm"
+                        >
+                          {activity.type === 'competition' ? (
+                            <>
+                              <div>
+                                <p className="font-medium">{activity.details.name}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {activity.details.location}
+                                </p>
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {new Date(activity.date).toLocaleDateString('ja-JP')}
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div>
+                                <p className="font-medium">
+                                  {activity.details.style} {activity.details.distance}m
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {activity.details.athleteName} - {activity.details.time}
+                                </p>
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {new Date(activity.date).toLocaleDateString('ja-JP')}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </main>
