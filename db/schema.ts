@@ -38,14 +38,6 @@ export const competitions = pgTable("competitions", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const announcements = pgTable("announcements", {
-  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  title: text("title").notNull(),
-  content: text("content").notNull(),
-  createdBy: integer("created_by").references(() => users.id),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow()
-});
 export const swimRecords = pgTable("swim_records", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   studentId: integer("student_id").references(() => users.id),
@@ -72,10 +64,6 @@ export type Category = z.infer<typeof selectCategorySchema>;
 
 export const insertDocumentSchema = createInsertSchema(documents);
 export const selectDocumentSchema = createSelectSchema(documents);
-export const insertAnnouncementSchema = createInsertSchema(announcements);
-export const selectAnnouncementSchema = createSelectSchema(announcements);
-export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
-export type Announcement = z.infer<typeof selectAnnouncementSchema>;
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type Document = z.infer<typeof selectDocumentSchema>;
 

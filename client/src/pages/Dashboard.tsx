@@ -8,8 +8,7 @@ import {
   LogOut,
   UserX,
   Key,
-  Trophy,
-  Plus
+  Trophy
 } from 'lucide-react'
 import { useUser } from '../hooks/use-user'
 import { useLocation } from 'wouter'
@@ -27,13 +26,10 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { UserPasswordList } from '../components/UserPasswordList';
-import { AnnouncementDialog } from '../components/AnnouncementDialog';
-import { AnnouncementCard } from '../components/AnnouncementCard';
-import useSWR, { mutate } from 'swr';
-import type { Announcement } from 'db/schema';
+
+
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
@@ -43,10 +39,6 @@ export default function Dashboard() {
   const [showLogoutDialog, setShowLogoutDialog] = React.useState(false);
   const [showDeleteAccountDialog, setShowDeleteAccountDialog] = React.useState(false);
   const [showPasswordList, setShowPasswordList] = React.useState(false);
-  const [showAnnouncementDialog, setShowAnnouncementDialog] = React.useState(false);
-  const [editingAnnouncement, setEditingAnnouncement] = React.useState<Announcement | null>(null);
-  const [deletingAnnouncementId, setDeletingAnnouncementId] = React.useState<number | null>(null);
-  const { data: announcements } = useSWR<(Announcement & { authorName: string })[]>('/api/announcements');
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -96,6 +88,8 @@ export default function Dashboard() {
       });
     }
   };
+
+  
 
   if (isLoading) {
     return <div className="flex items-center justify-center min-h-screen">読み込み中...</div>;
@@ -187,130 +181,21 @@ export default function Dashboard() {
       <main className="flex-grow">
         <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
           <div className="grid gap-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold">お知らせ</h2>
-              {user?.role === 'coach' && (
-                <Button onClick={() => setShowAnnouncementDialog(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  お知らせを作成
-                </Button>
-              )}
-            </div>
-            <div className="space-y-4">
-              {announcements?.map((announcement) => (
-                <AnnouncementCard
-                  key={announcement.id}
-                  {...announcement}
-                  onEdit={() => {
-                    setEditingAnnouncement(announcement);
-                    setShowAnnouncementDialog(true);
-                  }}
-                  onDelete={() => setDeletingAnnouncementId(announcement.id)}
-                />
-              ))}
-              {(!announcements || announcements.length === 0) && (
-                <Card>
-                  <CardContent className="py-4">
-                    <p className="text-center text-muted-foreground">
-                      お知らせはありません
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-
-            {user?.role === 'coach' && (
-              <>
-                <AnnouncementDialog
-                  isOpen={showAnnouncementDialog}
-                  onClose={() => {
-                    setShowAnnouncementDialog(false);
-                    setEditingAnnouncement(null);
-                  }}
-                  mode={editingAnnouncement ? "edit" : "create"}
-                  initialValues={editingAnnouncement ?? undefined}
-                  onSubmit={async (values) => {
-                    const url = editingAnnouncement
-                      ? `/api/announcements/${editingAnnouncement.id}`
-                      : '/api/announcements';
-                    const method = editingAnnouncement ? 'PUT' : 'POST';
-
-                    const res = await fetch(url, {
-                      method,
-                      headers: {
-                        'Content-Type': 'application/json',
-                      },
-                      body: JSON.stringify(values),
-                    });
-
-                    if (!res.ok) {
-                      throw new Error('お知らせの保存に失敗しました');
-                    }
-
-                    mutate('/api/announcements');
-                    toast({
-                      title: "成功",
-                      description: `お知らせを${editingAnnouncement ? '更新' : '作成'}しました`,
-                    });
-                  }}
-                />
-
-                <AlertDialog
-                  open={deletingAnnouncementId !== null}
-                  onOpenChange={(isOpen) => {
-                    if (!isOpen) setDeletingAnnouncementId(null);
-                  }}
-                >
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>お知らせを削除しますか？</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        この操作は取り消せません。
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>キャンセル</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={async () => {
-                          try {
-                            const res = await fetch(
-                              `/api/announcements/${deletingAnnouncementId}`,
-                              {
-                                method: 'DELETE',
-                              }
-                            );
-
-                            if (!res.ok) {
-                              throw new Error('お知らせの削除に失敗しました');
-                            }
-
-                            mutate('/api/announcements');
-                            toast({
-                              title: "成功",
-                              description: "お知らせを削除しました",
-                            });
-                          } catch (error: any) {
-                            toast({
-                              variant: "destructive",
-                              title: "エラー",
-                              description: error.message || "お知らせの削除に失敗しました",
-                            });
-                          } finally {
-                            setDeletingAnnouncementId(null);
-                          }
-                        }}
-                        className="bg-red-500 hover:bg-red-600"
-                      >
-                        削除
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </>
-            )}
+            <Card>
+              <CardHeader>
+                <CardTitle>ダッシュボード</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">
+                  SwimTrackへようこそ。メニューから機能を選択してください。
+                </p>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </main>
+
+      
 
       <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
         <AlertDialogContent>
