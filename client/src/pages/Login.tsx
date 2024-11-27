@@ -17,17 +17,13 @@ import { AlertCircle, Loader2, Home } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
 import { insertUserSchema } from "db/schema";
-import { useEffect, useCallback } from "react";
+import { useState } from "react";
 
 export default function Login() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { 
-    login, 
-    isAuthenticated, 
-    isLoading: isAuthChecking,
-    error: authError 
-  } = useUser();
+  const { login, isAuthenticated } = useUser();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const form = useForm({
     resolver: zodResolver(insertUserSchema),
@@ -37,16 +33,11 @@ export default function Login() {
     },
   });
 
-  // Optimized authentication state check
-  useEffect(() => {
-    // Only redirect if we have confirmed authentication
-    if (!isAuthChecking && isAuthenticated) {
-      navigate('/');
-    }
-  }, [isAuthChecking, isAuthenticated, navigate]);
-
   async function onSubmit(values: { username: string; password: string }) {
+    if (isSubmitting) return;
+
     try {
+      setIsSubmitting(true);
       const result = await login(values);
       
       if (result.ok) {
@@ -90,18 +81,15 @@ export default function Login() {
         title: "エラー",
         description: "認証中にエラーが発生しました。再度お試しください。",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
-  if (isAuthChecking) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="flex flex-col items-center gap-2">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">認証状態を確認中...</p>
-        </div>
-      </div>
-    );
+  // If already authenticated, redirect to dashboard
+  if (isAuthenticated) {
+    navigate('/');
+    return null;
   }
 
   return (
@@ -125,12 +113,6 @@ export default function Login() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {authError?.field === "network" && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{authError.message}</AlertDescription>
-              </Alert>
-            )}
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
@@ -142,7 +124,7 @@ export default function Login() {
                       <FormControl>
                         <Input 
                           {...field} 
-                          disabled={form.formState.isSubmitting}
+                          disabled={isSubmitting}
                           autoComplete="username"
                           className="bg-white"
                         />
@@ -161,7 +143,7 @@ export default function Login() {
                         <Input 
                           type="password" 
                           {...field} 
-                          disabled={form.formState.isSubmitting}
+                          disabled={isSubmitting}
                           autoComplete="current-password"
                           className="bg-white"
                         />
@@ -170,18 +152,12 @@ export default function Login() {
                     </FormItem>
                   )}
                 />
-                {authError?.field === "credentials" && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{authError.message}</AlertDescription>
-                  </Alert>
-                )}
                 <Button 
                   type="submit" 
                   className="w-full" 
-                  disabled={form.formState.isSubmitting}
+                  disabled={isSubmitting}
                 >
-                  {form.formState.isSubmitting ? (
+                  {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ログイン中...
@@ -201,7 +177,7 @@ export default function Login() {
               variant="outline"
               className="w-full"
               onClick={() => navigate("/register")}
-              disabled={form.formState.isSubmitting}
+              disabled={isSubmitting}
             >
               新規登録
             </Button>
