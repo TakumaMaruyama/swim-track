@@ -30,7 +30,8 @@ import { Trophy, Trash2, Edit2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
 import type { ExtendedSwimRecord } from "../hooks/use-swim-records";
-import { TimeProgressChart } from './TimeProgressChart';
+import { lazy, Suspense } from 'react';
+const TimeProgressChart = lazy(() => import('./TimeProgressChart'));
 import { EditRecordForm } from './EditRecordForm';
 
 type TimeHistoryModalProps = {
@@ -200,12 +201,14 @@ export function TimeHistoryModal({
                       </h3>
                     </div>
                     
-                    <TimeProgressChart 
-                      records={records} 
-                      style={style} 
-                      distance={parseInt(distance)}
-                      poolLength={poolLength}
-                    />
+                    <Suspense fallback={<div className="w-full h-[400px] flex items-center justify-center">グラフを読み込んでいます...</div>}>
+                      <TimeProgressChart 
+                        records={records} 
+                        style={style} 
+                        distance={parseInt(distance)}
+                        poolLength={poolLength}
+                      />
+                    </Suspense>
 
                     <div className="space-y-3 mt-4">
                       {records.map((record) => {

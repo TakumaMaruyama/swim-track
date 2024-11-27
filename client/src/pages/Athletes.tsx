@@ -16,9 +16,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { EditAthleteForm } from '../components/EditAthleteForm';
-import { EditRecordForm } from '../components/EditRecordForm';
-import { TimeHistoryModal } from '../components/TimeHistoryModal';
+import { lazy, Suspense } from 'react';
+const EditAthleteForm = lazy(() => import('../components/EditAthleteForm'));
+const EditRecordForm = lazy(() => import('../components/EditRecordForm'));
+const TimeHistoryModal = lazy(() => import('../components/TimeHistoryModal'));
 import { useUser } from '../hooks/use-user';
 import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '../components/PageHeader';
@@ -363,38 +364,44 @@ export default function Athletes() {
         </div>
 
         {athlete && (
-          <EditAthleteForm
-            athlete={athlete}
-            isOpen={!!editingAthlete}
-            onClose={() => setEditingAthlete(null)}
-            onSubmit={async (data) => {
-              await handleEdit(athlete.id, data);
-            }}
-          />
+          <Suspense fallback={<div>読み込み中...</div>}>
+            <EditAthleteForm
+              athlete={athlete}
+              isOpen={!!editingAthlete}
+              onClose={() => setEditingAthlete(null)}
+              onSubmit={async (data) => {
+                await handleEdit(athlete.id, data);
+              }}
+            />
+          </Suspense>
         )}
 
-        <EditRecordForm
-          record={record}
-          studentId={editingRecord.studentId ?? undefined}
-          isOpen={!!editingRecord.studentId}
-          onClose={() => setEditingRecord({ id: null, studentId: null })}
-          onSubmit={async (data) => {
-            if (editingRecord.id) {
-              await handleEditRecord(editingRecord.id, data);
-            } else {
-              await handleCreateRecord(data);
-            }
-          }}
-        />
+        <Suspense fallback={<div>読み込み中...</div>}>
+          <EditRecordForm
+            record={record}
+            studentId={editingRecord.studentId ?? undefined}
+            isOpen={!!editingRecord.studentId}
+            onClose={() => setEditingRecord({ id: null, studentId: null })}
+            onSubmit={async (data) => {
+              if (editingRecord.id) {
+                await handleEditRecord(editingRecord.id, data);
+              } else {
+                await handleCreateRecord(data);
+              }
+            }}
+          />
+        </Suspense>
 
         {viewingHistory.athleteId && (
-          <TimeHistoryModal
-            isOpen={!!viewingHistory.athleteId}
-            onClose={() => setViewingHistory({ athleteId: null, athleteName: '' })}
-            records={getAthleteRecords(viewingHistory.athleteId)}
-            athleteName={viewingHistory.athleteName}
-            onRecordDeleted={() => mutateRecords()}
-          />
+          <Suspense fallback={<div>読み込み中...</div>}>
+            <TimeHistoryModal
+              isOpen={!!viewingHistory.athleteId}
+              onClose={() => setViewingHistory({ athleteId: null, athleteName: '' })}
+              records={getAthleteRecords(viewingHistory.athleteId)}
+              athleteName={viewingHistory.athleteName}
+              onRecordDeleted={() => mutateRecords()}
+            />
+          </Suspense>
         )}
 
         <AlertDialog 
