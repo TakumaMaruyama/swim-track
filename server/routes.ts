@@ -410,6 +410,99 @@ export function registerRoutes(app: Express) {
 
   // Records API endpoints
   app.get("/api/records", requireAuth, async (req, res) => {
+  // Optimized records retrieval with aggregated data
+  app.get("/api/records/aggregated", requireAuth, async (req, res) => {
+    try {
+      const aggregatedRecords = await db
+        .select({
+          id: swimRecords.id,
+          style: swimRecords.style,
+          distance: swimRecords.distance,
+          time: swimRecords.time,
+          date: swimRecords.date,
+          poolLength: swimRecords.poolLength,
+          studentId: swimRecords.studentId,
+          athleteName: users.username,
+          isCompetition: swimRecords.isCompetition,
+          competitionName: swimRecords.competitionName,
+          competitionLocation: swimRecords.competitionLocation,
+          personalBest: sql<string>`MIN(${swimRecords.time}) OVER (
+            PARTITION BY ${swimRecords.studentId}, ${swimRecords.style}, ${swimRecords.distance}, ${swimRecords.poolLength}
+          )`,
+          averageTime: sql<string>`AVG(${swimRecords.time}) OVER (
+            PARTITION BY ${swimRecords.studentId}, ${swimRecords.style}, ${swimRecords.distance}, ${swimRecords.poolLength}
+          )`,
+          recordCount: sql<number>`COUNT(*) OVER (
+            PARTITION BY ${swimRecords.studentId}, ${swimRecords.style}, ${swimRecords.distance}, ${swimRecords.poolLength}
+          )`,
+          ranking: sql<number>`RANK() OVER (
+            PARTITION BY ${swimRecords.style}, ${swimRecords.distance}, ${swimRecords.poolLength}
+            ORDER BY ${swimRecords.time}
+          )`
+        })
+        .from(swimRecords)
+        .leftJoin(users, eq(swimRecords.studentId, users.id))
+        .orderBy(desc(swimRecords.date));
+
+      res.json(aggregatedRecords);
+    } catch (error) {
+      console.error('Error fetching aggregated records:', error);
+      res.status(500).json({ message: "記録の取得に失敗しました" });
+    }
+  });
+
+  // Get statistics by style and distance
+  app.get("/api/records/statistics", requireAuth, async (req, res) => {
+    try {
+      const statistics = await db
+        .select({
+          style: swimRecords.style,
+          distance: swimRecords.distance,
+          poolLength: swimRecords.poolLength,
+          recordCount: sql<number>`COUNT(*)`,
+          averageTime: sql<string>`AVG(${swimRecords.time})`,
+          bestTime: sql<string>`MIN(${swimRecords.time})`,
+          bestTimeAthlete: users.username,
+        })
+        .from(swimRecords)
+        .leftJoin(users, eq(swimRecords.studentId, users.id))
+        .groupBy(swimRecords.style, swimRecords.distance, swimRecords.poolLength, users.username)
+        .orderBy(swimRecords.style, swimRecords.distance);
+
+      res.json(statistics);
+    } catch (error) {
+      console.error('Error fetching record statistics:', error);
+      res.status(500).json({ message: "統計情報の取得に失敗しました" });
+    }
+  });
+
+  // Get athlete progress over time
+  app.get("/api/records/progress/:studentId", requireAuth, async (req, res) => {
+    try {
+      const { studentId } = req.params;
+      const progress = await db
+        .select({
+          id: swimRecords.id,
+          style: swimRecords.style,
+          distance: swimRecords.distance,
+          time: swimRecords.time,
+          date: swimRecords.date,
+          poolLength: swimRecords.poolLength,
+          improvement: sql<string>`LAG(${swimRecords.time}) OVER (
+            PARTITION BY ${swimRecords.style}, ${swimRecords.distance}, ${swimRecords.poolLength}
+            ORDER BY ${swimRecords.date}
+          )`,
+        })
+        .from(swimRecords)
+        .where(eq(swimRecords.studentId, parseInt(studentId)))
+        .orderBy(swimRecords.date);
+
+      res.json(progress);
+    } catch (error) {
+      console.error('Error fetching athlete progress:', error);
+      res.status(500).json({ message: "進捗データの取得に失敗しました" });
+    }
+  });
     try {
       const allRecords = await db
         .select({
