@@ -30,20 +30,17 @@ interface TimeProgressChartProps {
   records: ExtendedSwimRecord[];
   style: string;
   distance: number;
-  poolLength: number;
 }
 
 const TimeProgressChart: React.FC<TimeProgressChartProps> = ({ 
   records, 
   style, 
-  distance, 
-  poolLength 
+  distance
 }) => {
   const filteredRecords = records
     .filter(r => {
       return r.style === style &&
-             r.distance === distance &&
-             r.poolLength === poolLength;
+             r.distance === distance;
     })
     .sort((a, b) => {
       const dateA = new Date(a.date || '');
@@ -61,19 +58,34 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
     return new Date(date).toLocaleDateString('ja-JP');
   };
 
+  // Group records by pool length
+  const poolLengths = [...new Set(filteredRecords.map(r => r.poolLength))].sort();
+  const colors = [
+    { border: 'rgb(75, 192, 192)', background: 'rgba(75, 192, 192, 0.5)' },
+    { border: 'rgb(255, 99, 132)', background: 'rgba(255, 99, 132, 0.5)' },
+    { border: 'rgb(53, 162, 235)', background: 'rgba(53, 162, 235, 0.5)' },
+  ];
+
   const data = {
     labels: filteredRecords.map(r => formatDate(r.date)),
-    datasets: [
-      {
-        label: `${style} ${distance}m (${poolLength}mプール)`,
-        data: filteredRecords.map(r => timeToSeconds(r.time)),
-        borderColor: 'rgb(75, 192, 192)',
-        backgroundColor: 'rgba(75, 192, 192, 0.5)',
-        tension: 0.3,
-        pointStyle: filteredRecords.map(r => r.isCompetition ? 'star' : 'circle'),
-        pointRadius: filteredRecords.map(r => r.isCompetition ? 8 : 4),
-      },
-    ],
+    datasets: poolLengths.map((poolLength, index) => ({
+      label: `${poolLength}mプール`,
+      data: filteredRecords
+        .filter(r => r.poolLength === poolLength)
+        .map(r => ({
+          x: formatDate(r.date),
+          y: timeToSeconds(r.time)
+        })),
+      borderColor: colors[index % colors.length].border,
+      backgroundColor: colors[index % colors.length].background,
+      tension: 0.3,
+      pointStyle: filteredRecords
+        .filter(r => r.poolLength === poolLength)
+        .map(r => r.isCompetition ? 'star' : 'circle'),
+      pointRadius: filteredRecords
+        .filter(r => r.poolLength === poolLength)
+        .map(r => r.isCompetition ? 8 : 4),
+    })),
   };
 
   const options: ChartOptions<'line'> = {
@@ -84,7 +96,7 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
       },
       title: {
         display: true,
-        text: `${style} ${distance}m (${poolLength}mプール) の記録推移`,
+        text: `${style} ${distance}m の記録推移`,
       },
       tooltip: {
         callbacks: {

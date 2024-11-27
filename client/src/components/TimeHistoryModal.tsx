@@ -227,7 +227,6 @@ export function TimeHistoryModal({
                           records={records} 
                           style={style} 
                           distance={parseInt(distance)}
-                          poolLength={poolLength}
                         />
                       </Suspense>
                     </ErrorBoundary>
