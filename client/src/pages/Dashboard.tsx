@@ -29,8 +29,18 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { UserPasswordList } from '../components/UserPasswordList';
+import { ErrorBoundary } from '../components/ErrorBoundary';
+
+// Constants outside component
+const NAV_ITEMS = [
+  { label: '選手一覧', icon: <Users className="h-4 w-4" />, href: '/athletes' },
+  { label: '大会情報', icon: <Trophy className="h-4 w-4" />, href: '/competitions' },
+  { label: '歴代記録', icon: <Trophy className="h-4 w-4" />, href: '/all-time-records' },
+  { label: '資料', icon: <ClipboardList className="h-4 w-4" />, href: '/documents' },
+];
 
 export default function Dashboard() {
+  // Hooks at the top level
   const [, navigate] = useLocation();
   const { user, isLoading, logout, deleteAccount } = useUser();
   const isMobile = useMobile();
@@ -40,31 +50,34 @@ export default function Dashboard() {
   const [showPasswordList, setShowPasswordList] = React.useState(false);
   const { activities, isLoading: isActivitiesLoading, error: activitiesError } = useRecentActivities();
 
-  useEffect(() => {
-    if (!isLoading && !user) {
-      navigate('/login');
-      return;
-    }
-  }, [user, isLoading, navigate]);
-
-  const handleLogout = useCallback(async () => {
-    const result = await logout();
-    if (result.ok) {
-      toast({
-        title: "ログアウト成功",
-        description: "セッションが終了しました",
-      });
-      navigate('/login');
-    } else {
+  // All hooks before any conditional returns
+  const handleLogout = React.useCallback(async () => {
+    try {
+      const result = await logout();
+      if (result.ok) {
+        toast({
+          title: "ログアウト成功",
+          description: "セッションが終了しました",
+        });
+        navigate('/login');
+      } else {
+        toast({
+          variant: "destructive",
+          title: "エラー",
+          description: result.message || "ログアウトに失敗しました",
+        });
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
       toast({
         variant: "destructive",
         title: "エラー",
-        description: result.message || "ログアウトに失敗しました",
+        description: "予期せぬエラーが発生しました",
       });
     }
   }, [logout, toast, navigate]);
 
-  const handleDeleteAccount = useCallback(async () => {
+  const handleDeleteAccount = React.useCallback(async () => {
     try {
       const result = await deleteAccount();
       if (result.ok) {
@@ -90,23 +103,27 @@ export default function Dashboard() {
     }
   }, [deleteAccount, toast, navigate]);
 
+  React.useEffect(() => {
+    if (!isLoading && !user) {
+      navigate('/login');
+    }
+  }, [user, isLoading, navigate]);
+
   if (isLoading) {
-    return <div className="flex items-center justify-center min-h-screen">読み込み中...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
   }
 
   if (!user) {
     return null;
   }
 
-  const navItems = useMemo(() => [
-    { label: '選手一覧', icon: <Users className="h-4 w-4" />, href: '/athletes' },
-    { label: '大会情報', icon: <Trophy className="h-4 w-4" />, href: '/competitions' },
-    { label: '歴代記録', icon: <Trophy className="h-4 w-4" />, href: '/all-time-records' },
-    { label: '資料', icon: <ClipboardList className="h-4 w-4" />, href: '/documents' },
-  ], []);
-
   return (
-    <div className="flex flex-col min-h-screen bg-gray-100">
+    <ErrorBoundary>
+      <div className="flex flex-col min-h-screen bg-gray-100">
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
           <h1 className="text-3xl font-bold text-gray-900">SwimTrack</h1>
@@ -158,7 +175,7 @@ export default function Dashboard() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center h-16">
               <div className="hidden md:flex items-center space-x-4">
-                {navItems.map((item, index) => (
+                {NAV_ITEMS.map((item, index) => (
                   <Button
                     key={index}
                     variant="ghost"
@@ -175,7 +192,7 @@ export default function Dashboard() {
         </nav>
       )}
 
-      {isMobile && <MobileNav items={navItems} />}
+      {isMobile && <MobileNav items={NAV_ITEMS} />}
 
       <main className="flex-grow">
         <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
@@ -295,6 +312,7 @@ export default function Dashboard() {
         isOpen={showPasswordList}
         onClose={() => setShowPasswordList(false)}
       />
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 }

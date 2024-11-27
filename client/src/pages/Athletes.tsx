@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { useAthletes } from '../hooks/use-athletes';
 import { useSwimRecords } from '../hooks/use-swim-records';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,14 +16,48 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { lazy, Suspense } from 'react';
-const EditAthleteForm = lazy(() => import('../components/EditAthleteForm'));
-const EditRecordForm = lazy(() => import('../components/EditRecordForm'));
-const TimeHistoryModal = lazy(() => import('../components/TimeHistoryModal'));
 import { useUser } from '../hooks/use-user';
 import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '../components/PageHeader';
 import { Badge } from "@/components/ui/badge";
+import { ErrorBoundary } from '../components/ErrorBoundary';
+
+// Lazy load components with proper loading states
+const EditAthleteForm = lazy(() =>
+  import('../components/EditAthleteForm').then(module => ({
+    default: module.EditAthleteForm
+  }))
+);
+
+const EditRecordForm = lazy(() =>
+  import('../components/EditRecordForm').then(module => ({
+    default: module.EditRecordForm
+  }))
+);
+
+const TimeHistoryModal = lazy(() =>
+  import('../components/TimeHistoryModal').then(module => ({
+    default: module.TimeHistoryModal
+  }))
+);
+
+// Loading components for Suspense
+const LoadingSpinner = () => (
+  <div className="flex items-center justify-center p-4">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+  </div>
+);
+
+const FormLoadingFallback = () => (
+  <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50">
+    <div className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 sm:rounded-lg">
+      <div className="flex flex-col items-center justify-center gap-4">
+        <LoadingSpinner />
+        <p className="text-sm text-muted-foreground">読み込み中...</p>
+      </div>
+    </div>
+  </div>
+);
 
 export default function Athletes() {
   const { user } = useUser();
@@ -32,7 +66,7 @@ export default function Athletes() {
   const { records, isLoading: recordsLoading, error: recordsError, mutate: mutateRecords } = useSwimRecords();
   const [editingAthlete, setEditingAthlete] = React.useState<number | null>(null);
   const [deletingAthlete, setDeletingAthlete] = React.useState<number | null>(null);
-  const [editingRecord, setEditingRecord] = React.useState<{id: number | null, studentId: number | null}>({
+  const [editingRecord, setEditingRecord] = React.useState<{ id: number | null, studentId: number | null }>({
     id: null,
     studentId: null
   });
@@ -182,7 +216,7 @@ export default function Athletes() {
         mutateAthletes(),
         mutateRecords()
       ]);
-      
+
       toast({
         title: "削除成功",
         description: "選手と関連する記録が削除されました",
@@ -231,7 +265,7 @@ export default function Athletes() {
 
   return (
     <>
-      <PageHeader 
+      <PageHeader
         title="選手一覧"
         children={
           user?.role === 'coach' && (
@@ -247,8 +281,8 @@ export default function Athletes() {
           {athletes?.map((athlete) => {
             const latestRecord = getLatestPerformance(athlete.id);
             return (
-              <Card 
-                key={athlete.id} 
+              <Card
+                key={athlete.id}
                 className={`hover:shadow-lg transition-shadow ${!athlete.isActive ? 'opacity-60' : ''}`}
               >
                 <CardHeader>
@@ -273,7 +307,7 @@ export default function Athletes() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => setViewingHistory({ 
+                        onClick={() => setViewingHistory({
                           athleteId: athlete.id,
                           athleteName: athlete.username
                         })}
@@ -324,9 +358,9 @@ export default function Athletes() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => setEditingRecord({ 
-                              id: latestRecord.id, 
-                              studentId: athlete.id 
+                            onClick={() => setEditingRecord({
+                              id: latestRecord.id,
+                              studentId: athlete.id
                             })}
                           >
                             <Edit2 className="h-4 w-4" />
@@ -363,49 +397,51 @@ export default function Athletes() {
           })}
         </div>
 
-        {athlete && (
-          <Suspense fallback={<div>読み込み中...</div>}>
-            <EditAthleteForm
-              athlete={athlete}
-              isOpen={!!editingAthlete}
-              onClose={() => setEditingAthlete(null)}
+        <ErrorBoundary>
+          {athlete && (
+            <Suspense fallback={<FormLoadingFallback />}>
+              <EditAthleteForm
+                athlete={athlete}
+                isOpen={!!editingAthlete}
+                onClose={() => setEditingAthlete(null)}
+                onSubmit={async (data) => {
+                  await handleEdit(athlete.id, data);
+                }}
+              />
+            </Suspense>
+          )}
+
+          <Suspense fallback={<FormLoadingFallback />}>
+            <EditRecordForm
+              record={record}
+              studentId={editingRecord.studentId ?? undefined}
+              isOpen={!!editingRecord.studentId}
+              onClose={() => setEditingRecord({ id: null, studentId: null })}
               onSubmit={async (data) => {
-                await handleEdit(athlete.id, data);
+                if (editingRecord.id) {
+                  await handleEditRecord(editingRecord.id, data);
+                } else {
+                  await handleCreateRecord(data);
+                }
               }}
             />
           </Suspense>
-        )}
 
-        <Suspense fallback={<div>読み込み中...</div>}>
-          <EditRecordForm
-            record={record}
-            studentId={editingRecord.studentId ?? undefined}
-            isOpen={!!editingRecord.studentId}
-            onClose={() => setEditingRecord({ id: null, studentId: null })}
-            onSubmit={async (data) => {
-              if (editingRecord.id) {
-                await handleEditRecord(editingRecord.id, data);
-              } else {
-                await handleCreateRecord(data);
-              }
-            }}
-          />
-        </Suspense>
+          {viewingHistory.athleteId && (
+            <Suspense fallback={<FormLoadingFallback />}>
+              <TimeHistoryModal
+                isOpen={!!viewingHistory.athleteId}
+                onClose={() => setViewingHistory({ athleteId: null, athleteName: '' })}
+                records={getAthleteRecords(viewingHistory.athleteId)}
+                athleteName={viewingHistory.athleteName}
+                onRecordDeleted={() => mutateRecords()}
+              />
+            </Suspense>
+          )}
+        </ErrorBoundary>
 
-        {viewingHistory.athleteId && (
-          <Suspense fallback={<div>読み込み中...</div>}>
-            <TimeHistoryModal
-              isOpen={!!viewingHistory.athleteId}
-              onClose={() => setViewingHistory({ athleteId: null, athleteName: '' })}
-              records={getAthleteRecords(viewingHistory.athleteId)}
-              athleteName={viewingHistory.athleteName}
-              onRecordDeleted={() => mutateRecords()}
-            />
-          </Suspense>
-        )}
-
-        <AlertDialog 
-          open={!!deletingAthlete} 
+        <AlertDialog
+          open={!!deletingAthlete}
           onOpenChange={(open) => !open && setDeletingAthlete(null)}
         >
           <AlertDialogContent>
