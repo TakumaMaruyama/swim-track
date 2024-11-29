@@ -77,10 +77,55 @@ export function TimeHistoryModal({
   const [sortBy, setSortBy] = React.useState<string>("date_desc");
   const [deletingRecord, setDeletingRecord] = React.useState<number | null>(null);
   const [editingRecord, setEditingRecord] = React.useState<ExtendedSwimRecord | null>(null);
+  const [periodFilter, setPeriodFilter] = React.useState<string>("all");
+  const [customStartDate, setCustomStartDate] = React.useState<string>("");
+  const [customEndDate, setCustomEndDate] = React.useState<string>("");
   const groupedAndFilteredRecords: GroupedRecords = React.useMemo(() => {
-    const filtered = records.filter(record => 
-      styleFilter === "all" || record.style === styleFilter
-    );
+    const filtered = records.filter(record => {
+      // Style filter
+      if (styleFilter !== "all" && record.style !== styleFilter) {
+        return false;
+      }
+
+      // Period filter
+      if (periodFilter !== "all" && record.date) {
+        const recordDate = new Date(record.date);
+        const now = new Date();
+        
+        switch (periodFilter) {
+          case "1month":
+            const oneMonthAgo = new Date();
+            oneMonthAgo.setMonth(now.getMonth() - 1);
+            return recordDate >= oneMonthAgo;
+          case "3months":
+            const threeMonthsAgo = new Date();
+            threeMonthsAgo.setMonth(now.getMonth() - 3);
+            return recordDate >= threeMonthsAgo;
+          case "6months":
+            const sixMonthsAgo = new Date();
+            sixMonthsAgo.setMonth(now.getMonth() - 6);
+            return recordDate >= sixMonthsAgo;
+          case "1year":
+            const oneYearAgo = new Date();
+            oneYearAgo.setFullYear(now.getFullYear() - 1);
+            return recordDate >= oneYearAgo;
+          case "custom":
+            const startDate = customStartDate ? new Date(customStartDate) : null;
+            const endDate = customEndDate ? new Date(customEndDate) : null;
+            
+            if (startDate && endDate) {
+              return recordDate >= startDate && recordDate <= endDate;
+            } else if (startDate) {
+              return recordDate >= startDate;
+            } else if (endDate) {
+              return recordDate <= endDate;
+            }
+            break;
+        }
+      }
+      
+      return true;
+    });
 
     const sorted = [...filtered].sort((a, b) => {
       switch (sortBy) {
@@ -191,6 +236,39 @@ export function TimeHistoryModal({
                 ))}
               </SelectContent>
             </Select>
+
+            <Select value={periodFilter} onValueChange={setPeriodFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="期間で絞り込み" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">すべての期間</SelectItem>
+                <SelectItem value="1month">過去1ヶ月</SelectItem>
+                <SelectItem value="3months">過去3ヶ月</SelectItem>
+                <SelectItem value="6months">過去6ヶ月</SelectItem>
+                <SelectItem value="1year">過去1年</SelectItem>
+                <SelectItem value="custom">カスタム期間</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {periodFilter === "custom" && (
+              <div className="flex gap-2">
+                <input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  className="px-3 py-2 border rounded"
+                  placeholder="開始日"
+                />
+                <input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  className="px-3 py-2 border rounded"
+                  placeholder="終了日"
+                />
+              </div>
+            )}
 
             <Select value={sortBy} onValueChange={setSortBy}>
               <SelectTrigger className="w-[180px]">
