@@ -215,7 +215,7 @@ export function TimeHistoryModal({
                   <CardContent className="pt-6">
                     <div className="mb-4">
                       <h3 className="text-lg font-semibold">
-                        {style} {distance}m ({poolLength}mプール)
+                        {style} {distance}m
                       </h3>
                     </div>
                     
