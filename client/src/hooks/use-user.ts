@@ -27,10 +27,6 @@ export function useUser() {
     error: null
   });
 
-  const [retryCount, setRetryCount] = useState(0);
-  const MAX_RETRY_ATTEMPTS = 3;
-  const RETRY_DELAY = 1000; // 1 second
-
   const { 
     data: user, 
     error: swrError, 
@@ -40,72 +36,11 @@ export function useUser() {
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
     shouldRetryOnError: true,
-    refreshInterval: 60000, // 1分ごとにチェック
-    refreshWhenHidden: false,
-    refreshWhenOffline: false,
     errorRetryCount: 3,
-    errorRetryInterval: 5000, // 5秒後に再試行
-    onError: async (error) => {
-      if (error.message.includes('Not logged in')) {
-        console.log('[Auth] Not logged in, skipping refresh');
+    refreshInterval: 0,
+    onError: (error) => {
+      if (error.message.includes('Not logged in') || error.message.includes('認証が必要です')) {
         mutate(undefined, { revalidate: false });
-        return;
-      }
-
-      console.log('[Auth] Session validation failed, attempting refresh');
-      
-      if (retryCount >= MAX_RETRY_ATTEMPTS) {
-        console.log('[Auth] Max retry attempts reached, clearing user data');
-        setRetryCount(0);
-        mutate(undefined, { revalidate: false });
-        return;
-      }
-
-      try {
-        const delay = RETRY_DELAY * Math.pow(1.5, retryCount);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        
-        const response = await fetch('/api/refresh', {
-          method: 'POST',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          console.log('[Auth] Refresh failed:', errorData.message || 'Unknown error');
-          
-          if (response.status === 401) {
-            console.log('[Auth] Session expired or invalid, clearing user data');
-            setRetryCount(0);
-            mutate(undefined, { revalidate: false });
-            return;
-          }
-
-          // Only increment retry count for non-401 errors
-          setRetryCount(prev => prev + 1);
-          throw new Error(errorData.message || 'セッションの更新に失敗しました');
-        }
-
-        const refreshedUser = await response.json();
-        console.log('[Auth] Session refreshed successfully');
-        setRetryCount(0);
-        await mutate(refreshedUser, { revalidate: false });
-      } catch (e) {
-        console.error('[Auth] Refresh error:', e);
-        
-        // Don't increment retry count for network errors
-        if (!(e instanceof TypeError)) {
-          setRetryCount(prev => prev + 1);
-        }
-        
-        if (retryCount + 1 >= MAX_RETRY_ATTEMPTS) {
-          console.log('[Auth] Max retry attempts reached after error');
-          setRetryCount(0);
-          mutate(undefined, { revalidate: false });
-        }
       }
     }
   });
@@ -226,6 +161,8 @@ export function useUser() {
       const error = { message: "サーバーとの通信に失敗しました" };
       setAuthState({ isLoading: false, error });
       return { ok: false, ...error };
+    } finally {
+      setAuthState(prev => ({ ...prev, isLoading: false }));
     }
   }, [authState.isLoading, mutate]);
 
@@ -256,6 +193,8 @@ export function useUser() {
       const errorMessage = { message: "サーバーとの通信に失敗しました" };
       setAuthState({ isLoading: false, error: errorMessage });
       return { ok: false, ...errorMessage };
+    } finally {
+      setAuthState(prev => ({ ...prev, isLoading: false }));
     }
   }, [authState.isLoading, mutate]);
 
