@@ -37,11 +37,17 @@ export function useUser() {
     isLoading: swrLoading, 
     mutate 
   } = useSWR<User>("/api/user", {
-    revalidateOnFocus: true,
+    revalidateOnFocus: false,
     revalidateOnReconnect: true,
-    shouldRetryOnError: true,
-    refreshInterval: 60000, // Check every minute
+    shouldRetryOnError: false,
+    refreshInterval: 30000, // Check every 30 seconds
     onError: async (error) => {
+      if (error.message.includes('Not logged in')) {
+        console.log('[Auth] Not logged in, skipping refresh');
+        mutate(undefined, { revalidate: false });
+        return;
+      }
+
       console.log('[Auth] Session validation failed, attempting refresh');
       
       if (retryCount >= MAX_RETRY_ATTEMPTS) {
@@ -52,8 +58,7 @@ export function useUser() {
       }
 
       try {
-        // Add exponential backoff delay
-        const delay = RETRY_DELAY * Math.pow(2, retryCount);
+        const delay = RETRY_DELAY * Math.pow(1.5, retryCount);
         await new Promise(resolve => setTimeout(resolve, delay));
         
         const response = await fetch('/api/refresh', {
@@ -63,17 +68,19 @@ export function useUser() {
             'Content-Type': 'application/json'
           }
         });
-        
+
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           console.log('[Auth] Refresh failed:', errorData.message || 'Unknown error');
           
           if (response.status === 401) {
-            console.log('[Auth] Session expired, clearing user data');
+            console.log('[Auth] Session expired or invalid, clearing user data');
+            setRetryCount(0);
             mutate(undefined, { revalidate: false });
             return;
           }
-          
+
+          // Only increment retry count for non-401 errors
           setRetryCount(prev => prev + 1);
           throw new Error(errorData.message || 'セッションの更新に失敗しました');
         }
@@ -84,7 +91,11 @@ export function useUser() {
         await mutate(refreshedUser, { revalidate: false });
       } catch (e) {
         console.error('[Auth] Refresh error:', e);
-        setRetryCount(prev => prev + 1);
+        
+        // Don't increment retry count for network errors
+        if (!(e instanceof TypeError)) {
+          setRetryCount(prev => prev + 1);
+        }
         
         if (retryCount + 1 >= MAX_RETRY_ATTEMPTS) {
           console.log('[Auth] Max retry attempts reached after error');
