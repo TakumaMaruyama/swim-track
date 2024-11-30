@@ -1,12 +1,13 @@
 import React from 'react';
 import { useSwimRecords } from '../hooks/use-swim-records';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../components/ui/accordion";
+import { Alert, AlertDescription } from "../components/ui/alert";
 import { AlertCircle, Edit2, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "../components/ui/button";
 import { EditRecordForm } from '../components/EditRecordForm';
 import { useUser } from '../hooks/use-user';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '../hooks/use-toast';
 import { PageHeader } from '../components/PageHeader';
 import {
   Select,
@@ -14,7 +15,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "../components/ui/select";
 
 type GroupedRecord = {
   id: number;
@@ -50,6 +51,11 @@ export default function AllTimeRecords() {
 
   const poolLengths = [15, 25, 50];
 
+  const formatDate = (date: string | Date | null) => {
+    if (!date) return '';
+    return new Date(date).toLocaleDateString('ja-JP');
+  };
+
   const groupedRecords: GroupedRecords = React.useMemo(() => {
     if (!records) return {};
     return records.reduce((acc, record) => {
@@ -74,37 +80,6 @@ export default function AllTimeRecords() {
       return acc;
     }, {} as GroupedRecords);
   }, [records, styleFilter, poolLengthFilter]);
-
-  const handleEdit = async (recordId: number, data: any) => {
-    try {
-      const response = await fetch(`/api/records/${recordId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update record');
-      }
-
-      await mutate();
-      toast({
-        title: "更新成功",
-        description: "記録が更新されました",
-      });
-    } catch (error) {
-      console.error('Error updating record:', error);
-      toast({
-        variant: "destructive",
-        title: "エラー",
-        description: "記録の更新に失敗しました",
-      });
-      throw error;
-    }
-  };
 
   const handleDelete = async (recordId: number) => {
     if (!confirm('この記録を削除してもよろしいですか？')) {
@@ -136,7 +111,7 @@ export default function AllTimeRecords() {
     }
   };
 
-  const record = records?.find(r => r.id === editingRecord);
+  const record = editingRecord ? records?.find(r => r.id === editingRecord) : undefined;
 
   if (isLoading) {
     return (
@@ -197,67 +172,133 @@ export default function AllTimeRecords() {
       </PageHeader>
 
       <div className="container px-4 md:px-8">
-        <div className="grid gap-4 md:grid-cols-2">
-          {Object.entries(groupedRecords).map(([key, record]) => (
-            <Card key={key} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div>
-                    <span className="text-xl">{record.style}</span>
-                    <span className="text-sm ml-2">
-                      {record.distance}m ({record.poolLength}mプール)
-                    </span>
-                  </div>
-                  {user?.role === 'coach' && (
-                    <div className="flex gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setEditingRecord(record.id)}
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(record.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-4">
-                    <p className="text-xl font-semibold">{record.athleteName}</p>
-                    <p className="text-3xl font-bold text-primary">{record.time}</p>
-                  </div>
-                  {record.isCompetition && (
-                    <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
-                      大会記録
-                    </span>
-                  )}
-                </div>
-                <p className="text-sm mt-2">
-                  {new Date(record.date).toLocaleDateString('ja-JP')}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <Accordion type="single" collapsible className="space-y-4">
+          {swimStyles.map(style => {
+            const styleRecords = Object.entries(groupedRecords)
+              .filter(([_, record]) => record.style === style);
+            
+            if (styleFilter !== "all" && style !== styleFilter) return null;
+            if (styleRecords.length === 0) return null;
 
-        <EditRecordForm
-          record={editingRecord === -1 ? undefined : record}
-          isOpen={!!editingRecord}
-          onClose={() => setEditingRecord(null)}
-          onSubmit={async (data) => {
-            if (record) {
-              await handleEdit(record.id, data);
-            }
-          }}
-        />
+            return (
+              <AccordionItem
+                key={style}
+                value={style}
+                className="border rounded-lg px-6 bg-white shadow-sm"
+              >
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xl font-semibold">{style}</h3>
+                    <span className="text-sm text-muted-foreground">
+                      ({styleRecords.length} 記録)
+                    </span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 pt-4">
+                    {styleRecords.map(([key, record]) => (
+                      <Card key={key} className="hover:shadow-lg transition-shadow">
+                        <CardHeader>
+                          <CardTitle className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg font-bold">
+                                {record.distance}m
+                              </span>
+                              <span className="text-sm text-muted-foreground">
+                                ({record.poolLength}mプール)
+                              </span>
+                            </div>
+                            {user?.role === 'coach' && (
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setEditingRecord(record.id)}
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleDelete(record.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-4">
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <p className="text-sm text-muted-foreground">選手名</p>
+                                <p className="text-lg font-semibold">{record.athleteName}</p>
+                              </div>
+                              <div>
+                                <p className="text-sm text-muted-foreground">記録</p>
+                                <p className="text-2xl font-bold text-primary">{record.time}</p>
+                              </div>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <p className="text-sm text-muted-foreground">
+                                記録日: {formatDate(record.date)}
+                              </p>
+                              {record.isCompetition && (
+                                <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
+                                  大会記録
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            );
+          })}
+        </Accordion>
+
+        {record && (
+          <EditRecordForm
+            record={record}
+            isOpen={!!editingRecord}
+            onClose={() => setEditingRecord(null)}
+            onSubmit={async (data) => {
+              try {
+                const response = await fetch(`/api/records/${record.id}`, {
+                  method: 'PUT',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify(data),
+                  credentials: 'include',
+                });
+
+                if (!response.ok) {
+                  throw new Error('Failed to update record');
+                }
+
+                await mutate();
+                toast({
+                  title: "更新成功",
+                  description: "記録が更新されました",
+                });
+                setEditingRecord(null);
+              } catch (error) {
+                console.error('Error updating record:', error);
+                toast({
+                  variant: "destructive",
+                  title: "エラー",
+                  description: "記録の更新に失敗しました",
+                });
+                throw error;
+              }
+            }}
+          />
+        )}
       </div>
     </>
   );

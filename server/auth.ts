@@ -54,21 +54,27 @@ export function setupAuth(app: Express) {
 
   const sessionSettings: session.SessionOptions = {
     secret: process.env.REPL_ID || "porygon-supremacy",
-    resave: false,
+    resave: true,
     saveUninitialized: false,
     rolling: true,
     store: new MemoryStore({
-      checkPeriod: 86400000, // Prune expired entries every 24h
-      stale: false, // Don't serve stale sessions
+      checkPeriod: 86400000,
+      stale: false,
+      retry: {
+        retries: 3,
+        factor: 2,
+        minTimeout: 1000,
+        maxTimeout: 10000,
+      },
     }),
     cookie: {
       maxAge: SESSION_MAX_AGE,
       httpOnly: true,
-      secure: 'auto',
+      secure: false, // Allow non-HTTPS for development
       sameSite: 'lax',
       path: '/'
     },
-    name: 'sessionId', // Custom cookie name
+    name: 'connect.sid',
   };
 
   app.use(session(sessionSettings));
@@ -344,30 +350,48 @@ export function setupAuth(app: Express) {
   app.post("/api/refresh", async (req, res) => {
     console.log('[Auth] Processing refresh request');
 
-    if (!req.session || !req.sessionID) {
-      console.log('[Auth] No session to refresh');
-      return res.status(401).json({ 
-        message: "セッションが見つかりません",
-        code: "SESSION_NOT_FOUND"
-      });
+    // Initialize session if it doesn't exist
+    if (!req.session) {
+      console.log('[Auth] Creating new session');
+      req.session = {} as any;
     }
 
-    // Check if session is close to expiry
-    const sessionExpiryTime = new Date(req.session.cookie.expires || 0).getTime();
-    const currentTime = Date.now();
-    const timeUntilExpiry = sessionExpiryTime - currentTime;
-
-    if (req.isAuthenticated() && timeUntilExpiry > SESSION_REFRESH_THRESHOLD) {
-      console.log('[Auth] Session still valid, no refresh needed');
-      return res.json(req.user);
-    }
-
-    // Try to revalidate the session
     try {
-      const userId = req.session.passport?.user;
+      // Check if user is already authenticated with valid session
+      if (req.isAuthenticated() && req.session.passport?.user) {
+        console.log('[Auth] User is authenticated, checking session validity');
+        const sessionExpiryTime = new Date(req.session.cookie?.expires || 0).getTime();
+        const currentTime = Date.now();
+        const timeUntilExpiry = sessionExpiryTime - currentTime;
+
+        if (timeUntilExpiry > SESSION_REFRESH_THRESHOLD) {
+          console.log('[Auth] Session still valid, extending session');
+          req.session.touch();
+          return res.json(req.user);
+        }
+      }
+
+      // Attempt to recover session
+      let userId = req.session.passport?.user;
       
+      if (!userId && req.user?.id) {
+        console.log('[Auth] Recovering session from user data');
+        userId = req.user.id;
+        req.session.passport = { user: userId };
+        await new Promise<void>((resolve, reject) => {
+          req.session.save((err) => {
+            if (err) {
+              console.error('[Auth] Session save error:', err);
+              reject(err);
+              return;
+            }
+            resolve();
+          });
+        });
+      }
+
       if (!userId) {
-        console.log('[Auth] No user ID in session');
+        console.log('[Auth] No valid user ID found for session recovery');
         return res.status(401).json({ 
           message: "セッション情報が不完全です",
           code: "INVALID_SESSION"
