@@ -37,10 +37,14 @@ export function useUser() {
     isLoading: swrLoading, 
     mutate 
   } = useSWR<User>("/api/user", {
-    revalidateOnFocus: false,
+    revalidateOnFocus: true,
     revalidateOnReconnect: true,
-    shouldRetryOnError: false,
-    refreshInterval: 30000, // Check every 30 seconds
+    shouldRetryOnError: true,
+    refreshInterval: 60000, // 1分ごとにチェック
+    refreshWhenHidden: false,
+    refreshWhenOffline: false,
+    errorRetryCount: 3,
+    errorRetryInterval: 5000, // 5秒後に再試行
     onError: async (error) => {
       if (error.message.includes('Not logged in')) {
         console.log('[Auth] Not logged in, skipping refresh');

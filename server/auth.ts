@@ -53,20 +53,34 @@ export function setupAuth(app: Express) {
   const sessionSettings: session.SessionOptions = {
     secret: process.env.REPL_ID || "porygon-supremacy",
     name: 'sid',
-    resave: true, // 変更: セッションを確実に保存
+    resave: false,
     saveUninitialized: false,
     rolling: true,
     store: new MemoryStore({
-      checkPeriod: 15 * 60 * 1000, // 15分ごとにチェック
+      checkPeriod: 300000, // 5分ごとにチェック
       ttl: SESSION_MAX_AGE,
       stale: false,
+      noDisposeOnSet: true,
       dispose: (sid) => {
         console.log('[Auth] Session disposed:', sid);
       },
       touch: (sid, session) => {
-        if (!session) return;
-        console.log('[Auth] Session touched:', sid);
-        session.cookie.maxAge = SESSION_MAX_AGE;
+        if (!session) {
+          console.error('[Auth] Invalid session touched:', sid);
+          return;
+        }
+        try {
+          session.lastAccess = Date.now();
+          if (session.cookie) {
+            session.cookie.maxAge = SESSION_MAX_AGE;
+            console.log('[Auth] Session touched:', sid, 'New maxAge:', session.cookie.maxAge);
+          }
+        } catch (error) {
+          console.error('[Auth] Error updating session:', error);
+        }
+      },
+      error: (error) => {
+        console.error('[Auth] MemoryStore error:', error);
       }
     }),
     cookie: {
@@ -74,8 +88,7 @@ export function setupAuth(app: Express) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      path: '/',
-      domain: undefined
+      path: '/'
     }
   };
 
@@ -144,53 +157,48 @@ export function setupAuth(app: Express) {
 
   passport.serializeUser((user: Express.User, done) => {
     try {
+      if (!user || !user.id) {
+        console.error('[Auth] Invalid user data for serialization');
+        return done(new Error('Invalid user data'));
+      }
       console.log('[Auth] Serializing user:', user.id);
-      done(null, {
-        id: user.id,
-        username: user.username,
-        role: user.role,
-        isActive: user.isActive
-      });
+      // 最小限のデータのみを保存
+      done(null, user.id);
     } catch (error) {
       console.error('[Auth] Serialization error:', error);
       done(error);
     }
   });
 
-  passport.deserializeUser(async (serialized: any, done) => {
+  passport.deserializeUser(async (id: number, done) => {
     try {
-      console.log('[Auth] Deserializing user:', serialized.id);
-      
-      // First check if we have complete serialized data
-      if (!serialized || !serialized.id) {
-        console.log('[Auth] Incomplete serialized data');
-        return done(null, false);
+      if (!id || typeof id !== 'number') {
+        console.error('[Auth] Invalid user ID for deserialization:', id);
+        return done(new Error('Invalid user ID'));
       }
 
-      // Verify against database to ensure user still exists and is active
+      console.log('[Auth] Deserializing user:', id);
+      
       const [user] = await db
         .select()
         .from(users)
-        .where(eq(users.id, serialized.id))
+        .where(eq(users.id, id))
         .limit(1);
       
       if (!user) {
-        console.log('[Auth] User not found in database:', serialized.id);
+        console.log('[Auth] User not found in database:', id);
         return done(null, false);
       }
 
       if (!user.isActive) {
-        console.log('[Auth] User account is inactive:', serialized.id);
+        console.log('[Auth] User account is inactive:', id);
         return done(null, false);
       }
 
-      // Compare serialized data with database data
-      if (
-        user.username !== serialized.username ||
-        user.role !== serialized.role ||
-        user.isActive !== serialized.isActive
-      ) {
-        console.log('[Auth] User data mismatch, updating session');
+      // セッションハイジャック防止のための追加チェック
+      if (!user.username || !user.role) {
+        console.error('[Auth] Corrupted user data:', id);
+        return done(new Error('Corrupted user data'));
       }
 
       done(null, user);
@@ -271,7 +279,7 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/login", (req, res, next) => {
+  app.post("/login", async (req, res, next) => {
     console.log('[Auth] Processing login request');
     const result = insertUserSchema.safeParse(req.body);
     if (!result.success) {
@@ -281,11 +289,15 @@ export function setupAuth(app: Express) {
       });
     }
 
-    passport.authenticate("local", (err: any, user: Express.User | false, info: IVerifyOptions) => {
-      if (err) {
-        console.error('[Auth] Login error:', err);
-        return next(err);
-      }
+    try {
+      const authenticate = () => new Promise((resolve, reject) => {
+        passport.authenticate("local", (err: any, user: Express.User | false, info: IVerifyOptions) => {
+          if (err) reject(err);
+          resolve({ user, info });
+        })(req, res, next);
+      });
+
+      const { user, info } = await authenticate() as any;
 
       if (!user) {
         console.log('[Auth] Login failed:', info.message);
@@ -295,32 +307,43 @@ export function setupAuth(app: Express) {
         });
       }
 
-      req.login(user, (err) => {
-        if (err) {
-          console.error('[Auth] Session error:', err);
-          return next(err);
-        }
-
-        // Initialize session
-        if (!req.session.passport) {
-          req.session.passport = { user: user.id };
-        }
-
-        // Ensure session is saved
-        req.session.save((err) => {
-          if (err) {
-            console.error('[Auth] Session save error:', err);
-            return next(err);
-          }
-
-          console.log('[Auth] Login successful');
-          return res.json({
-            message: "ログインしました",
-            user: { id: user.id, username: user.username }
-          });
+      // セッションを再生成してセッション固定攻撃を防止
+      await new Promise<void>((resolve, reject) => {
+        req.session.regenerate((err) => {
+          if (err) reject(err);
+          resolve();
         });
       });
-    })(req, res, next);
+
+      // ユーザーをログイン
+      await new Promise<void>((resolve, reject) => {
+        req.login(user, (err) => {
+          if (err) reject(err);
+          resolve();
+        });
+      });
+
+      // セッションを初期化
+      req.session.passport = { user: user.id };
+      req.session.cookie.maxAge = SESSION_MAX_AGE;
+
+      // セッションを保存
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err) => {
+          if (err) reject(err);
+          resolve();
+        });
+      });
+
+      console.log('[Auth] Login successful');
+      return res.json({
+        message: "ログインしました",
+        user: { id: user.id, username: user.username }
+      });
+    } catch (error) {
+      console.error('[Auth] Login process error:', error);
+      next(error);
+    }
   });
 
   app.post("/logout", (req, res) => {
@@ -394,97 +417,88 @@ export function setupAuth(app: Express) {
     }
 
     try {
-      // セッションが存在し、認証済みの場合
-      if (req.isAuthenticated() && req.user) {
-        console.log('[Auth] User authenticated, refreshing session');
-        
-        // セッションの有効期限を更新
-        req.session.cookie.maxAge = SESSION_MAX_AGE;
-        req.session.touch();
-        
-        // セッションを保存
-        await new Promise<void>((resolve, reject) => {
-          req.session.save((err) => {
-            if (err) {
-              console.error('[Auth] Session save error:', err);
-              reject(err);
-            } else {
-              resolve();
-            }
-          });
+      // セッションIDを再生成してセッション固定攻撃を防止
+      const regenerateSession = () => new Promise<void>((resolve, reject) => {
+        req.session.regenerate((err) => {
+          if (err) {
+            console.error('[Auth] Session regeneration error:', err);
+            reject(err);
+          } else {
+            resolve();
+          }
         });
-
-        return res.json(req.user);
-      }
-
-      // パスポートデータがある場合、ユーザーを再検証
-      if (req.session.passport?.user) {
-        console.log('[Auth] Revalidating user session');
-        
-        const [user] = await db
-          .select()
-          .from(users)
-          .where(eq(users.id, req.session.passport.user))
-          .limit(1);
-
-        if (!user) {
-          console.log('[Auth] User not found');
-          req.logout((err) => {
-            if (err) console.error('[Auth] Logout error:', err);
-          });
-          return res.status(401).json({ 
-            message: "ユーザーが見つかりません",
-            code: "USER_NOT_FOUND"
-          });
-        }
-
-        if (!user.isActive) {
-          console.log('[Auth] User account is inactive');
-          req.logout((err) => {
-            if (err) console.error('[Auth] Logout error:', err);
-          });
-          return res.status(401).json({ 
-            message: "アカウントが無効化されています",
-            code: "ACCOUNT_INACTIVE"
-          });
-        }
-
-        // ユーザーを再認証
-        await new Promise<void>((resolve, reject) => {
-          req.login(user, (err) => {
-            if (err) {
-              console.error('[Auth] Login error:', err);
-              reject(err);
-            } else {
-              resolve();
-            }
-          });
-        });
-
-        // セッションを更新して保存
-        req.session.cookie.maxAge = SESSION_MAX_AGE;
-        req.session.touch();
-
-        await new Promise<void>((resolve, reject) => {
-          req.session.save((err) => {
-            if (err) {
-              console.error('[Auth] Session save error:', err);
-              reject(err);
-            } else {
-              resolve();
-            }
-          });
-        });
-
-        console.log('[Auth] Session refreshed successfully');
-        return res.json(user);
-      }
-
-      console.log('[Auth] No valid session data');
-      return res.status(401).json({ 
-        message: "セッション情報が不完全です",
-        code: "INVALID_SESSION"
       });
+
+      // セッションを保存
+      const saveSession = () => new Promise<void>((resolve, reject) => {
+        req.session.save((err) => {
+          if (err) {
+            console.error('[Auth] Session save error:', err);
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
+      });
+
+      // 現在のユーザーIDを保持
+      const currentUserId = req.session.passport?.user;
+
+      if (!currentUserId) {
+        console.log('[Auth] No user ID in session');
+        return res.status(401).json({ 
+          message: "セッション情報が不完全です",
+          code: "INVALID_SESSION"
+        });
+      }
+
+      // ユーザーデータを取得
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, currentUserId))
+        .limit(1);
+
+      if (!user || !user.isActive) {
+        console.log('[Auth] User not found or inactive:', currentUserId);
+        await new Promise<void>((resolve) => {
+          req.logout((err) => {
+            if (err) console.error('[Auth] Logout error:', err);
+            resolve();
+          });
+        });
+        return res.status(401).json({ 
+          message: user ? "アカウントが無効化されています" : "ユーザーが見つかりません",
+          code: user ? "ACCOUNT_INACTIVE" : "USER_NOT_FOUND"
+        });
+      }
+
+      // セッションを再生成
+      await regenerateSession();
+
+      // ユーザーを再ログイン
+      await new Promise<void>((resolve, reject) => {
+        req.login(user, (err) => {
+          if (err) {
+            console.error('[Auth] Login error:', err);
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
+      });
+
+      // セッション情報を更新
+      req.session.passport = { user: user.id };
+      if (req.session.cookie) {
+        req.session.cookie.maxAge = SESSION_MAX_AGE;
+      }
+
+      // 変更を保存
+      await saveSession();
+
+      console.log('[Auth] Session refreshed successfully for user:', user.id);
+      return res.json(user);
     } catch (error) {
       console.error('[Auth] Session refresh error:', error);
       res.status(500).json({ 
