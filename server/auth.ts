@@ -2,7 +2,7 @@ import passport from "passport";
 import { IVerifyOptions, Strategy as LocalStrategy } from "passport-local";
 import { type Express } from "express";
 import session from "express-session";
-import ConnectPgSimple from "connect-pg-simple";
+import createMemoryStore from "memorystore";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { users, insertUserSchema, type User as SelectUser } from "db/schema";
@@ -13,7 +13,6 @@ const scryptAsync = promisify(scrypt);
 
 const SALT_LENGTH = 32;
 const HASH_LENGTH = 64;
-const SESSION_MAX_AGE = 24 * 60 * 60 * 1000; // 24時間
 
 const crypto = {
   hash: async (password: string) => {
@@ -48,39 +47,90 @@ declare global {
 }
 
 export function setupAuth(app: Express) {
-  const PostgresStore = ConnectPgSimple(session);
-  
+  const MemoryStore = createMemoryStore(session);
+  // Session settings with enhanced security and management
+  const SESSION_MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours
+  const SESSION_REFRESH_THRESHOLD = 30 * 60 * 1000; // 30 minutes
+
   const sessionSettings: session.SessionOptions = {
     secret: process.env.REPL_ID || "porygon-supremacy",
-    name: 'sid',
-    resave: false,
+    resave: true,
     saveUninitialized: false,
-    rolling: false,
-    store: new PostgresStore({
-      conObject: {
-        connectionString: process.env.DATABASE_URL,
-        ssl: false
+    rolling: true,
+    store: new MemoryStore({
+      checkPeriod: 86400000,
+      stale: false,
+      retry: {
+        retries: 3,
+        factor: 2,
+        minTimeout: 1000,
+        maxTimeout: 10000,
       },
-      createTableIfMissing: true,
-      pruneSessionInterval: 60 * 15,
-      touchAfter: 24 * 60 * 60 // 24時間
     }),
     cookie: {
-      maxAge: 24 * 60 * 60 * 1000, // 24時間
+      maxAge: SESSION_MAX_AGE,
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax'
-    }
+      secure: false, // Allow non-HTTPS for development
+      sameSite: 'lax',
+      path: '/'
+    },
+    name: 'connect.sid',
   };
 
   app.use(session(sessionSettings));
   app.use(passport.initialize());
   app.use(passport.session());
 
+  // Enhanced rate limiting with more sophisticated tracking
+  const loginAttempts = new Map<string, { 
+    count: number; 
+    lastAttempt: number;
+    lastSuccess?: number;
+    lockoutUntil?: number;
+  }>();
+  
+  const MAX_ATTEMPTS = 5;
+  const LOCKOUT_TIME = 15 * 60 * 1000; // 15 minutes
+  const ATTEMPT_RESET_TIME = 30 * 60 * 1000; // 30 minutes
+
+  const checkLoginAttempts = (username: string): { allowed: boolean; message?: string } => {
+    const now = Date.now();
+    const key = username.toLowerCase();
+    const attempts = loginAttempts.get(key) || { count: 0, lastAttempt: 0 };
+
+    // Reset attempts if enough time has passed since last attempt
+    if (now - attempts.lastAttempt > ATTEMPT_RESET_TIME) {
+      loginAttempts.delete(key);
+      return { allowed: true };
+    }
+
+    // Check if user is in lockout period
+    if (attempts.lockoutUntil && now < attempts.lockoutUntil) {
+      const remainingTime = Math.ceil((attempts.lockoutUntil - now) / 60000);
+      return {
+        allowed: false,
+        message: `アカウントが一時的にロックされています。${remainingTime}分後に再試行してください。`
+      };
+    }
+
+    return { allowed: true };
+  };
+
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
-        console.log('[Auth] Authenticating user:', username);
+        const loginCheck = checkLoginAttempts(username);
+        if (!loginCheck.allowed) {
+          return done(null, false, { message: loginCheck.message });
+        }
+
+        const ipKey = username.toLowerCase();
+        const now = Date.now();
+        const attempts = loginAttempts.get(ipKey) || { count: 0, lastAttempt: 0 };
+
+        // Add delay to prevent timing attacks
+        await new Promise(resolve => setTimeout(resolve, Math.random() * 100));
+
         const [user] = await db
           .select()
           .from(users)
@@ -88,34 +138,44 @@ export function setupAuth(app: Express) {
           .limit(1);
 
         if (!user?.password) {
-          console.log('[Auth] User not found or no password:', username);
-          return done(null, false, { message: "ユーザー名またはパスワードが正しくありません" });
+          loginAttempts.set(ipKey, {
+            count: attempts.count + 1,
+            lastAttempt: now,
+            lockoutUntil: attempts.count + 1 >= MAX_ATTEMPTS ? now + LOCKOUT_TIME : undefined
+          });
+          return done(null, false, { 
+            message: "ユーザー名またはパスワードが正しくありません。" 
+          });
         }
 
         const isMatch = await crypto.compare(password, user.password);
         if (!isMatch) {
-          console.log('[Auth] Password mismatch for user:', username);
-          return done(null, false, { message: "ユーザー名またはパスワードが正しくありません" });
+          loginAttempts.set(ipKey, {
+            count: attempts.count + 1,
+            lastAttempt: now,
+            lockoutUntil: attempts.count + 1 >= MAX_ATTEMPTS ? now + LOCKOUT_TIME : undefined
+          });
+          return done(null, false, { 
+            message: "ユーザー名またはパスワードが正しくありません。"
+          });
         }
 
-        if (!user.isActive) {
-          console.log('[Auth] Inactive user attempted login:', username);
-          return done(null, false, { message: "アカウントが無効化されています" });
-        }
+        // Reset attempts on successful login
+        loginAttempts.set(ipKey, {
+          count: 0,
+          lastAttempt: now,
+          lastSuccess: now
+        });
 
-        console.log('[Auth] Authentication successful:', username);
         return done(null, user);
       } catch (err) {
-        console.error('[Auth] Authentication error:', err);
+        console.error('Authentication error:', err);
         return done(err);
       }
     })
   );
 
   passport.serializeUser((user, done) => {
-    if (!user?.id) {
-      return done(new Error('無効なユーザーデータです'));
-    }
     done(null, user.id);
   });
 
@@ -126,123 +186,135 @@ export function setupAuth(app: Express) {
         .from(users)
         .where(eq(users.id, id))
         .limit(1);
-
-      if (!user || !user.isActive) {
-        return done(null, false);
+      
+      if (!user) {
+        return done(new Error("ユーザーが見つかりません"));
       }
 
       done(null, user);
     } catch (err) {
+      console.error('Deserialization error:', err);
       done(err);
     }
   });
 
-  app.post("/login", async (req, res, next) => {
+  app.post("/register", async (req, res, next) => {
     try {
-      if (!req.session) {
-        console.error('[Auth] No session available for login');
-        return res.status(500).json({
-          message: "セッションが利用できません",
-          code: "NO_SESSION"
+      console.log('[Auth] Processing registration request');
+      const result = insertUserSchema.safeParse(req.body);
+      if (!result.success) {
+        console.log('[Auth] Registration validation failed:', result.error);
+        return res
+          .status(400)
+          .json({ 
+            message: "入力が無効です", 
+            errors: result.error.flatten().fieldErrors 
+          });
+      }
+
+      const { username, password, role } = result.data;
+
+      // Check if user already exists
+      const [existingUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.username, username))
+        .limit(1);
+
+      if (existingUser) {
+        console.log('[Auth] Registration failed: username already exists');
+        return res.status(400).json({ 
+          message: "このユーザー名は既に使用されています",
+          field: "username"
         });
       }
 
-      const result = insertUserSchema.safeParse(req.body);
-      if (!result.success) {
-        return res.status(400).json({ 
+      const hashedPassword = await crypto.hash(password);
+
+      const [newUser] = await db
+        .insert(users)
+        .values({
+          username,
+          password: hashedPassword,
+          role,
+        })
+        .returning();
+
+      console.log('[Auth] Registration successful');
+      req.login(newUser, (err) => {
+        if (err) {
+          console.error('[Auth] Login after registration failed:', err);
+          return next(err);
+        }
+        return res.json({
+          message: "登録が完了しました",
+          user: { id: newUser.id, username: newUser.username, role: newUser.role },
+        });
+      });
+    } catch (error) {
+      console.error('Registration error:', error);
+      next(error);
+    }
+  });
+
+  app.post("/login", (req, res, next) => {
+    console.log('[Auth] Processing login request');
+    const result = insertUserSchema.safeParse(req.body);
+    if (!result.success) {
+      return res
+        .status(400)
+        .json({ 
           message: "入力が無効です", 
           errors: result.error.flatten().fieldErrors 
         });
+    }
+
+    const cb = (err: any, user: Express.User, info: IVerifyOptions) => {
+      if (err) {
+        console.error("[Auth] Login error:", err);
+        return next(err);
       }
-
-      const authenticate = () => new Promise<{ user: Express.User | false, info: IVerifyOptions }>((resolve, reject) => {
-        passport.authenticate("local", (err: any, user: Express.User | false, info: IVerifyOptions) => {
-          if (err) return reject(err);
-          resolve({ user, info });
-        })(req, res, next);
-      });
-
-      // 認証を実行
-      const { user, info } = await authenticate();
       if (!user) {
+        console.log('[Auth] Login failed:', info.message);
         return res.status(401).json({
           message: info.message ?? "ログインに失敗しました",
           field: "credentials"
         });
       }
 
-      // セッションを再生成
-      await new Promise<void>((resolve, reject) => {
-        req.session.regenerate((err) => {
-          if (err) {
-            console.error('[Auth] Session regeneration error:', err);
-            reject(err);
-            return;
-          }
-          resolve();
+      req.logIn(user, (err) => {
+        if (err) {
+          console.error("[Auth] Session error:", err);
+          return next(err);
+        }
+        console.log('[Auth] Login successful, session established');
+        return res.json({
+          message: "ログインしました",
+          user: { id: user.id, username: user.username, role: user.role },
         });
       });
-
-      // ユーザーをログイン
-      await new Promise<void>((resolve, reject) => {
-        req.login(user, (err) => {
-          if (err) {
-            console.error('[Auth] Login error:', err);
-            reject(err);
-            return;
-          }
-          resolve();
-        });
-      });
-
-      // セッションを保存
-      await new Promise<void>((resolve, reject) => {
-        req.session.save((err) => {
-          if (err) {
-            console.error('[Auth] Session save error:', err);
-            reject(err);
-            return;
-          }
-          resolve();
-        });
-      });
-
-      console.log('[Auth] Login successful:', user.username);
-      res.json({
-        message: "ログインしました",
-        user: { id: user.id, username: user.username, role: user.role }
-      });
-    } catch (error) {
-      console.error('[Auth] Authentication error:', error);
-      res.status(500).json({
-        message: "認証中にエラーが発生しました",
-        code: "AUTH_ERROR"
-      });
-    }
+    };
+    
+    passport.authenticate("local", cb)(req, res, next);
   });
 
   app.post("/logout", (req, res) => {
-    if (!req.session) {
-      return res.status(500).json({ message: "セッションが利用できません" });
-    }
-
-    const sessionId = req.sessionID;
-    console.log('[Auth] Starting logout process for session:', sessionId);
-
+    const username = req.user?.username;
     req.logout((err) => {
       if (err) {
         console.error('[Auth] Logout error:', err);
         return res.status(500).json({ message: "ログアウトに失敗しました" });
       }
-
-      req.session!.destroy((err) => {
+      if (username) {
+        loginAttempts.delete(username.toLowerCase());
+      }
+      req.session.destroy((err) => {
         if (err) {
           console.error('[Auth] Session destruction error:', err);
           return res.status(500).json({ message: "セッションの削除に失敗しました" });
         }
-
-        res.clearCookie('sid');
-        console.log('[Auth] Logout successful. Session destroyed:', sessionId);
+        res.clearCookie('connect.sid');
+        console.log('[Auth] Logout successful');
         res.json({ message: "ログアウトしました" });
       });
     });
@@ -250,85 +322,139 @@ export function setupAuth(app: Express) {
 
   app.get("/api/user", (req, res) => {
     if (!req.session) {
-      console.log('[Auth] No session found');
       return res.status(401).json({ 
         message: "セッションが見つかりません",
         code: "NO_SESSION"
       });
     }
 
-    if (!req.isAuthenticated() || !req.user) {
-      console.log('[Auth] User not authenticated');
+    if (!req.isAuthenticated()) {
       return res.status(401).json({ 
         message: "認証が必要です",
         code: "NOT_AUTHENTICATED"
       });
     }
 
-    console.log('[Auth] User data requested:', req.user.username);
+    // Check if user is active
+    if (req.user && !req.user.isActive) {
+      return res.status(401).json({
+        message: "アカウントが無効化されています",
+        code: "ACCOUNT_INACTIVE"
+      });
+    }
+
     res.json(req.user);
   });
 
+  // Session refresh endpoint
   app.post("/api/refresh", async (req, res) => {
-    if (!req.session || !req.isAuthenticated() || !req.user) {
-      console.log('[Auth] Invalid session or user for refresh');
-      return res.status(401).json({ 
-        message: "認証が必要です",
-        code: "NOT_AUTHENTICATED"
-      });
+    console.log('[Auth] Processing refresh request');
+
+    // Initialize session if it doesn't exist
+    if (!req.session) {
+      console.log('[Auth] Creating new session');
+      req.session = {} as any;
     }
 
     try {
-      console.log('[Auth] Refreshing session for user:', req.user.username);
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, req.user.id))
-        .limit(1);
+      // Check if user is already authenticated with valid session
+      if (req.isAuthenticated() && req.session.passport?.user) {
+        console.log('[Auth] User is authenticated, checking session validity');
+        const sessionExpiryTime = new Date(req.session.cookie?.expires || 0).getTime();
+        const currentTime = Date.now();
+        const timeUntilExpiry = sessionExpiryTime - currentTime;
 
-      if (!user || !user.isActive) {
-        console.log('[Auth] User not found or inactive:', req.user.id);
-        req.logout((err) => {
-          if (err) console.error('[Auth] Error logging out inactive user:', err);
-        });
-        return res.status(401).json({
-          message: user ? "アカウントが無効化されています" : "ユーザーが見つかりません",
-          code: user ? "ACCOUNT_INACTIVE" : "USER_NOT_FOUND"
+        if (timeUntilExpiry > SESSION_REFRESH_THRESHOLD) {
+          console.log('[Auth] Session still valid, extending session');
+          req.session.touch();
+          return res.json(req.user);
+        }
+      }
+
+      // Attempt to recover session
+      let userId = req.session.passport?.user;
+      
+      if (!userId && req.user?.id) {
+        console.log('[Auth] Recovering session from user data');
+        userId = req.user.id;
+        req.session.passport = { user: userId };
+        await new Promise<void>((resolve, reject) => {
+          req.session.save((err) => {
+            if (err) {
+              console.error('[Auth] Session save error:', err);
+              reject(err);
+              return;
+            }
+            resolve();
+          });
         });
       }
 
-      // セッションを更新
+      if (!userId) {
+        console.log('[Auth] No valid user ID found for session recovery');
+        return res.status(401).json({ 
+          message: "セッション情報が不完全です",
+          code: "INVALID_SESSION"
+        });
+      }
+
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+
+      if (!user) {
+        console.log('[Auth] User not found for session refresh');
+        req.session.destroy((err) => {
+          if (err) console.error('[Auth] Error destroying invalid session:', err);
+        });
+        return res.status(401).json({ 
+          message: "ユーザーが見つかりません",
+          code: "USER_NOT_FOUND"
+        });
+      }
+
+      if (!user.isActive) {
+        console.log('[Auth] Inactive user attempted refresh');
+        req.session.destroy((err) => {
+          if (err) console.error('[Auth] Error destroying session for inactive user:', err);
+        });
+        return res.status(401).json({ 
+          message: "アカウントが無効化されています",
+          code: "ACCOUNT_INACTIVE"
+        });
+      }
+
+      // Re-establish the session with error handling
       await new Promise<void>((resolve, reject) => {
-        req.session.regenerate((err) => {
+        req.login(user, (err) => {
           if (err) {
-            console.error('[Auth] Session regeneration error during refresh:', err);
+            console.error('[Auth] Session refresh failed:', err);
             reject(err);
             return;
           }
-
-          req.login(user, (loginErr) => {
-            if (loginErr) {
-              console.error('[Auth] Login error during refresh:', loginErr);
-              reject(loginErr);
-              return;
-            }
-
-            req.session.save((saveErr) => {
-              if (saveErr) {
-                console.error('[Auth] Session save error during refresh:', saveErr);
-                reject(saveErr);
-                return;
-              }
-              resolve();
-            });
-          });
+          
+          // Explicitly set new expiry
+          if (req.session) {
+            req.session.cookie.maxAge = SESSION_MAX_AGE;
+            req.session.touch();
+          }
+          
+          resolve();
         });
       });
 
-      console.log('[Auth] Session refreshed successfully for:', user.username);
+      console.log('[Auth] Session refreshed successfully');
       res.json(user);
     } catch (error) {
       console.error('[Auth] Session refresh error:', error);
+      
+      // Clean up the session on error
+      req.session.destroy((err) => {
+        if (err) console.error('[Auth] Error destroying session after refresh failure:', err);
+      });
+      
       res.status(500).json({ 
         message: "セッションの更新に失敗しました",
         code: "REFRESH_FAILED"
