@@ -172,34 +172,41 @@ export function setupAuth(app: Express) {
           }
         } else {
           // General user login - only password check
-          if (password === GENERAL_USER_PASSWORD) {
-            // Create or get general user
-            [user] = await db
-              .select()
-              .from(users)
-              .where(and(
-                eq(users.role, 'student'),
-                eq(users.isActive, true)
-              ))
-              .limit(1);
-
-            if (!user) {
-              // Create a default general user if none exists
-              [user] = await db
-                .insert(users)
-                .values({
-                  username: 'general_user',
-                  password: await crypto.hash(GENERAL_USER_PASSWORD),
-                  role: 'student',
-                  isActive: true
-                })
-                .returning();
-            }
-          } else {
+          if (password !== GENERAL_USER_PASSWORD) {
+            console.log('[Auth] General user login failed: Invalid password');
             return done(null, false, { 
               message: "パスワードが正しくありません。" 
             });
           }
+
+          // Create or get general user with provided username
+          const generalUsername = username || 'general_user';
+          
+          [user] = await db
+            .select()
+            .from(users)
+            .where(and(
+              eq(users.username, generalUsername),
+              eq(users.role, 'student'),
+              eq(users.isActive, true)
+            ))
+            .limit(1);
+
+          if (!user) {
+            console.log('[Auth] Creating new general user');
+            // Create a general user with the provided username
+            [user] = await db
+              .insert(users)
+              .values({
+                username: generalUsername,
+                password: await crypto.hash(GENERAL_USER_PASSWORD),
+                role: 'student',
+                isActive: true
+              })
+              .returning();
+          }
+
+          console.log('[Auth] General user login successful');
         }
 
         return done(null, user);

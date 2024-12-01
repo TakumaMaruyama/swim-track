@@ -111,7 +111,7 @@ export default function Login() {
                   setIsAdminLogin(!isAdminLogin);
                   setLoginError(null);
                   form.reset({
-                    username: !isAdminLogin ? "丸山拓真" : "",
+                    username: "",
                     password: ""
                   });
                 }}
@@ -150,10 +150,10 @@ export default function Login() {
                       <FormControl>
                         <Input 
                           {...field} 
-                          disabled={isSubmitting || isAdminLogin}
+                          disabled={isSubmitting}
                           autoComplete="username"
                           className="bg-white"
-                          placeholder={isAdminLogin ? "丸山拓真" : "ユーザー名を入力"}
+                          placeholder="ユーザー名を入力"
                         />
                       </FormControl>
                       <FormMessage />
