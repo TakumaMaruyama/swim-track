@@ -16,8 +16,20 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, Loader2, Home, KeyRound, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
-import { insertUserSchema } from "db/schema";
+import { z } from "zod";
 import { useState } from "react";
+
+// ログインフォーム用のスキーマ
+const loginFormSchema = z.object({
+  username: z.string().optional(),
+  password: z.string().min(1, "パスワードを入力してください"),
+}).refine((data) => {
+  // この関数は外部から渡されたisAdminLoginの値にアクセスできないため、
+  // フォームデータの送信時に別途検証を行います
+  return true;
+});
+
+type LoginFormData = z.infer<typeof loginFormSchema>;
 
 export default function Login() {
   const [, navigate] = useLocation();
@@ -27,23 +39,33 @@ export default function Login() {
   const [isAdminLogin, setIsAdminLogin] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   
-  const form = useForm({
-    resolver: zodResolver(insertUserSchema),
+  const form = useForm<LoginFormData>({
+    resolver: zodResolver(loginFormSchema),
     defaultValues: {
-      username: isAdminLogin ? "丸山拓真" : "",
+      username: "",
       password: "",
     },
   });
 
-  async function onSubmit(values: { username: string; password: string }) {
+  async function onSubmit(values: LoginFormData) {
     if (isSubmitting) return;
+
+    // 管理者ログイン時のバリデーション
+    if (isAdminLogin && !values.username) {
+      form.setError("username", {
+        type: "manual",
+        message: "管理者名を入力してください",
+      });
+      return;
+    }
 
     try {
       setIsSubmitting(true);
       setLoginError(null);
 
+      // 一般ユーザーの場合はusernameを省略
       const loginData = {
-        ...values,
+        ...(isAdminLogin ? values : { password: values.password }),
         isAdminLogin
       };
 
@@ -59,11 +81,11 @@ export default function Login() {
       }
 
       // Handle validation errors
-      if (result.errors) {
+      if ('errors' in result) {
         Object.entries(result.errors).forEach(([field, messages]) => {
-          form.setError(field as "username" | "password", {
+          form.setError(field as keyof LoginFormData, {
             type: "manual",
-            message: messages[0],
+            message: Array.isArray(messages) ? messages[0] : messages,
           });
         });
         return;
@@ -78,7 +100,7 @@ export default function Login() {
     }
   }
 
-  // If already authenticated, redirect to dashboard
+  // ログイン済みの場合はダッシュボードにリダイレクト
   if (isAuthenticated) {
     navigate('/');
     return null;

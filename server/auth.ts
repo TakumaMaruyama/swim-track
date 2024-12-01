@@ -7,6 +7,7 @@ import { users, insertUserSchema, type User as SelectUser } from "db/schema";
 import { db } from "db";
 import { eq, and } from "drizzle-orm";
 import { sql } from "drizzle-orm";
+import { z } from "zod";
 
 // 認証用の固定値
 const ADMIN_USERNAME = "丸山拓真";
@@ -22,6 +23,22 @@ declare global {
     interface User extends SelectUser {}
   }
 }
+
+// 条件付きバリデーションスキーマ
+const loginSchema = z.object({
+  username: z.string().optional(),
+  password: z.string(),
+  isAdminLogin: z.boolean()
+}).refine((data) => {
+  // 管理者ログインの場合のみusernameを必須に
+  if (data.isAdminLogin && !data.username) {
+    return false;
+  }
+  return true;
+}, {
+  message: "管理者ログインの場合はユーザー名が必要です",
+  path: ["username"]
+});
 
 export function setupAuth(app: Express) {
   const MemoryStore = createMemoryStore(session);
@@ -165,7 +182,7 @@ export function setupAuth(app: Express) {
 
   app.post("/login", (req, res, next) => {
     console.log('[Auth] Processing login request');
-    const result = insertUserSchema.safeParse(req.body);
+    const result = loginSchema.safeParse(req.body);
     if (!result.success) {
       return res.status(400).json({ 
         message: "入力が無効です", 
@@ -212,7 +229,6 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/logout", (req, res) => {
-    const username = req.user?.username;
     req.logout((err) => {
       if (err) {
         console.error('[Auth] Logout error:', err);
@@ -243,13 +259,6 @@ export function setupAuth(app: Express) {
       return res.status(401).json({ 
         message: "認証が必要です",
         code: "NOT_AUTHENTICATED"
-      });
-    }
-
-    if (req.user && !req.user.isActive) {
-      return res.status(401).json({
-        message: "アカウントが無効化されています",
-        code: "ACCOUNT_INACTIVE"
       });
     }
 
