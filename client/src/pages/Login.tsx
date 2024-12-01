@@ -141,25 +141,27 @@ export default function Login() {
             )}
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="username"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{isAdminLogin ? "管理者名" : "ユーザー名"}</FormLabel>
-                      <FormControl>
-                        <Input 
-                          {...field} 
-                          disabled={isSubmitting}
-                          autoComplete="username"
-                          className="bg-white"
-                          placeholder="ユーザー名を入力"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {isAdminLogin && (
+                  <FormField
+                    control={form.control}
+                    name="username"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>管理者名</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            disabled={isSubmitting}
+                            autoComplete="username"
+                            className="bg-white"
+                            placeholder="管理者名を入力"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
                 <FormField
                   control={form.control}
                   name="password"

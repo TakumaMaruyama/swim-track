@@ -54,8 +54,8 @@ declare global {
 export function setupAuth(app: Express) {
   const MemoryStore = createMemoryStore(session);
   // Session settings with enhanced security and management
-  const SESSION_MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours
-  const SESSION_REFRESH_THRESHOLD = 30 * 60 * 1000; // 30 minutes
+  const SESSION_MAX_AGE = 12 * 60 * 60 * 1000; // 12 hours
+  const SESSION_REFRESH_THRESHOLD = 15 * 60 * 1000; // 15 minutes
 
   const sessionSettings: session.SessionOptions = {
     secret: process.env.REPL_ID || "porygon-supremacy",
@@ -63,18 +63,18 @@ export function setupAuth(app: Express) {
     saveUninitialized: false,
     rolling: true,
     store: new MemoryStore({
-      checkPeriod: 86400000, // Prune expired entries every 24h
+      checkPeriod: 43200000, // Prune expired entries every 12h
       stale: false, // Don't serve stale sessions
     }),
     cookie: {
       maxAge: SESSION_MAX_AGE,
       httpOnly: true,
-      secure: false, // Allow non-HTTPS for development
-      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
       path: '/',
       domain: undefined // Allow same-origin only
     },
-    name: 'connect.sid' // Use default session name
+    name: 'swimtrack.sid'
   };
 
   app.use(session(sessionSettings));
@@ -179,17 +179,19 @@ export function setupAuth(app: Express) {
             });
           }
 
-          // Create or get general user with provided username
-          const generalUsername = username || 'general_user';
+          // Generate a unique username for general user if not provided
+          const timestamp = Date.now();
+          const randomSuffix = Math.random().toString(36).substring(2, 8);
+          const generalUsername = `user_${timestamp}_${randomSuffix}`;
           
           [user] = await db
             .select()
             .from(users)
             .where(and(
-              eq(users.username, generalUsername),
               eq(users.role, 'student'),
               eq(users.isActive, true)
             ))
+            .orderBy(sql`RANDOM()`)
             .limit(1);
 
           if (!user) {
