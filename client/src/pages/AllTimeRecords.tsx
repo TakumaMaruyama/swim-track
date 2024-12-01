@@ -2,19 +2,14 @@ import React from 'react';
 import { useSwimRecords } from '../hooks/use-swim-records';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Edit2, Trash2 } from "lucide-react";
+import { AlertCircle, Edit2, Trash2, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EditRecordForm } from '../components/EditRecordForm';
 import { useUser } from '../hooks/use-user';
 import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '../components/PageHeader';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type GroupedRecord = {
   id: number;
@@ -36,48 +31,39 @@ type GroupedRecords = {
   [distance: number]: GroupedRecordsByStyle;
 };
 
+const swimStyles = [
+  "自由形",
+  "背泳ぎ",
+  "平泳ぎ",
+  "バタフライ",
+  "個人メドレー"
+];
+
 export default function AllTimeRecords() {
   const { user } = useUser();
   const { toast } = useToast();
   const { records, isLoading, error, mutate } = useSwimRecords();
   const [editingRecord, setEditingRecord] = React.useState<number | null>(null);
-  const [styleFilter, setStyleFilter] = React.useState<string>("all");
-  const [poolLengthFilter, setPoolLengthFilter] = React.useState<number>(25); // デフォルトは25mプール
+  const [poolLengthFilter, setPoolLengthFilter] = React.useState<string>("25"); // デフォルトは25mプール
 
-  const swimStyles = [
-    "自由形",
-    "背泳ぎ",
-    "平泳ぎ",
-    "バタフライ",
-    "個人メドレー"
-  ];
-
-  const poolLengths = [15, 25, 50];
-  
   const formatTime = (time: string) => {
-    // MM:SS.ms形式の時間を整形
     const [minutes, seconds] = time.split(':');
-    if (!seconds) return time; // 既に整形済みの場合
-    return `${minutes}'${seconds}"`; // 日本式の表記に変換
+    if (!seconds) return time;
+    return `${minutes}'${seconds}"`;
   };
 
   const groupedRecords: GroupedRecords = React.useMemo(() => {
     if (!records) return {};
     
-    // First, filter records
-    const filteredRecords = records.filter(record => {
-      if (styleFilter !== "all" && record.style !== styleFilter) return false;
-      if (record.poolLength !== poolLengthFilter) return false;
-      return true;
-    });
+    const filteredRecords = records.filter(record => 
+      record.poolLength === parseInt(poolLengthFilter)
+    );
 
-    // Group by distance first
     const groupedByDistance = filteredRecords.reduce((acc, record) => {
       if (!acc[record.distance]) {
         acc[record.distance] = {};
       }
       
-      // Then by style within each distance
       if (!acc[record.distance][record.style] || record.time < acc[record.distance][record.style].time) {
         acc[record.distance][record.style] = {
           id: record.id,
@@ -94,7 +80,6 @@ export default function AllTimeRecords() {
       return acc;
     }, {} as GroupedRecords);
 
-    // Sort distances
     const sortedGrouped: GroupedRecords = {};
     Object.keys(groupedByDistance)
       .map(Number)
@@ -104,7 +89,7 @@ export default function AllTimeRecords() {
       });
 
     return sortedGrouped;
-  }, [records, styleFilter, poolLengthFilter]);
+  }, [records, poolLengthFilter]);
 
   const handleEdit = async (recordId: number, data: any) => {
     try {
@@ -200,113 +185,101 @@ export default function AllTimeRecords() {
 
   return (
     <>
-      <PageHeader title="歴代記録">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex items-center gap-4">
-            <Select value={styleFilter} onValueChange={setStyleFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="種目で絞り込み" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">すべての種目</SelectItem>
-                {swimStyles.map(style => (
-                  <SelectItem key={style} value={style}>{style}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-lg">
-            {poolLengths.map(length => (
-              <Button
-                key={length}
-                variant={poolLengthFilter === length ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setPoolLengthFilter(length)}
-                className="min-w-[80px]"
-              >
-                {length}m
-              </Button>
-            ))}
-          </div>
-        </div>
-      </PageHeader>
-
+      <PageHeader title="歴代記録" />
+      
       <div className="container px-4 md:px-8">
-        <div className="space-y-8">
-          {Object.entries(groupedRecords).map(([distance, styles]) => (
-            <div key={distance} className="space-y-4">
-              <h2 className="text-2xl font-bold border-b pb-2">
-                {distance}m
-              </h2>
-              <div className="grid gap-4 md:grid-cols-2">
-                {Object.entries(styles).map(([style, record]) => (
-                  <Card key={`${distance}-${style}`} className="hover:shadow-lg transition-shadow group">
-                    <CardHeader className="pb-4">
-                      <CardTitle className="flex items-center justify-between">
-                        <span className="text-xl font-bold text-primary">
-                          {style}
-                        </span>
-                        {user?.role === 'coach' && (
-                          <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setEditingRecord(record.id)}
-                              className="h-8 w-8"
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDelete(record.id)}
-                              className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pb-6">
-                      <div className="space-y-4">
-                        <div className="flex flex-col gap-3">
-                          <div className="flex flex-col">
-                            <p className="text-lg font-medium">
-                              {record.athleteName}
-                            </p>
-                            <p className="text-2xl font-bold text-primary">
-                              {formatTime(record.time)}
-                            </p>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <time className="text-sm text-muted-foreground">
-                              {new Date(record.date).toLocaleDateString('ja-JP', {
-                                year: 'numeric',
-                                month: 'long',
-                                day: 'numeric'
-                              })}
-                            </time>
-                            <div className="flex gap-2">
-                              {record.isCompetition && (
-                                <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary ring-1 ring-inset ring-primary/20">
-                                  大会記録
-                                </span>
+        <Tabs defaultValue="25" value={poolLengthFilter} onValueChange={setPoolLengthFilter}>
+          <TabsList className="mb-8">
+            <TabsTrigger value="15">15mプール</TabsTrigger>
+            <TabsTrigger value="25">25mプール</TabsTrigger>
+            <TabsTrigger value="50">50mプール</TabsTrigger>
+          </TabsList>
+
+          {['15', '25', '50'].map((poolLength) => (
+            <TabsContent key={poolLength} value={poolLength} className="space-y-8">
+              {Object.entries(groupedRecords).map(([distance, styles]) => (
+                <Card key={distance} className="overflow-hidden">
+                  <CardHeader className="bg-muted/50">
+                    <CardTitle className="text-2xl">
+                      {distance}m種目
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-6">
+                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                      {Object.entries(styles)
+                        .sort(([styleA], [styleB]) => {
+                          const indexA = swimStyles.indexOf(styleA);
+                          const indexB = swimStyles.indexOf(styleB);
+                          if (indexA === -1) return 1;
+                          if (indexB === -1) return -1;
+                          return indexA - indexB;
+                        })
+                        .map(([style, record]) => (
+                          <div
+                            key={`${distance}-${style}`}
+                            className="p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group"
+                          >
+                            <div className="flex items-center justify-between mb-4">
+                              <h3 className="text-lg font-semibold text-primary">
+                                {style}
+                              </h3>
+                              {user?.role === 'coach' && (
+                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setEditingRecord(record.id)}
+                                    className="h-8 w-8"
+                                  >
+                                    <Edit2 className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleDelete(record.id)}
+                                    className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
                               )}
-                              <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium">
-                                {record.poolLength}mプール
-                              </span>
+                            </div>
+
+                            <div className="space-y-3">
+                              <div className="flex items-baseline gap-2">
+                                <span className="text-3xl font-bold tracking-tight">
+                                  {formatTime(record.time)}
+                                </span>
+                                {record.isCompetition && (
+                                  <Badge variant="secondary" className="flex items-center gap-1">
+                                    <Trophy className="h-3 w-3" />
+                                    大会記録
+                                  </Badge>
+                                )}
+                              </div>
+
+                              <div className="space-y-1">
+                                <p className="font-medium">
+                                  {record.athleteName}
+                                </p>
+                                <time className="text-sm text-muted-foreground">
+                                  {new Date(record.date).toLocaleDateString('ja-JP', {
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric'
+                                  })}
+                                </time>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
+                        ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </TabsContent>
           ))}
-        </div>
+        </Tabs>
 
         <EditRecordForm
           record={editingRecord === -1 ? undefined : record}
