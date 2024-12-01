@@ -38,7 +38,7 @@ export default function AllTimeRecords() {
   const { records, isLoading, error, mutate } = useSwimRecords();
   const [editingRecord, setEditingRecord] = React.useState<number | null>(null);
   const [styleFilter, setStyleFilter] = React.useState<string>("all");
-  const [poolLengthFilter, setPoolLengthFilter] = React.useState<string>("all_pools");
+  const [poolLengthFilter, setPoolLengthFilter] = React.useState<number>(25); // デフォルトは25mプール
 
   const swimStyles = [
     "自由形",
@@ -49,15 +49,22 @@ export default function AllTimeRecords() {
   ];
 
   const poolLengths = [15, 25, 50];
+  
+  const formatTime = (time: string) => {
+    // MM:SS.ms形式の時間を整形
+    const [minutes, seconds] = time.split(':');
+    if (!seconds) return time; // 既に整形済みの場合
+    return `${minutes}'${seconds}"`; // 日本式の表記に変換
+  };
 
   const groupedRecords: GroupedRecords = React.useMemo(() => {
     if (!records) return {};
     return records.reduce((acc, record) => {
       // Apply filters
       if (styleFilter !== "all" && record.style !== styleFilter) return acc;
-      if (poolLengthFilter !== "all_pools" && record.poolLength !== parseInt(poolLengthFilter)) return acc;
+      if (record.poolLength !== poolLengthFilter) return acc;
 
-      const key = `${record.style}-${record.distance}-${record.poolLength}`;
+      const key = `${record.style}-${record.distance}`;
       if (!acc[key] || record.time < acc[key].time) {
         acc[key] = {
           id: record.id,
@@ -170,50 +177,55 @@ export default function AllTimeRecords() {
   return (
     <>
       <PageHeader title="歴代記録">
-        <div className="flex gap-4">
-          <Select value={styleFilter} onValueChange={setStyleFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="種目で絞り込み" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">すべての種目</SelectItem>
-              {swimStyles.map(style => (
-                <SelectItem key={style} value={style}>{style}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={poolLengthFilter} onValueChange={setPoolLengthFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="プール長で絞り込み" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all_pools">すべてのプール</SelectItem>
-              {poolLengths.map(length => (
-                <SelectItem key={length} value={length.toString()}>{length}mプール</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex items-center gap-4">
+            <Select value={styleFilter} onValueChange={setStyleFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="種目で絞り込み" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">すべての種目</SelectItem>
+                {swimStyles.map(style => (
+                  <SelectItem key={style} value={style}>{style}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-lg">
+            {poolLengths.map(length => (
+              <Button
+                key={length}
+                variant={poolLengthFilter === length ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setPoolLengthFilter(length)}
+                className="min-w-[80px]"
+              >
+                {length}m
+              </Button>
+            ))}
+          </div>
         </div>
       </PageHeader>
 
       <div className="container px-4 md:px-8">
         <div className="grid gap-4 md:grid-cols-2">
           {Object.entries(groupedRecords).map(([key, record]) => (
-            <Card key={key} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
+            <Card key={key} className="hover:shadow-lg transition-shadow group">
+              <CardHeader className="pb-4">
                 <CardTitle className="flex items-center justify-between">
-                  <div>
-                    <span className="text-xl">{record.style}</span>
-                    <span className="text-sm ml-2">
-                      {record.distance}m ({record.poolLength}mプール)
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-xl font-bold">{record.style}</span>
+                    <span className="text-base font-medium text-muted-foreground">
+                      {record.distance}m
                     </span>
                   </div>
                   {user?.role === 'coach' && (
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => setEditingRecord(record.id)}
+                        className="h-8 w-8"
                       >
                         <Edit2 className="h-4 w-4" />
                       </Button>
@@ -221,6 +233,7 @@ export default function AllTimeRecords() {
                         variant="ghost"
                         size="icon"
                         onClick={() => handleDelete(record.id)}
+                        className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -228,21 +241,33 @@ export default function AllTimeRecords() {
                   )}
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-4">
-                    <p className="text-xl font-semibold">{record.athleteName}</p>
-                    <p className="text-3xl font-bold text-primary">{record.time}</p>
+              <CardContent className="pb-6">
+                <div className="space-y-4">
+                  <div className="flex items-baseline justify-between">
+                    <div className="space-y-1">
+                      <p className="text-4xl font-bold tracking-tight text-primary">
+                        {formatTime(record.time)}
+                      </p>
+                      <p className="text-lg font-medium">
+                        {record.athleteName}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      {record.isCompetition && (
+                        <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary ring-1 ring-inset ring-primary/20">
+                          大会記録
+                        </span>
+                      )}
+                      <time className="text-sm text-muted-foreground">
+                        {new Date(record.date).toLocaleDateString('ja-JP', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })}
+                      </time>
+                    </div>
                   </div>
-                  {record.isCompetition && (
-                    <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
-                      大会記録
-                    </span>
-                  )}
                 </div>
-                <p className="text-sm mt-2">
-                  {new Date(record.date).toLocaleDateString('ja-JP')}
-                </p>
               </CardContent>
             </Card>
           ))}
