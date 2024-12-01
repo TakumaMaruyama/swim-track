@@ -3,47 +3,19 @@ import { IVerifyOptions, Strategy as LocalStrategy } from "passport-local";
 import { type Express } from "express";
 import session from "express-session";
 import createMemoryStore from "memorystore";
-import { scrypt, randomBytes, timingSafeEqual } from "crypto";
-import { promisify } from "util";
 import { users, insertUserSchema, type User as SelectUser } from "db/schema";
 import { db } from "db";
 import { eq, and } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 
-const scryptAsync = promisify(scrypt);
-
-// Fixed credentials for authentication
-const GENERAL_USER_PASSWORD = "seiji";
+// 認証用の固定値
 const ADMIN_USERNAME = "丸山拓真";
 const ADMIN_PASSWORD = "dpjm3756";
+const GENERAL_PASSWORD = "seiji";
 
-const SALT_LENGTH = 32;
-const HASH_LENGTH = 64;
-
-const crypto = {
-  hash: async (password: string) => {
-    try {
-      const salt = randomBytes(SALT_LENGTH);
-      const hash = (await scryptAsync(password, salt, HASH_LENGTH)) as Buffer;
-      const hashedPassword = Buffer.concat([hash, salt]);
-      return hashedPassword.toString('hex');
-    } catch (error) {
-      console.error('Password hashing error:', error);
-      throw new Error('パスワードのハッシュ化に失敗しました');
-    }
-  },
-  compare: async (suppliedPassword: string, storedPassword: string) => {
-    try {
-      const buffer = Buffer.from(storedPassword, 'hex');
-      const hash = buffer.subarray(0, HASH_LENGTH);
-      const salt = buffer.subarray(HASH_LENGTH);
-      const suppliedHash = (await scryptAsync(suppliedPassword, salt, HASH_LENGTH)) as Buffer;
-      return timingSafeEqual(hash, suppliedHash);
-    } catch (error) {
-      console.error('Password comparison error:', error);
-      return false;
-    }
-  },
-};
+// セッション設定
+const SESSION_MAX_AGE = 12 * 60 * 60 * 1000; // 12時間
+const SESSION_REFRESH_THRESHOLD = 15 * 60 * 1000; // 15分
 
 declare global {
   namespace Express {
@@ -53,18 +25,15 @@ declare global {
 
 export function setupAuth(app: Express) {
   const MemoryStore = createMemoryStore(session);
-  // Session settings with enhanced security and management
-  const SESSION_MAX_AGE = 12 * 60 * 60 * 1000; // 12 hours
-  const SESSION_REFRESH_THRESHOLD = 15 * 60 * 1000; // 15 minutes
-
+  
   const sessionSettings: session.SessionOptions = {
-    secret: process.env.REPL_ID || "porygon-supremacy",
+    secret: process.env.REPL_ID || "swimtrack-session-secret",
     resave: false,
     saveUninitialized: false,
     rolling: true,
     store: new MemoryStore({
-      checkPeriod: 43200000, // Prune expired entries every 12h
-      stale: false, // Don't serve stale sessions
+      checkPeriod: 43200000, // 12時間ごとに期限切れセッションを削除
+      stale: false,
     }),
     cookie: {
       maxAge: SESSION_MAX_AGE,
@@ -72,7 +41,7 @@ export function setupAuth(app: Express) {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
       path: '/',
-      domain: undefined // Allow same-origin only
+      domain: undefined
     },
     name: 'swimtrack.sid'
   };
@@ -81,41 +50,6 @@ export function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Enhanced rate limiting with more sophisticated tracking
-  const loginAttempts = new Map<string, { 
-    count: number; 
-    lastAttempt: number;
-    lastSuccess?: number;
-    lockoutUntil?: number;
-  }>();
-  
-  const MAX_ATTEMPTS = 5;
-  const LOCKOUT_TIME = 15 * 60 * 1000; // 15 minutes
-  const ATTEMPT_RESET_TIME = 30 * 60 * 1000; // 30 minutes
-
-  const checkLoginAttempts = (username: string): { allowed: boolean; message?: string } => {
-    const now = Date.now();
-    const key = username.toLowerCase();
-    const attempts = loginAttempts.get(key) || { count: 0, lastAttempt: 0 };
-
-    // Reset attempts if enough time has passed since last attempt
-    if (now - attempts.lastAttempt > ATTEMPT_RESET_TIME) {
-      loginAttempts.delete(key);
-      return { allowed: true };
-    }
-
-    // Check if user is in lockout period
-    if (attempts.lockoutUntil && now < attempts.lockoutUntil) {
-      const remainingTime = Math.ceil((attempts.lockoutUntil - now) / 60000);
-      return {
-        allowed: false,
-        message: `アカウントが一時的にロックされています。${remainingTime}分後に再試行してください。`
-      };
-    }
-
-    return { allowed: true };
-  };
-
   passport.use(
     new LocalStrategy({
       usernameField: 'username',
@@ -123,67 +57,52 @@ export function setupAuth(app: Express) {
       passReqToCallback: true
     }, async (req, username, password, done) => {
       try {
-        const isAdminLogin = req.body.isAdminLogin === 'true';
-        const now = Date.now();
+        console.log('[Auth] Processing authentication request');
+        const isAdminLogin = req.body.isAdminLogin === true;
         let user;
 
-        // Add delay to prevent timing attacks
-        await new Promise(resolve => setTimeout(resolve, Math.random() * 100));
-
         if (isAdminLogin) {
-          // Admin login - requires both username and password
-          if (username === ADMIN_USERNAME) {
-            if (password !== ADMIN_PASSWORD) {
-              console.log('[Auth] Admin login failed: Invalid password');
-              return done(null, false, { 
-                message: "管理者パスワードが正しくありません。" 
-              });
-            }
-
-            // Check if admin user exists, if not create it
-            [user] = await db
-              .select()
-              .from(users)
-              .where(and(
-                eq(users.username, ADMIN_USERNAME),
-                eq(users.role, 'coach')
-              ))
-              .limit(1);
-
-            if (!user) {
-              console.log('[Auth] Creating new admin user');
-              // Create admin user if it doesn't exist
-              [user] = await db
-                .insert(users)
-                .values({
-                  username: ADMIN_USERNAME,
-                  password: await crypto.hash(ADMIN_PASSWORD),
-                  role: 'coach',
-                  isActive: true
-                })
-                .returning();
-            }
-            
-            console.log('[Auth] Admin login successful');
-          } else {
-            return done(null, false, { 
-              message: "管理者ユーザー名が正しくありません。" 
+          // 管理者ログイン
+          if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) {
+            console.log('[Auth] Admin login failed: Invalid credentials');
+            return done(null, false, {
+              message: username !== ADMIN_USERNAME 
+                ? "管理者ユーザー名が正しくありません。"
+                : "管理者パスワードが正しくありません。"
             });
+          }
+
+          [user] = await db
+            .select()
+            .from(users)
+            .where(and(
+              eq(users.username, ADMIN_USERNAME),
+              eq(users.role, 'coach')
+            ))
+            .limit(1);
+
+          if (!user) {
+            console.log('[Auth] Creating new admin user');
+            [user] = await db
+              .insert(users)
+              .values({
+                username: ADMIN_USERNAME,
+                password: ADMIN_PASSWORD,
+                role: 'coach',
+                isActive: true
+              })
+              .returning();
           }
         } else {
-          // General user login - only password check
-          if (password !== GENERAL_USER_PASSWORD) {
+          // 一般ユーザーログイン
+          if (password !== GENERAL_PASSWORD) {
             console.log('[Auth] General user login failed: Invalid password');
-            return done(null, false, { 
-              message: "パスワードが正しくありません。" 
+            return done(null, false, {
+              message: "パスワードが正しくありません。"
             });
           }
 
-          // Generate a unique username for general user if not provided
-          const timestamp = Date.now();
-          const randomSuffix = Math.random().toString(36).substring(2, 8);
-          const generalUsername = `user_${timestamp}_${randomSuffix}`;
-          
+          // ランダムな一般ユーザーを取得または作成
           [user] = await db
             .select()
             .from(users)
@@ -195,25 +114,27 @@ export function setupAuth(app: Express) {
             .limit(1);
 
           if (!user) {
+            const timestamp = Date.now();
+            const randomSuffix = Math.random().toString(36).substring(2, 8);
+            const generalUsername = `user_${timestamp}_${randomSuffix}`;
+            
             console.log('[Auth] Creating new general user');
-            // Create a general user with the provided username
             [user] = await db
               .insert(users)
               .values({
                 username: generalUsername,
-                password: await crypto.hash(GENERAL_USER_PASSWORD),
+                password: GENERAL_PASSWORD,
                 role: 'student',
                 isActive: true
               })
               .returning();
           }
-
-          console.log('[Auth] General user login successful');
         }
 
+        console.log('[Auth] Login successful');
         return done(null, user);
       } catch (err) {
-        console.error('Authentication error:', err);
+        console.error('[Auth] Authentication error:', err);
         return done(err);
       }
     })
@@ -237,67 +158,8 @@ export function setupAuth(app: Express) {
 
       done(null, user);
     } catch (err) {
-      console.error('Deserialization error:', err);
+      console.error('[Auth] Deserialization error:', err);
       done(err);
-    }
-  });
-
-  app.post("/register", async (req, res, next) => {
-    try {
-      console.log('[Auth] Processing registration request');
-      const result = insertUserSchema.safeParse(req.body);
-      if (!result.success) {
-        console.log('[Auth] Registration validation failed:', result.error);
-        return res
-          .status(400)
-          .json({ 
-            message: "入力が無効です", 
-            errors: result.error.flatten().fieldErrors 
-          });
-      }
-
-      const { username, password, role } = result.data;
-
-      // Check if user already exists
-      const [existingUser] = await db
-        .select()
-        .from(users)
-        .where(eq(users.username, username))
-        .limit(1);
-
-      if (existingUser) {
-        console.log('[Auth] Registration failed: username already exists');
-        return res.status(400).json({ 
-          message: "このユーザー名は既に使用されています",
-          field: "username"
-        });
-      }
-
-      const hashedPassword = await crypto.hash(password);
-
-      const [newUser] = await db
-        .insert(users)
-        .values({
-          username,
-          password: hashedPassword,
-          role,
-        })
-        .returning();
-
-      console.log('[Auth] Registration successful');
-      req.login(newUser, (err) => {
-        if (err) {
-          console.error('[Auth] Login after registration failed:', err);
-          return next(err);
-        }
-        return res.json({
-          message: "登録が完了しました",
-          user: { id: newUser.id, username: newUser.username, role: newUser.role },
-        });
-      });
-    } catch (error) {
-      console.error('Registration error:', error);
-      next(error);
     }
   });
 
@@ -305,19 +167,18 @@ export function setupAuth(app: Express) {
     console.log('[Auth] Processing login request');
     const result = insertUserSchema.safeParse(req.body);
     if (!result.success) {
-      return res
-        .status(400)
-        .json({ 
-          message: "入力が無効です", 
-          errors: result.error.flatten().fieldErrors 
-        });
+      return res.status(400).json({ 
+        message: "入力が無効です", 
+        errors: result.error.flatten().fieldErrors 
+      });
     }
 
-    const cb = (err: any, user: Express.User, info: IVerifyOptions) => {
+    passport.authenticate("local", (err: any, user: Express.User, info: IVerifyOptions) => {
       if (err) {
         console.error("[Auth] Login error:", err);
         return next(err);
       }
+
       if (!user) {
         console.log('[Auth] Login failed:', info.message);
         return res.status(401).json({
@@ -331,15 +192,23 @@ export function setupAuth(app: Express) {
           console.error("[Auth] Session error:", err);
           return next(err);
         }
+
+        // セッションの有効期限を設定
+        if (req.session) {
+          req.session.cookie.maxAge = SESSION_MAX_AGE;
+        }
+
         console.log('[Auth] Login successful, session established');
         return res.json({
           message: "ログインしました",
-          user: { id: user.id, username: user.username, role: user.role },
+          user: { 
+            id: user.id, 
+            username: user.username, 
+            role: user.role 
+          },
         });
       });
-    };
-    
-    passport.authenticate("local", cb)(req, res, next);
+    })(req, res, next);
   });
 
   app.post("/logout", (req, res) => {
@@ -349,15 +218,13 @@ export function setupAuth(app: Express) {
         console.error('[Auth] Logout error:', err);
         return res.status(500).json({ message: "ログアウトに失敗しました" });
       }
-      if (username) {
-        loginAttempts.delete(username.toLowerCase());
-      }
+
       req.session.destroy((err) => {
         if (err) {
           console.error('[Auth] Session destruction error:', err);
           return res.status(500).json({ message: "セッションの削除に失敗しました" });
         }
-        res.clearCookie('connect.sid');
+        res.clearCookie('swimtrack.sid');
         console.log('[Auth] Logout successful');
         res.json({ message: "ログアウトしました" });
       });
@@ -379,7 +246,6 @@ export function setupAuth(app: Express) {
       });
     }
 
-    // Check if user is active
     if (req.user && !req.user.isActive) {
       return res.status(401).json({
         message: "アカウントが無効化されています",
@@ -390,7 +256,6 @@ export function setupAuth(app: Express) {
     res.json(req.user);
   });
 
-  // Session refresh endpoint
   app.post("/api/refresh", async (req, res) => {
     console.log('[Auth] Processing refresh request');
 
@@ -402,7 +267,6 @@ export function setupAuth(app: Express) {
       });
     }
 
-    // Check if session is close to expiry
     const sessionExpiryTime = new Date(req.session.cookie.expires || 0).getTime();
     const currentTime = Date.now();
     const timeUntilExpiry = sessionExpiryTime - currentTime;
@@ -412,7 +276,6 @@ export function setupAuth(app: Express) {
       return res.json(req.user);
     }
 
-    // Try to revalidate the session
     try {
       const userId = req.session.passport?.user;
       
@@ -452,7 +315,6 @@ export function setupAuth(app: Express) {
         });
       }
 
-      // Re-establish the session with error handling
       await new Promise<void>((resolve, reject) => {
         req.login(user, (err) => {
           if (err) {
@@ -461,7 +323,6 @@ export function setupAuth(app: Express) {
             return;
           }
           
-          // Explicitly set new expiry
           if (req.session) {
             req.session.cookie.maxAge = SESSION_MAX_AGE;
             req.session.touch();
@@ -476,7 +337,6 @@ export function setupAuth(app: Express) {
     } catch (error) {
       console.error('[Auth] Session refresh error:', error);
       
-      // Clean up the session on error
       req.session.destroy((err) => {
         if (err) console.error('[Auth] Error destroying session after refresh failure:', err);
       });
