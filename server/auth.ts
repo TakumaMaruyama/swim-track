@@ -12,11 +12,46 @@ import { z } from "zod";
 // 認証用の固定値
 const ADMIN_USERNAME = "丸山拓真";
 const ADMIN_PASSWORD = "dpjm3756";
-const GENERAL_PASSWORD = "seiji";
 
 // セッション設定
 const SESSION_MAX_AGE = 12 * 60 * 60 * 1000; // 12時間
 const SESSION_REFRESH_THRESHOLD = 15 * 60 * 1000; // 15分
+
+// 一般ログインパスワードのキャッシュ
+let cachedGeneralPassword: string | null = null;
+let generalPasswordLastFetched: number = 0;
+const CACHE_TTL = 5 * 60 * 1000; // 5分
+
+// 一般ログインパスワードを取得する関数
+async function getGeneralPassword(): Promise<string> {
+  const now = Date.now();
+  
+  // キャッシュが有効な場合はキャッシュから返す
+  if (cachedGeneralPassword && (now - generalPasswordLastFetched) < CACHE_TTL) {
+    return cachedGeneralPassword;
+  }
+
+  try {
+    const [setting] = await db
+      .select()
+      .from(sql.table('settings'))
+      .where(sql.eq('key', 'general_password'))
+      .limit(1);
+
+    if (!setting) {
+      throw new Error('General password not found in settings');
+    }
+
+    // キャッシュを更新
+    cachedGeneralPassword = setting.value;
+    generalPasswordLastFetched = now;
+
+    return setting.value;
+  } catch (error) {
+    console.error('[Auth] Failed to fetch general password:', error);
+    throw new Error('Failed to fetch general password');
+  }
+}
 
 declare global {
   namespace Express {
@@ -112,11 +147,17 @@ export function setupAuth(app: Express) {
           }
         } else {
           // 一般ユーザーログイン
-          if (password !== GENERAL_PASSWORD) {
-            console.log('[Auth] General user login failed: Invalid password');
-            return done(null, false, {
-              message: "パスワードが正しくありません。"
-            });
+          try {
+            const generalPassword = await getGeneralPassword();
+            if (password !== generalPassword) {
+              console.log('[Auth] General user login failed: Invalid password');
+              return done(null, false, {
+                message: "パスワードが正しくありません。"
+              });
+            }
+          } catch (error) {
+            console.error('[Auth] Failed to validate general password:', error);
+            return done(error);
           }
 
           // ランダムな一般ユーザーを取得または作成
@@ -316,6 +357,72 @@ export function setupAuth(app: Express) {
       if (!user.isActive) {
         console.log('[Auth] Inactive user attempted refresh');
         req.session.destroy((err) => {
+// 管理者チェックミドルウェア
+function requireAdmin(req: Express.Request, res: Express.Response, next: Express.NextFunction) {
+  if (!req.isAuthenticated() || !req.user || req.user.role !== 'coach') {
+    return res.status(403).json({ 
+      message: "管理者権限が必要です",
+      code: "ADMIN_REQUIRED"
+    });
+  }
+  next();
+}
+
+// 設定管理API
+app.get("/api/settings/general-password", requireAdmin, async (req, res) => {
+  try {
+    const password = await getGeneralPassword();
+    res.json({ value: password });
+  } catch (error) {
+    console.error('[Settings] Failed to fetch general password:', error);
+    res.status(500).json({ 
+      message: "パスワードの取得に失敗しました",
+      code: "FETCH_FAILED"
+    });
+  }
+});
+
+app.post("/api/settings/general-password", requireAdmin, async (req, res) => {
+  const { password } = req.body;
+
+  // パスワードのバリデーション
+  if (!password || typeof password !== 'string' || password.length < 4) {
+    return res.status(400).json({
+      message: "パスワードは4文字以上で入力してください",
+      code: "INVALID_PASSWORD"
+    });
+  }
+
+  try {
+    await db
+      .insert(sql.table('settings'))
+      .values({
+        key: 'general_password',
+        value: password,
+        updated_at: new Date()
+      })
+      .onConflictDoUpdate({
+        target: ['key'],
+        set: {
+          value: password,
+          updated_at: new Date()
+        }
+      });
+
+    // キャッシュを更新
+    cachedGeneralPassword = password;
+    generalPasswordLastFetched = Date.now();
+
+    res.json({ message: "パスワードを更新しました" });
+  } catch (error) {
+    console.error('[Settings] Failed to update general password:', error);
+    res.status(500).json({ 
+      message: "パスワードの更新に失敗しました",
+      code: "UPDATE_FAILED"
+    });
+  }
+});
+
           if (err) console.error('[Auth] Error destroying session for inactive user:', err);
         });
         return res.status(401).json({ 
