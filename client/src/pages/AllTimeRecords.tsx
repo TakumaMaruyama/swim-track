@@ -28,8 +28,12 @@ type GroupedRecord = {
   athleteName: string;
 };
 
+type GroupedRecordsByStyle = {
+  [style: string]: GroupedRecord;
+};
+
 type GroupedRecords = {
-  [key: string]: GroupedRecord;
+  [distance: number]: GroupedRecordsByStyle;
 };
 
 export default function AllTimeRecords() {
@@ -59,14 +63,23 @@ export default function AllTimeRecords() {
 
   const groupedRecords: GroupedRecords = React.useMemo(() => {
     if (!records) return {};
-    return records.reduce((acc, record) => {
-      // Apply filters
-      if (styleFilter !== "all" && record.style !== styleFilter) return acc;
-      if (record.poolLength !== poolLengthFilter) return acc;
+    
+    // First, filter records
+    const filteredRecords = records.filter(record => {
+      if (styleFilter !== "all" && record.style !== styleFilter) return false;
+      if (record.poolLength !== poolLengthFilter) return false;
+      return true;
+    });
 
-      const key = `${record.style}-${record.distance}`;
-      if (!acc[key] || record.time < acc[key].time) {
-        acc[key] = {
+    // Group by distance first
+    const groupedByDistance = filteredRecords.reduce((acc, record) => {
+      if (!acc[record.distance]) {
+        acc[record.distance] = {};
+      }
+      
+      // Then by style within each distance
+      if (!acc[record.distance][record.style] || record.time < acc[record.distance][record.style].time) {
+        acc[record.distance][record.style] = {
           id: record.id,
           style: record.style,
           distance: record.distance,
@@ -80,6 +93,17 @@ export default function AllTimeRecords() {
       }
       return acc;
     }, {} as GroupedRecords);
+
+    // Sort distances
+    const sortedGrouped: GroupedRecords = {};
+    Object.keys(groupedByDistance)
+      .map(Number)
+      .sort((a, b) => a - b)
+      .forEach(distance => {
+        sortedGrouped[distance] = groupedByDistance[distance];
+      });
+
+    return sortedGrouped;
   }, [records, styleFilter, poolLengthFilter]);
 
   const handleEdit = async (recordId: number, data: any) => {
@@ -208,68 +232,79 @@ export default function AllTimeRecords() {
       </PageHeader>
 
       <div className="container px-4 md:px-8">
-        <div className="grid gap-4 md:grid-cols-2">
-          {Object.entries(groupedRecords).map(([key, record]) => (
-            <Card key={key} className="hover:shadow-lg transition-shadow group">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-xl font-bold">{record.style}</span>
-                    <span className="text-base font-medium text-muted-foreground">
-                      {record.distance}m
-                    </span>
-                  </div>
-                  {user?.role === 'coach' && (
-                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setEditingRecord(record.id)}
-                        className="h-8 w-8"
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(record.id)}
-                        className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pb-6">
-                <div className="space-y-4">
-                  <div className="flex items-baseline justify-between">
-                    <div className="space-y-1">
-                      <p className="text-4xl font-bold tracking-tight text-primary">
-                        {formatTime(record.time)}
-                      </p>
-                      <p className="text-lg font-medium">
-                        {record.athleteName}
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-end gap-2">
-                      {record.isCompetition && (
-                        <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary ring-1 ring-inset ring-primary/20">
-                          大会記録
+        <div className="space-y-8">
+          {Object.entries(groupedRecords).map(([distance, styles]) => (
+            <div key={distance} className="space-y-4">
+              <h2 className="text-2xl font-bold border-b pb-2">
+                {distance}m
+              </h2>
+              <div className="grid gap-4 md:grid-cols-2">
+                {Object.entries(styles).map(([style, record]) => (
+                  <Card key={`${distance}-${style}`} className="hover:shadow-lg transition-shadow group">
+                    <CardHeader className="pb-4">
+                      <CardTitle className="flex items-center justify-between">
+                        <span className="text-xl font-bold text-primary">
+                          {style}
                         </span>
-                      )}
-                      <time className="text-sm text-muted-foreground">
-                        {new Date(record.date).toLocaleDateString('ja-JP', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
-                        })}
-                      </time>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                        {user?.role === 'coach' && (
+                          <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setEditingRecord(record.id)}
+                              className="h-8 w-8"
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDelete(record.id)}
+                              className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pb-6">
+                      <div className="space-y-4">
+                        <div className="flex flex-col gap-3">
+                          <div className="flex flex-col">
+                            <p className="text-lg font-medium">
+                              {record.athleteName}
+                            </p>
+                            <p className="text-2xl font-bold text-primary">
+                              {formatTime(record.time)}
+                            </p>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <time className="text-sm text-muted-foreground">
+                              {new Date(record.date).toLocaleDateString('ja-JP', {
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                              })}
+                            </time>
+                            <div className="flex gap-2">
+                              {record.isCompetition && (
+                                <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary ring-1 ring-inset ring-primary/20">
+                                  大会記録
+                                </span>
+                              )}
+                              <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium">
+                                {record.poolLength}mプール
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
 
