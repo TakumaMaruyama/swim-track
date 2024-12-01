@@ -45,10 +45,10 @@ export default function AllTimeRecords() {
   const [poolLengthFilter, setPoolLengthFilter] = React.useState<number>(25); // デフォルトは25mプール
 
   const swimStyles = [
-    "バタフライ",
+    "自由形",
     "背泳ぎ",
     "平泳ぎ",
-    "自由形",
+    "バタフライ",
     "個人メドレー"
   ];
 
@@ -235,29 +235,17 @@ export default function AllTimeRecords() {
         <div className="space-y-8">
           {Object.entries(groupedRecords).map(([distance, styles]) => (
             <div key={distance} className="space-y-4">
-              <h2 className="text-3xl font-bold text-primary/90 border-b pb-3 mb-6">
-                {distance}m 歴代ベスト
+              <h2 className="text-2xl font-bold border-b pb-2">
+                {distance}m
               </h2>
               <div className="grid gap-4 md:grid-cols-2">
-                {Object.entries(styles)
-                  .sort(([styleA], [styleB]) => {
-                    const indexA = swimStyles.indexOf(styleA);
-                    const indexB = swimStyles.indexOf(styleB);
-                    return indexA - indexB;
-                  })
-                  .map(([style, record]) => (
+                {Object.entries(styles).map(([style, record]) => (
                   <Card key={`${distance}-${style}`} className="hover:shadow-lg transition-shadow group">
                     <CardHeader className="pb-4">
                       <CardTitle className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xl font-bold">
-                            {style}
-                          </span>
-                          <div className="h-1 w-1 rounded-full bg-muted-foreground/30"></div>
-                          <span className="text-muted-foreground font-medium">
-                            {poolLengthFilter}mプール
-                          </span>
-                        </div>
+                        <span className="text-xl font-bold text-primary">
+                          {style}
+                        </span>
                         {user?.role === 'coach' && (
                           <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <Button
@@ -282,39 +270,32 @@ export default function AllTimeRecords() {
                     </CardHeader>
                     <CardContent className="pb-6">
                       <div className="space-y-4">
-                        <div className="flex flex-col gap-4">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-3xl font-bold text-primary tracking-tight">
-                                {formatTime(record.time)}
-                              </span>
-                              <div className="flex flex-col items-start">
-                                <span className="bg-primary/10 text-primary text-sm font-semibold px-2 py-0.5 rounded">
-                                  {record.poolLength}mプール
-                                </span>
-                                {record.isCompetition && (
-                                  <span className="bg-secondary/10 text-secondary text-sm font-semibold px-2 py-0.5 rounded mt-1">
-                                    大会記録
-                                  </span>
-                                )}
-                              </div>
-                            </div>
+                        <div className="flex flex-col gap-3">
+                          <div className="flex flex-col">
+                            <p className="text-lg font-medium">
+                              {record.athleteName}
+                            </p>
+                            <p className="text-2xl font-bold text-primary">
+                              {formatTime(record.time)}
+                            </p>
                           </div>
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between border-t pt-3">
-                              <div className="space-y-1">
-                                <p className="text-sm text-muted-foreground">記録保持者</p>
-                                <p className="text-base font-semibold">
-                                  {record.athleteName}
-                                </p>
-                              </div>
-                              <time className="text-sm text-muted-foreground">
-                                {new Date(record.date).toLocaleDateString('ja-JP', {
-                                  year: 'numeric',
-                                  month: 'long',
-                                  day: 'numeric'
-                                })}
-                              </time>
+                          <div className="flex items-center justify-between">
+                            <time className="text-sm text-muted-foreground">
+                              {new Date(record.date).toLocaleDateString('ja-JP', {
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                              })}
+                            </time>
+                            <div className="flex gap-2">
+                              {record.isCompetition && (
+                                <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary ring-1 ring-inset ring-primary/20">
+                                  大会記録
+                                </span>
+                              )}
+                              <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium">
+                                {record.poolLength}mプール
+                              </span>
                             </div>
                           </div>
                         </div>
