@@ -24,11 +24,12 @@ export default function Login() {
   const { toast } = useToast();
   const { login, isAuthenticated } = useUser();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAdminLogin, setIsAdminLogin] = useState(false);
   
   const form = useForm({
     resolver: zodResolver(insertUserSchema),
     defaultValues: {
-      username: "",
+      username: "general_user",
       password: "",
     },
   });
@@ -38,7 +39,14 @@ export default function Login() {
 
     try {
       setIsSubmitting(true);
-      const result = await login(values);
+
+      // Add isAdminLogin flag to the request
+      const loginData = {
+        ...values,
+        isAdminLogin: isAdminLogin
+      };
+
+      const result = await login(loginData);
       
       if (result.ok) {
         toast({
@@ -106,7 +114,21 @@ export default function Login() {
         </Button>
       </div>
       <div className="container flex items-center justify-center py-8">
-        <Card className="w-full max-w-md">
+        <Card className="w-full max-w-md relative">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setIsAdminLogin(!isAdminLogin);
+              form.reset({
+                username: !isAdminLogin ? "丸山拓真" : "general_user",
+                password: ""
+              });
+            }}
+            className="absolute right-4 top-4"
+          >
+            {isAdminLogin ? "一般ログインへ" : "管理者ログインへ"}
+          </Button>
           <CardHeader>
             <CardTitle className="text-2xl text-center">
               SwimTrack ログイン
@@ -115,24 +137,28 @@ export default function Login() {
           <CardContent className="space-y-4">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="username"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>ユーザー名</FormLabel>
-                      <FormControl>
-                        <Input 
-                          {...field} 
-                          disabled={isSubmitting}
-                          autoComplete="username"
-                          className="bg-white"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {isAdminLogin ? (
+                  <FormField
+                    control={form.control}
+                    name="username"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>管理者名</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            disabled={isSubmitting}
+                            autoComplete="username"
+                            className="bg-white"
+                            value="丸山拓真"
+                            readOnly
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ) : null}
                 <FormField
                   control={form.control}
                   name="password"
@@ -146,6 +172,7 @@ export default function Login() {
                           disabled={isSubmitting}
                           autoComplete="current-password"
                           className="bg-white"
+                          placeholder={isAdminLogin ? "管理者パスワード" : "一般利用者パスワード"}
                         />
                       </FormControl>
                       <FormMessage />
@@ -169,19 +196,21 @@ export default function Login() {
               </form>
             </Form>
           </CardContent>
-          <CardFooter className="flex flex-col space-y-2">
-            <div className="text-sm text-gray-500 text-center">
-              アカウントをお持ちでない方は
-            </div>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => navigate("/register")}
-              disabled={isSubmitting}
-            >
-              新規登録
-            </Button>
-          </CardFooter>
+          {!isAdminLogin && (
+            <CardFooter className="flex flex-col space-y-2">
+              <div className="text-sm text-gray-500 text-center">
+                アカウントをお持ちでない方は
+              </div>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => navigate("/register")}
+                disabled={isSubmitting}
+              >
+                新規登録
+              </Button>
+            </CardFooter>
+          )}
         </Card>
       </div>
     </div>

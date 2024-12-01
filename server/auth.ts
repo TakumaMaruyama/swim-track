@@ -7,9 +7,14 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { users, insertUserSchema, type User as SelectUser } from "db/schema";
 import { db } from "db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 const scryptAsync = promisify(scrypt);
+
+// Fixed credentials for authentication
+const GENERAL_USER_PASSWORD = "seiji";
+const ADMIN_USERNAME = "丸山拓真";
+const ADMIN_PASSWORD = "dpjm3756";
 
 const SALT_LENGTH = 32;
 const HASH_LENGTH = 64;
@@ -111,55 +116,80 @@ export function setupAuth(app: Express) {
   };
 
   passport.use(
-    new LocalStrategy(async (username, password, done) => {
+    new LocalStrategy({
+      usernameField: 'username',
+      passwordField: 'password',
+      passReqToCallback: true
+    }, async (req, username, password, done) => {
       try {
-        const loginCheck = checkLoginAttempts(username);
-        if (!loginCheck.allowed) {
-          return done(null, false, { message: loginCheck.message });
-        }
-
-        const ipKey = username.toLowerCase();
+        const isAdminLogin = req.body.isAdminLogin === 'true';
         const now = Date.now();
-        const attempts = loginAttempts.get(ipKey) || { count: 0, lastAttempt: 0 };
+        let user;
 
         // Add delay to prevent timing attacks
         await new Promise(resolve => setTimeout(resolve, Math.random() * 100));
 
-        const [user] = await db
-          .select()
-          .from(users)
-          .where(eq(users.username, username))
-          .limit(1);
+        if (isAdminLogin) {
+          // Admin login - requires both username and password
+          if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+            // Check if admin user exists, if not create it
+            [user] = await db
+              .select()
+              .from(users)
+              .where(and(
+                eq(users.username, ADMIN_USERNAME),
+                eq(users.role, 'coach')
+              ))
+              .limit(1);
 
-        if (!user?.password) {
-          loginAttempts.set(ipKey, {
-            count: attempts.count + 1,
-            lastAttempt: now,
-            lockoutUntil: attempts.count + 1 >= MAX_ATTEMPTS ? now + LOCKOUT_TIME : undefined
-          });
-          return done(null, false, { 
-            message: "ユーザー名またはパスワードが正しくありません。" 
-          });
+            if (!user) {
+              // Create admin user if it doesn't exist
+              [user] = await db
+                .insert(users)
+                .values({
+                  username: ADMIN_USERNAME,
+                  password: await crypto.hash(ADMIN_PASSWORD),
+                  role: 'coach',
+                  isActive: true
+                })
+                .returning();
+            }
+          } else {
+            return done(null, false, { 
+              message: "管理者の認証情報が正しくありません。" 
+            });
+          }
+        } else {
+          // General user login - only password check
+          if (password === GENERAL_USER_PASSWORD) {
+            // Create or get general user
+            [user] = await db
+              .select()
+              .from(users)
+              .where(and(
+                eq(users.role, 'student'),
+                eq(users.isActive, true)
+              ))
+              .limit(1);
+
+            if (!user) {
+              // Create a default general user if none exists
+              [user] = await db
+                .insert(users)
+                .values({
+                  username: 'general_user',
+                  password: await crypto.hash(GENERAL_USER_PASSWORD),
+                  role: 'student',
+                  isActive: true
+                })
+                .returning();
+            }
+          } else {
+            return done(null, false, { 
+              message: "パスワードが正しくありません。" 
+            });
+          }
         }
-
-        const isMatch = await crypto.compare(password, user.password);
-        if (!isMatch) {
-          loginAttempts.set(ipKey, {
-            count: attempts.count + 1,
-            lastAttempt: now,
-            lockoutUntil: attempts.count + 1 >= MAX_ATTEMPTS ? now + LOCKOUT_TIME : undefined
-          });
-          return done(null, false, { 
-            message: "ユーザー名またはパスワードが正しくありません。"
-          });
-        }
-
-        // Reset attempts on successful login
-        loginAttempts.set(ipKey, {
-          count: 0,
-          lastAttempt: now,
-          lastSuccess: now
-        });
 
         return done(null, user);
       } catch (err) {
