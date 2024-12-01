@@ -69,11 +69,12 @@ export function setupAuth(app: Express) {
     cookie: {
       maxAge: SESSION_MAX_AGE,
       httpOnly: true,
-      secure: 'auto',
+      secure: false, // Allow non-HTTPS for development
       sameSite: 'lax',
-      path: '/'
+      path: '/',
+      domain: undefined // Allow same-origin only
     },
-    name: 'sessionId', // Custom cookie name
+    name: 'connect.sid' // Use default session name
   };
 
   app.use(session(sessionSettings));
@@ -131,7 +132,14 @@ export function setupAuth(app: Express) {
 
         if (isAdminLogin) {
           // Admin login - requires both username and password
-          if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+          if (username === ADMIN_USERNAME) {
+            if (password !== ADMIN_PASSWORD) {
+              console.log('[Auth] Admin login failed: Invalid password');
+              return done(null, false, { 
+                message: "管理者パスワードが正しくありません。" 
+              });
+            }
+
             // Check if admin user exists, if not create it
             [user] = await db
               .select()
@@ -143,6 +151,7 @@ export function setupAuth(app: Express) {
               .limit(1);
 
             if (!user) {
+              console.log('[Auth] Creating new admin user');
               // Create admin user if it doesn't exist
               [user] = await db
                 .insert(users)
@@ -154,9 +163,11 @@ export function setupAuth(app: Express) {
                 })
                 .returning();
             }
+            
+            console.log('[Auth] Admin login successful');
           } else {
             return done(null, false, { 
-              message: "管理者の認証情報が正しくありません。" 
+              message: "管理者ユーザー名が正しくありません。" 
             });
           }
         } else {

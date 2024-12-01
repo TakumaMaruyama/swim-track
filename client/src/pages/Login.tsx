@@ -12,8 +12,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Loader2, Home } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle, Loader2, Home, KeyRound, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "../hooks/use-user";
 import { insertUserSchema } from "db/schema";
@@ -25,11 +25,12 @@ export default function Login() {
   const { login, isAuthenticated } = useUser();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAdminLogin, setIsAdminLogin] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
   
   const form = useForm({
     resolver: zodResolver(insertUserSchema),
     defaultValues: {
-      username: "general_user",
+      username: isAdminLogin ? "丸山拓真" : "",
       password: "",
     },
   });
@@ -39,11 +40,11 @@ export default function Login() {
 
     try {
       setIsSubmitting(true);
+      setLoginError(null);
 
-      // Add isAdminLogin flag to the request
       const loginData = {
         ...values,
-        isAdminLogin: isAdminLogin
+        isAdminLogin
       };
 
       const result = await login(loginData);
@@ -68,27 +69,10 @@ export default function Login() {
         return;
       }
 
-      // Handle credential errors
-      if (result.field === "credentials") {
-        form.setError("password", {
-          type: "manual",
-          message: result.message,
-        });
-        return;
-      }
-
-      // Handle other errors
-      toast({
-        variant: "destructive",
-        title: "認証エラー",
-        description: result.message,
-      });
+      // Set error message
+      setLoginError(result.message);
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "エラー",
-        description: "認証中にエラーが発生しました。再度お試しください。",
-      });
+      setLoginError("認証中にエラーが発生しました。再度お試しください。");
     } finally {
       setIsSubmitting(false);
     }
@@ -115,50 +99,67 @@ export default function Login() {
       </div>
       <div className="container flex items-center justify-center py-8">
         <Card className="w-full max-w-md relative">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setIsAdminLogin(!isAdminLogin);
-              form.reset({
-                username: !isAdminLogin ? "丸山拓真" : "general_user",
-                password: ""
-              });
-            }}
-            className="absolute right-4 top-4"
-          >
-            {isAdminLogin ? "一般ログインへ" : "管理者ログインへ"}
-          </Button>
-          <CardHeader>
+          <CardHeader className="space-y-1">
             <CardTitle className="text-2xl text-center">
-              SwimTrack ログイン
+              SwimTrack {isAdminLogin ? "管理者" : "一般"} ログイン
             </CardTitle>
+            <div className="flex justify-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setIsAdminLogin(!isAdminLogin);
+                  setLoginError(null);
+                  form.reset({
+                    username: !isAdminLogin ? "丸山拓真" : "",
+                    password: ""
+                  });
+                }}
+                className="mt-2"
+              >
+                {isAdminLogin ? (
+                  <>
+                    <User className="h-4 w-4 mr-2" />
+                    一般ログインへ
+                  </>
+                ) : (
+                  <>
+                    <KeyRound className="h-4 w-4 mr-2" />
+                    管理者ログインへ
+                  </>
+                )}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
+            {loginError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>エラー</AlertTitle>
+                <AlertDescription>{loginError}</AlertDescription>
+              </Alert>
+            )}
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                {isAdminLogin ? (
-                  <FormField
-                    control={form.control}
-                    name="username"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>管理者名</FormLabel>
-                        <FormControl>
-                          <Input 
-                            {...field} 
-                            disabled={isSubmitting}
-                            autoComplete="username"
-                            className="bg-white"
-                            value="丸山拓真"
-                            readOnly
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                ) : null}
+                <FormField
+                  control={form.control}
+                  name="username"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{isAdminLogin ? "管理者名" : "ユーザー名"}</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          disabled={isSubmitting || isAdminLogin}
+                          autoComplete="username"
+                          className="bg-white"
+                          placeholder={isAdminLogin ? "丸山拓真" : "ユーザー名を入力"}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <FormField
                   control={form.control}
                   name="password"
@@ -172,7 +173,7 @@ export default function Login() {
                           disabled={isSubmitting}
                           autoComplete="current-password"
                           className="bg-white"
-                          placeholder={isAdminLogin ? "管理者パスワード" : "一般利用者パスワード"}
+                          placeholder={isAdminLogin ? "管理者パスワード" : "パスワードを入力"}
                         />
                       </FormControl>
                       <FormMessage />
