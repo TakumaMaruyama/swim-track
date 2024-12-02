@@ -397,41 +397,21 @@ export function setupAuth(app: Express) {
     }
   });
 
-  // 設定管理API
-  app.get("/api/settings/general-password", async (req, res) => {
-    if (!req.user || req.user.role !== 'coach') {
-      return res.status(403).json({ 
-        message: "管理者権限が必要です",
-        code: "ADMIN_REQUIRED"
-      });
-    }
-
-    try {
-      const password = await getGeneralPassword();
-      res.json({ value: password });
-    } catch (error) {
-      console.error('[Settings] Failed to fetch general password:', error);
-      res.status(500).json({ 
-        message: "パスワードの取得に失敗しました",
-        code: "FETCH_FAILED"
-      });
-    }
-  });
-
-  app.post("/api/settings/general-password", async (req, res) => {
-    if (!req.user || req.user.role !== 'coach') {
-      return res.status(403).json({ 
-        message: "管理者権限が必要です",
-        code: "ADMIN_REQUIRED"
+  // ユーザーパスワード変更API
+  app.put("/api/user/password", async (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({ 
+        message: "認証が必要です",
+        code: "AUTH_REQUIRED"
       });
     }
 
     const { password } = req.body;
 
     // パスワードのバリデーション
-    if (!password || typeof password !== 'string' || password.length < 5) {
+    if (!password || typeof password !== 'string' || password.length < 8) {
       return res.status(400).json({
-        message: "パスワードは5文字以上で入力してください",
+        message: "パスワードは8文字以上で入力してください",
         code: "INVALID_PASSWORD"
       });
     }
@@ -454,7 +434,7 @@ export function setupAuth(app: Express) {
 
       res.json({ message: "パスワードを更新しました" });
     } catch (error) {
-      console.error('[Settings] Failed to update general password:', error);
+      console.error('[Settings] Failed to update password:', error);
       res.status(500).json({ 
         message: "パスワードの更新に失敗しました",
         code: "UPDATE_FAILED"
