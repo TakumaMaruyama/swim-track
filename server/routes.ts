@@ -2,7 +2,7 @@ import { Express } from "express";
 import { setupAuth } from "./auth";
 import multer from "multer";
 import { db } from "db";
-import { documents, users, swimRecords, categories, competitions, generalLoginPassword } from "db/schema";
+import { documents, users, swimRecords, categories, competitions } from "db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import path from "path";
 import fs from "fs/promises";
@@ -205,8 +205,8 @@ export function registerRoutes(app: Express) {
       const { password } = req.body;
 
       // Validate password
-      if (!password || password.length < 5) {
-        return res.status(400).json({ message: "パスワードは5文字以上である必要があります" });
+      if (!password || password.length < 8) {
+        return res.status(400).json({ message: "パスワードは8文字以上である必要があります" });
       }
       
       // Get user to verify they exist and check role
@@ -236,29 +236,24 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Add login password update endpoint
-  app.put("/api/users/login-password", requireAuth, requireCoach, async (req, res) => {
+  // Update the /api/users/passwords endpoint to get both students and coaches
+  app.get("/api/users/passwords", requireAuth, requireCoach, async (req, res) => {
     try {
-      const { password } = req.body;
+      console.log('[Auth] Fetching user passwords list');
+      const usersList = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          role: users.role,
+          isActive: users.isActive,
+        })
+        .from(users)
+        .orderBy(users.username);
 
-      // Validate password
-      if (!password || password.length < 5) {
-        return res.status(400).json({ message: "パスワードは5文字以上である必要があります" });
-      }
-
-      // Hash the new password using crypto utility
-      const hashedPassword = await crypto.hash(password);
-      
-      // 最新のパスワードを保存
-      const [savedPassword] = await db
-        .insert(generalLoginPassword)
-        .values({ password: hashedPassword })
-        .returning();
-
-      res.json({ message: "ログイン用パスワードが更新されました" });
+      res.json(usersList);
     } catch (error) {
-      console.error('Error updating login password:', error);
-      res.status(500).json({ message: "パスワードの更新に失敗しました" });
+      console.error('Error fetching user list:', error);
+      res.status(500).json({ message: "ユーザー情報の取得に失敗しました" });
     }
   });
 

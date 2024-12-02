@@ -8,8 +8,7 @@ import {
   LogOut,
   UserX,
   Key,
-  Trophy,
-  Loader2
+  Trophy
 } from 'lucide-react'
 import { useUser } from '../hooks/use-user'
 import { useLocation } from 'wouter'
@@ -29,15 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { UserPasswordList } from '../components/UserPasswordList';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 
 // Constants outside component
@@ -56,9 +47,7 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [showLogoutDialog, setShowLogoutDialog] = React.useState(false);
   const [showDeleteAccountDialog, setShowDeleteAccountDialog] = React.useState(false);
-  const [showLoginPasswordDialog, setShowLoginPasswordDialog] = React.useState(false);
-  const [newLoginPassword, setNewLoginPassword] = React.useState("");
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [showPasswordList, setShowPasswordList] = React.useState(false);
   const { activities, isLoading: isActivitiesLoading, error: activitiesError } = useRecentActivities();
 
   // All hooks before any conditional returns
@@ -151,7 +140,7 @@ export default function Dashboard() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => setShowLoginPasswordDialog(true)}
+                  onClick={() => setShowPasswordList(true)}
                   className="text-gray-600 hover:text-gray-900"
                   title="パスワード管理"
                 >
@@ -319,95 +308,10 @@ export default function Dashboard() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={showLoginPasswordDialog} onOpenChange={setShowLoginPasswordDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>一般ユーザーログイン用パスワードの設定</DialogTitle>
-            <DialogDescription>
-              一般ユーザーがログインする際に使用するパスワードを設定します。
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Input
-                type="password"
-                placeholder="新しいパスワード（5文字以上）"
-                value={newLoginPassword}
-                onChange={(e) => setNewLoginPassword(e.target.value)}
-                disabled={isSubmitting}
-              />
-              {newLoginPassword && newLoginPassword.length < 5 && (
-                <p className="text-sm text-destructive">
-                  パスワードは5文字以上で入力してください
-                </p>
-              )}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowLoginPasswordDialog(false)}
-              disabled={isSubmitting}
-            >
-              キャンセル
-            </Button>
-            <Button
-              onClick={async () => {
-                if (newLoginPassword.length < 5) {
-                  toast({
-                    variant: "destructive",
-                    title: "エラー",
-                    description: "パスワードは5文字以上で入力してください",
-                  });
-                  return;
-                }
-
-                try {
-                  setIsSubmitting(true);
-                  const response = await fetch(`/api/users/login-password`, {
-                    method: "PUT",
-                    headers: {
-                      "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({ password: newLoginPassword }),
-                    credentials: "include",
-                  });
-
-                  if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.message || "パスワードの更新に失敗しました");
-                  }
-
-                  toast({
-                    title: "成功",
-                    description: "パスワードが更新されました",
-                  });
-                  setShowLoginPasswordDialog(false);
-                  setNewLoginPassword("");
-                } catch (error) {
-                  toast({
-                    variant: "destructive",
-                    title: "エラー",
-                    description: error instanceof Error ? error.message : "パスワードの更新に失敗しました",
-                  });
-                } finally {
-                  setIsSubmitting(false);
-                }
-              }}
-              disabled={isSubmitting || newLoginPassword.length < 5}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  更新中...
-                </>
-              ) : (
-                "更新"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <UserPasswordList 
+        isOpen={showPasswordList}
+        onClose={() => setShowPasswordList(false)}
+      />
       </div>
     </ErrorBoundary>
   );
