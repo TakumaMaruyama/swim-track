@@ -62,7 +62,7 @@ declare global {
 // 条件付きバリデーションスキーマ
 const loginSchema = z.object({
   username: z.string().optional(),
-  password: z.string(),
+  password: z.string().min(5, "パスワードは5文字以上で入力してください"),
   isAdminLogin: z.boolean()
 }).refine((data) => {
   // 管理者ログインの場合のみusernameを必須に
@@ -152,7 +152,7 @@ export function setupAuth(app: Express) {
             if (password !== generalPassword) {
               console.log('[Auth] General user login failed: Invalid password');
               return done(null, false, {
-                message: "パスワードが正しくありません。"
+                message: "入力されたパスワードが一般ユーザー用の共通パスワードと一致しません。正しいパスワードを入力してください。"
               });
             }
           } catch (error) {
@@ -386,9 +386,9 @@ app.post("/api/settings/general-password", requireAdmin, async (req, res) => {
   const { password } = req.body;
 
   // パスワードのバリデーション
-  if (!password || typeof password !== 'string' || password.length < 4) {
+  if (!password || typeof password !== 'string' || password.length < 5) {
     return res.status(400).json({
-      message: "パスワードは4文字以上で入力してください",
+      message: "パスワードは5文字以上で入力してください",
       code: "INVALID_PASSWORD"
     });
   }
