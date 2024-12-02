@@ -66,7 +66,7 @@ export function setupAuth(app: Express) {
   
   const sessionSettings: session.SessionOptions = {
     secret: process.env.REPL_ID || "swimtrack-session-secret",
-    resave: false,
+    resave: true,
     saveUninitialized: false,
     rolling: true,
     store: new MemoryStore({
@@ -76,7 +76,7 @@ export function setupAuth(app: Express) {
     cookie: {
       maxAge: SESSION_MAX_AGE,
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: false,
       sameSite: 'lax',
       path: '/',
     },
