@@ -51,6 +51,16 @@ export const swimRecords = pgTable("swim_records", {
   competitionName: text("competition_name"),
   competitionLocation: text("competition_location")
 });
+export const generalLoginPassword = pgTable("general_login_password", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  password: text("password").notNull(),
+  createdAt: timestamp("created_at").defaultNow()
+});
+
+export const insertGeneralLoginPasswordSchema = createInsertSchema(generalLoginPassword);
+export const selectGeneralLoginPasswordSchema = createSelectSchema(generalLoginPassword);
+export type InsertGeneralLoginPassword = z.infer<typeof insertGeneralLoginPasswordSchema>;
+export type GeneralLoginPassword = z.infer<typeof selectGeneralLoginPasswordSchema>;
 
 export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);

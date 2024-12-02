@@ -249,7 +249,13 @@ export function registerRoutes(app: Express) {
       // Hash the new password
       const hashedPassword = await hashPassword(password);
       
-      // Update the login password in the environment
+      // データベースに保存
+      const [savedPassword] = await db
+        .insert(generalLoginPassword)
+        .values({ password: hashedPassword })
+        .returning();
+
+      // 環境変数も更新（現在のセッション用）
       process.env.LOGIN_PASSWORD = hashedPassword;
 
       res.json({ message: "ログイン用パスワードが更新されました" });

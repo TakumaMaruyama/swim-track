@@ -8,7 +8,8 @@ import {
   LogOut,
   UserX,
   Key,
-  Trophy
+  Trophy,
+  Loader2
 } from 'lucide-react'
 import { useUser } from '../hooks/use-user'
 import { useLocation } from 'wouter'
