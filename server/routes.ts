@@ -205,8 +205,8 @@ export function registerRoutes(app: Express) {
       const { password } = req.body;
 
       // Validate password
-      if (!password || password.length < 8) {
-        return res.status(400).json({ message: "パスワードは8文字以上である必要があります" });
+      if (!password || password.length < 5) {
+        return res.status(400).json({ message: "パスワードは5文字以上である必要があります" });
       }
       
       // Get user to verify they exist and check role
@@ -242,8 +242,8 @@ export function registerRoutes(app: Express) {
       const { password } = req.body;
 
       // Validate password
-      if (!password || password.length < 8) {
-        return res.status(400).json({ message: "パスワードは8文字以上である必要があります" });
+      if (!password || password.length < 5) {
+        return res.status(400).json({ message: "パスワードは5文字以上である必要があります" });
       }
 
       // Hash the new password

@@ -330,14 +330,14 @@ export default function Dashboard() {
             <div className="space-y-2">
               <Input
                 type="password"
-                placeholder="新しいパスワード（8文字以上）"
+                placeholder="新しいパスワード（5文字以上）"
                 value={newLoginPassword}
                 onChange={(e) => setNewLoginPassword(e.target.value)}
                 disabled={isSubmitting}
               />
-              {newLoginPassword && newLoginPassword.length < 8 && (
+              {newLoginPassword && newLoginPassword.length < 5 && (
                 <p className="text-sm text-destructive">
-                  パスワードは8文字以上で入力してください
+                  パスワードは5文字以上で入力してください
                 </p>
               )}
             </div>
@@ -352,11 +352,11 @@ export default function Dashboard() {
             </Button>
             <Button
               onClick={async () => {
-                if (newLoginPassword.length < 8) {
+                if (newLoginPassword.length < 5) {
                   toast({
                     variant: "destructive",
                     title: "エラー",
-                    description: "パスワードは8文字以上で入力してください",
+                    description: "パスワードは5文字以上で入力してください",
                   });
                   return;
                 }
@@ -393,7 +393,7 @@ export default function Dashboard() {
                   setIsSubmitting(false);
                 }
               }}
-              disabled={isSubmitting || newLoginPassword.length < 8}
+              disabled={isSubmitting || newLoginPassword.length < 5}
             >
               {isSubmitting ? (
                 <>
