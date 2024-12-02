@@ -17,21 +17,10 @@ const ADMIN_PASSWORD = "dpjm3756";
 const SESSION_MAX_AGE = 12 * 60 * 60 * 1000; // 12時間
 const SESSION_REFRESH_THRESHOLD = 15 * 60 * 1000; // 15分
 
-// 一般ログインパスワードのキャッシュ
-let cachedGeneralPassword: string | null = null;
-let generalPasswordLastFetched: number = 0;
-const CACHE_TTL = 5 * 60 * 1000; // 5分
-
 // 一般ログインパスワードを取得する関数
 async function getGeneralPassword(): Promise<string> {
-  const now = Date.now();
-  
-  // キャッシュが有効な場合はキャッシュから返す
-  if (cachedGeneralPassword && (now - generalPasswordLastFetched) < CACHE_TTL) {
-    return cachedGeneralPassword;
-  }
-
   try {
+    console.log('[Auth] Fetching general password from settings');
     const [setting] = await db
       .select()
       .from(sql.table('settings'))
@@ -39,21 +28,15 @@ async function getGeneralPassword(): Promise<string> {
       .limit(1);
 
     if (!setting) {
-      console.error('[Auth] General password not found in settings table');
-      throw new Error('一般ユーザー用パスワードが設定されていません。管理者に連絡してください。');
+      console.error('[Auth] General password not found in settings');
+      throw new Error('一般ユーザー用パスワードが設定されていません');
     }
 
-    // キャッシュを更新
-    cachedGeneralPassword = setting.value;
-    generalPasswordLastFetched = now;
-
+    console.log('[Auth] General password fetched successfully');
     return setting.value;
   } catch (error) {
-    console.error('[Auth] Failed to fetch general password:', error);
-    if (error instanceof Error && error.message.includes('relation "settings" does not exist')) {
-      throw new Error('システムの初期設定が完了していません。管理者に連絡してください。');
-    }
-    throw new Error('パスワードの取得中にエラーが発生しました。しばらく経ってからもう一度お試しください。');
+    console.error('[Auth] Error fetching general password:', error);
+    throw new Error('パスワードの取得に失敗しました。管理者に連絡してください。');
   }
 }
 
@@ -84,20 +67,19 @@ export function setupAuth(app: Express) {
   
   const sessionSettings: session.SessionOptions = {
     secret: process.env.REPL_ID || "swimtrack-session-secret",
-    resave: false,
+    resave: true,
     saveUninitialized: false,
     rolling: true,
     store: new MemoryStore({
-      checkPeriod: 43200000, // 12時間ごとに期限切れセッションを削除
+      checkPeriod: SESSION_MAX_AGE,
       stale: false,
     }),
     cookie: {
       maxAge: SESSION_MAX_AGE,
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      secure: false,
+      sameSite: 'lax',
       path: '/',
-      domain: undefined
     },
     name: 'swimtrack.sid'
   };
@@ -152,15 +134,17 @@ export function setupAuth(app: Express) {
         } else {
           // 一般ユーザーログイン
           try {
+            console.log('[Auth] Validating general user password');
             const generalPassword = await getGeneralPassword();
             if (password !== generalPassword) {
-              console.log('[Auth] General user login failed: Invalid password');
+              console.log('[Auth] Invalid general password provided');
               return done(null, false, {
-                message: "入力されたパスワードが一般ユーザー用の共通パスワードと一致しません。正しいパスワードを入力してください。"
+                message: "パスワードが正しくありません"
               });
             }
+            console.log('[Auth] General password validation successful');
           } catch (error) {
-            console.error('[Auth] Failed to validate general password:', error);
+            console.error('[Auth] General password validation error:', error);
             return done(error);
           }
 
@@ -225,6 +209,18 @@ export function setupAuth(app: Express) {
     }
   });
 
+  // 管理者チェックミドルウェア
+  function requireAdmin(req: Express.Request, res: Express.Response, next: Express.NextFunction) {
+    if (!req.isAuthenticated() || !req.user || req.user.role !== 'coach') {
+      return res.status(403).json({ 
+        message: "管理者権限が必要です",
+        code: "ADMIN_REQUIRED"
+      });
+    }
+    next();
+  }
+
+  // ログインエンドポイント
   app.post("/login", (req, res, next) => {
     console.log('[Auth] Processing login request');
     const result = loginSchema.safeParse(req.body);
@@ -238,7 +234,10 @@ export function setupAuth(app: Express) {
     passport.authenticate("local", (err: any, user: Express.User, info: IVerifyOptions) => {
       if (err) {
         console.error("[Auth] Login error:", err);
-        return next(err);
+        return res.status(500).json({
+          message: err.message || "ログイン処理中にエラーが発生しました",
+          field: "credentials"
+        });
       }
 
       if (!user) {
@@ -273,6 +272,7 @@ export function setupAuth(app: Express) {
     })(req, res, next);
   });
 
+  // ログアウトエンドポイント
   app.post("/logout", (req, res) => {
     req.logout((err) => {
       if (err) {
@@ -292,6 +292,7 @@ export function setupAuth(app: Express) {
     });
   });
 
+  // ユーザー情報取得エンドポイント
   app.get("/api/user", (req, res) => {
     if (!req.session) {
       return res.status(401).json({ 
@@ -310,6 +311,7 @@ export function setupAuth(app: Express) {
     res.json(req.user);
   });
 
+  // セッション更新エンドポイント
   app.post("/api/refresh", async (req, res) => {
     console.log('[Auth] Processing refresh request');
 
@@ -361,72 +363,6 @@ export function setupAuth(app: Express) {
       if (!user.isActive) {
         console.log('[Auth] Inactive user attempted refresh');
         req.session.destroy((err) => {
-// 管理者チェックミドルウェア
-function requireAdmin(req: Express.Request, res: Express.Response, next: Express.NextFunction) {
-  if (!req.isAuthenticated() || !req.user || req.user.role !== 'coach') {
-    return res.status(403).json({ 
-      message: "管理者権限が必要です",
-      code: "ADMIN_REQUIRED"
-    });
-  }
-  next();
-}
-
-// 設定管理API
-app.get("/api/settings/general-password", requireAdmin, async (req, res) => {
-  try {
-    const password = await getGeneralPassword();
-    res.json({ value: password });
-  } catch (error) {
-    console.error('[Settings] Failed to fetch general password:', error);
-    res.status(500).json({ 
-      message: "パスワードの取得に失敗しました",
-      code: "FETCH_FAILED"
-    });
-  }
-});
-
-app.post("/api/settings/general-password", requireAdmin, async (req, res) => {
-  const { password } = req.body;
-
-  // パスワードのバリデーション
-  if (!password || typeof password !== 'string' || password.length < 5) {
-    return res.status(400).json({
-      message: "パスワードは5文字以上で入力してください",
-      code: "INVALID_PASSWORD"
-    });
-  }
-
-  try {
-    await db
-      .insert(sql.table('settings'))
-      .values({
-        key: 'general_password',
-        value: password,
-        updated_at: new Date()
-      })
-      .onConflictDoUpdate({
-        target: ['key'],
-        set: {
-          value: password,
-          updated_at: new Date()
-        }
-      });
-
-    // キャッシュを更新
-    cachedGeneralPassword = password;
-    generalPasswordLastFetched = Date.now();
-
-    res.json({ message: "パスワードを更新しました" });
-  } catch (error) {
-    console.error('[Settings] Failed to update general password:', error);
-    res.status(500).json({ 
-      message: "パスワードの更新に失敗しました",
-      code: "UPDATE_FAILED"
-    });
-  }
-});
-
           if (err) console.error('[Auth] Error destroying session for inactive user:', err);
         });
         return res.status(401).json({ 
@@ -464,6 +400,57 @@ app.post("/api/settings/general-password", requireAdmin, async (req, res) => {
       res.status(500).json({ 
         message: "セッションの更新に失敗しました",
         code: "REFRESH_FAILED"
+      });
+    }
+  });
+
+  // 設定管理API
+  app.get("/api/settings/general-password", requireAdmin, async (req, res) => {
+    try {
+      const password = await getGeneralPassword();
+      res.json({ value: password });
+    } catch (error) {
+      console.error('[Settings] Failed to fetch general password:', error);
+      res.status(500).json({ 
+        message: "パスワードの取得に失敗しました",
+        code: "FETCH_FAILED"
+      });
+    }
+  });
+
+  app.post("/api/settings/general-password", requireAdmin, async (req, res) => {
+    const { password } = req.body;
+
+    // パスワードのバリデーション
+    if (!password || typeof password !== 'string' || password.length < 5) {
+      return res.status(400).json({
+        message: "パスワードは5文字以上で入力してください",
+        code: "INVALID_PASSWORD"
+      });
+    }
+
+    try {
+      await db
+        .insert(sql.table('settings'))
+        .values({
+          key: 'general_password',
+          value: password,
+          updated_at: new Date()
+        })
+        .onConflictDoUpdate({
+          target: ['key'],
+          set: {
+            value: password,
+            updated_at: new Date()
+          }
+        });
+
+      res.json({ message: "パスワードを更新しました" });
+    } catch (error) {
+      console.error('[Settings] Failed to update general password:', error);
+      res.status(500).json({ 
+        message: "パスワードの更新に失敗しました",
+        code: "UPDATE_FAILED"
       });
     }
   });
