@@ -125,7 +125,6 @@ export function setupAuth(app: Express) {
               .insert(users)
               .values({
                 username: ADMIN_USERNAME,
-                password: ADMIN_PASSWORD,
                 role: 'coach',
                 isActive: true
               })
@@ -169,7 +168,6 @@ export function setupAuth(app: Express) {
               .insert(users)
               .values({
                 username: generalUsername,
-                password: await getGeneralPassword(),
                 role: 'student',
                 isActive: true
               })
