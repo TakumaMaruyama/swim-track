@@ -1,3 +1,7 @@
+// This file is deprecated and will be removed
+// 管理者用パスワード管理機能は削除され、UserPasswordEdit.tsxに置き換えられました
+// 一般ユーザー向けパスワード編集機能のみを使用してください
+
 import React from 'react';
 import {
   Dialog,
@@ -55,11 +59,11 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
     if (isSubmitting) return;
 
     // Validate password length
-    if (newPassword.length < 8) {
+    if (newPassword.length < 5) {
       toast({
         variant: "destructive",
         title: "エラー",
-        description: "パスワードは8文字以上である必要があります",
+        description: "パスワードは5文字以上である必要があります",
       });
       return;
     }
@@ -147,13 +151,13 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
                         type="password"
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="新しいパスワード (8文字以上)"
+                        placeholder="新しいパスワード (5文字以上)"
                         className="w-48"
                         disabled={isSubmitting}
                       />
-                      {newPassword && newPassword.length < 8 && (
+                      {newPassword && newPassword.length < 5 && (
                         <p className="text-xs text-red-500">
-                          パスワードは8文字以上である必要があります
+                          パスワードは5文字以上である必要があります
                         </p>
                       )}
                     </div>

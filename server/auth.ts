@@ -409,9 +409,9 @@ export function setupAuth(app: Express) {
     const { password } = req.body;
 
     // パスワードのバリデーション
-    if (!password || typeof password !== 'string' || password.length < 8) {
+    if (!password || typeof password !== 'string' || password.length < 5) {
       return res.status(400).json({
-        message: "パスワードは8文字以上で入力してください",
+        message: "パスワードは5文字以上で入力してください",
         code: "INVALID_PASSWORD"
       });
     }

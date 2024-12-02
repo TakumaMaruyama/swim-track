@@ -25,11 +25,11 @@ export function UserPasswordEdit({ isOpen, onClose }: UserPasswordEditProps) {
     if (isSubmitting) return;
 
     // Validate password
-    if (newPassword.length < 8) {
+    if (newPassword.length < 5) {
       toast({
         variant: "destructive",
         title: "エラー",
-        description: "パスワードは8文字以上である必要があります",
+        description: "パスワードは5文字以上である必要があります",
       });
       return;
     }
@@ -90,12 +90,12 @@ export function UserPasswordEdit({ isOpen, onClose }: UserPasswordEditProps) {
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="新しいパスワード (8文字以上)"
+              placeholder="新しいパスワード (5文字以上)"
               disabled={isSubmitting}
             />
-            {newPassword && newPassword.length < 8 && (
+            {newPassword && newPassword.length < 5 && (
               <p className="text-xs text-red-500">
-                パスワードは8文字以上である必要があります
+                パスワードは5文字以上である必要があります
               </p>
             )}
           </div>

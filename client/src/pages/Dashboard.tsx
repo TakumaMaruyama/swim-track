@@ -47,7 +47,7 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [showLogoutDialog, setShowLogoutDialog] = React.useState(false);
   const [showDeleteAccountDialog, setShowDeleteAccountDialog] = React.useState(false);
-  const [showPasswordList, setShowPasswordList] = React.useState(false);
+  const [showPasswordEdit, setShowPasswordEdit] = React.useState(false);
   const { activities, isLoading: isActivitiesLoading, error: activitiesError } = useRecentActivities();
 
   // All hooks before any conditional returns
@@ -139,7 +139,7 @@ export default function Dashboard() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setShowPasswordList(true)}
+                onClick={() => setShowPasswordEdit(true)}
                 className="text-gray-600 hover:text-gray-900"
                 title="パスワード変更"
               >
@@ -307,8 +307,8 @@ export default function Dashboard() {
       </AlertDialog>
 
       <UserPasswordEdit 
-        isOpen={showPasswordList}
-        onClose={() => setShowPasswordList(false)}
+        isOpen={showPasswordEdit}
+        onClose={() => setShowPasswordEdit(false)}
       />
       </div>
     </ErrorBoundary>
