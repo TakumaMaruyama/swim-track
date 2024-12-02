@@ -181,7 +181,7 @@ export function setupAuth(app: Express) {
               .insert(users)
               .values({
                 username: generalUsername,
-                password: GENERAL_PASSWORD,
+                password: await getGeneralPassword(),
                 role: 'student',
                 isActive: true
               })
