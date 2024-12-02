@@ -236,24 +236,26 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Update the /api/users/passwords endpoint to get both students and coaches
-  app.get("/api/users/passwords", requireAuth, requireCoach, async (req, res) => {
+  // Add login password update endpoint
+  app.put("/api/users/login-password", requireAuth, requireCoach, async (req, res) => {
     try {
-      console.log('[Auth] Fetching user passwords list');
-      const usersList = await db
-        .select({
-          id: users.id,
-          username: users.username,
-          role: users.role,
-          isActive: users.isActive,
-        })
-        .from(users)
-        .orderBy(users.username);
+      const { password } = req.body;
 
-      res.json(usersList);
+      // Validate password
+      if (!password || password.length < 8) {
+        return res.status(400).json({ message: "パスワードは8文字以上である必要があります" });
+      }
+
+      // Hash the new password
+      const hashedPassword = await hashPassword(password);
+      
+      // Update the login password in the environment
+      process.env.LOGIN_PASSWORD = hashedPassword;
+
+      res.json({ message: "ログイン用パスワードが更新されました" });
     } catch (error) {
-      console.error('Error fetching user list:', error);
-      res.status(500).json({ message: "ユーザー情報の取得に失敗しました" });
+      console.error('Error updating login password:', error);
+      res.status(500).json({ message: "パスワードの更新に失敗しました" });
     }
   });
 
