@@ -54,6 +54,16 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
   const handlePasswordUpdate = async (userId: number) => {
     if (isSubmitting) return;
 
+    // Validate password length
+    if (newPassword.length < 8) {
+      toast({
+        variant: "destructive",
+        title: "エラー",
+        description: "パスワードは8文字以上である必要があります",
+      });
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       const response = await fetch(`/api/users/${userId}/password`, {
@@ -63,7 +73,10 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
         credentials: 'include',
       });
 
-      if (!response.ok) throw new Error();
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "パスワードの更新に失敗しました");
+      }
 
       await mutate();
       toast({
@@ -76,7 +89,7 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
       toast({
         variant: "destructive",
         title: "エラー",
-        description: "パスワードの更新に失敗しました",
+        description: error instanceof Error ? error.message : "パスワードの更新に失敗しました",
       });
     } finally {
       setIsSubmitting(false);
@@ -129,14 +142,21 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
                 </div>
                 {editingUser === user.id ? (
                   <div className="flex items-center gap-2">
-                    <Input
-                      type="password"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="新しいパスワード"
-                      className="w-40"
-                      disabled={isSubmitting}
-                    />
+                    <div className="flex flex-col gap-2">
+                      <Input
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="新しいパスワード (8文字以上)"
+                        className="w-48"
+                        disabled={isSubmitting}
+                      />
+                      {newPassword && newPassword.length < 8 && (
+                        <p className="text-xs text-red-500">
+                          パスワードは8文字以上である必要があります
+                        </p>
+                      )}
+                    </div>
                     <Button 
                       size="sm"
                       onClick={() => handlePasswordUpdate(user.id)}

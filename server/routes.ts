@@ -198,12 +198,28 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Add password update endpoint
+  // Add password update endpoint with validation
   app.put("/api/users/:id/password", requireAuth, requireCoach, async (req, res) => {
     try {
       const { id } = req.params;
       const { password } = req.body;
+
+      // Validate password
+      if (!password || password.length < 8) {
+        return res.status(400).json({ message: "パスワードは8文字以上である必要があります" });
+      }
       
+      // Get user to verify they exist and check role
+      const [existingUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, parseInt(id)))
+        .limit(1);
+
+      if (!existingUser) {
+        return res.status(404).json({ message: "ユーザーが見つかりません" });
+      }
+
       // Hash the new password
       const hashedPassword = await hashPassword(password);
       
@@ -212,10 +228,6 @@ export function registerRoutes(app: Express) {
         .set({ password: hashedPassword })
         .where(eq(users.id, parseInt(id)))
         .returning();
-
-      if (!user) {
-        return res.status(404).json({ message: "ユーザーが見つかりません" });
-      }
 
       res.json({ message: "パスワードが更新されました" });
     } catch (error) {
