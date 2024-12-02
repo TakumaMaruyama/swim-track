@@ -39,7 +39,8 @@ async function getGeneralPassword(): Promise<string> {
       .limit(1);
 
     if (!setting) {
-      throw new Error('General password not found in settings');
+      console.error('[Auth] General password not found in settings table');
+      throw new Error('一般ユーザー用パスワードが設定されていません。管理者に連絡してください。');
     }
 
     // キャッシュを更新
@@ -49,7 +50,10 @@ async function getGeneralPassword(): Promise<string> {
     return setting.value;
   } catch (error) {
     console.error('[Auth] Failed to fetch general password:', error);
-    throw new Error('Failed to fetch general password');
+    if (error instanceof Error && error.message.includes('relation "settings" does not exist')) {
+      throw new Error('システムの初期設定が完了していません。管理者に連絡してください。');
+    }
+    throw new Error('パスワードの取得中にエラーが発生しました。しばらく経ってからもう一度お試しください。');
   }
 }
 
