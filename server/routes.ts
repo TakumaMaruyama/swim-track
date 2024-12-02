@@ -2,7 +2,7 @@ import { Express } from "express";
 import { setupAuth } from "./auth";
 import multer from "multer";
 import { db } from "db";
-import { documents, users, swimRecords, categories, competitions } from "db/schema";
+import { documents, users, swimRecords, categories, competitions, generalLoginPassword } from "db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import path from "path";
 import fs from "fs/promises";
@@ -246,17 +246,14 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ message: "パスワードは5文字以上である必要があります" });
       }
 
-      // Hash the new password
-      const hashedPassword = await hashPassword(password);
+      // Hash the new password using crypto utility
+      const hashedPassword = await crypto.hash(password);
       
-      // データベースに保存
+      // 最新のパスワードを保存
       const [savedPassword] = await db
         .insert(generalLoginPassword)
         .values({ password: hashedPassword })
         .returning();
-
-      // 環境変数も更新（現在のセッション用）
-      process.env.LOGIN_PASSWORD = hashedPassword;
 
       res.json({ message: "ログイン用パスワードが更新されました" });
     } catch (error) {

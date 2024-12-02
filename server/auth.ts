@@ -3,9 +3,9 @@ import { IVerifyOptions, Strategy as LocalStrategy } from "passport-local";
 import { type Express } from "express";
 import session from "express-session";
 import createMemoryStore from "memorystore";
-import { users, insertUserSchema, type User as SelectUser } from "db/schema";
+import { users, insertUserSchema, type User as SelectUser, generalLoginPassword } from "db/schema";
 import { db } from "db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -148,11 +148,26 @@ export function setupAuth(app: Express) {
         } else {
           // 一般ユーザーログイン
           try {
-            const generalPassword = await getGeneralPassword();
-            if (password !== generalPassword) {
+            // 最新のパスワードを取得
+            const [currentPassword] = await db
+              .select()
+              .from(generalLoginPassword)
+              .orderBy(desc(generalLoginPassword.createdAt))
+              .limit(1);
+
+            if (!currentPassword) {
+              console.log('[Auth] General user login failed: No password set');
+              return done(null, false, {
+                message: "一般ユーザーログイン用パスワードが設定されていません"
+              });
+            }
+
+            // パスワードの検証
+            const isMatch = await crypto.compare(password, currentPassword.password);
+            if (!isMatch) {
               console.log('[Auth] General user login failed: Invalid password');
               return done(null, false, {
-                message: "パスワードが正しくありません。"
+                message: "パスワードが正しくありません"
               });
             }
           } catch (error) {
@@ -181,7 +196,7 @@ export function setupAuth(app: Express) {
               .insert(users)
               .values({
                 username: generalUsername,
-                password: GENERAL_PASSWORD,
+                password: "temporary_password",
                 role: 'student',
                 isActive: true
               })
