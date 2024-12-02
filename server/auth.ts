@@ -107,7 +107,12 @@ export function setupAuth(app: Express) {
 
           // 管理者ユーザーを取得または作成
           let [user] = await db
-            .select()
+            .select({
+              id: users.id,
+              username: users.username,
+              role: users.role,
+              isActive: users.isActive
+            })
             .from(users)
             .where(and(
               eq(users.username, ADMIN_USERNAME),
@@ -138,7 +143,12 @@ export function setupAuth(app: Express) {
 
             // ランダムな一般ユーザーを取得または作成
             let [user] = await db
-              .select()
+              .select({
+                id: users.id,
+                username: users.username,
+                role: users.role,
+                isActive: users.isActive
+              })
               .from(users)
               .where(and(
                 eq(users.role, 'student'),
@@ -178,7 +188,12 @@ export function setupAuth(app: Express) {
   passport.deserializeUser(async (id: number, done) => {
     try {
       const [user] = await db
-        .select()
+        .select({
+          id: users.id,
+          username: users.username,
+          role: users.role,
+          isActive: users.isActive
+        })
         .from(users)
         .where(eq(users.id, id))
         .limit(1);
@@ -210,7 +225,7 @@ export function setupAuth(app: Express) {
         console.error("[Auth] Login error:", err);
         return res.status(500).json({
           message: err.message || "ログイン処理中にエラーが発生しました",
-          code: "LOGIN_ERROR"
+          details: err.code === '42703' ? "システムエラーが発生しました。管理者に連絡してください。" : undefined
         });
       }
 
@@ -317,7 +332,12 @@ export function setupAuth(app: Express) {
       }
 
       const [user] = await db
-        .select()
+        .select({
+          id: users.id,
+          username: users.username,
+          role: users.role,
+          isActive: users.isActive
+        })
         .from(users)
         .where(eq(users.id, userId))
         .limit(1);
