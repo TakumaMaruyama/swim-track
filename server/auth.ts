@@ -3,7 +3,7 @@ import { IVerifyOptions, Strategy as LocalStrategy } from "passport-local";
 import { type Express } from "express";
 import session from "express-session";
 import createMemoryStore from "memorystore";
-import { users, insertUserSchema, type User as SelectUser } from "db/schema";
+import { users, type User as SelectUser } from "db/schema";
 import { db } from "db";
 import { eq, and } from "drizzle-orm";
 import { sql } from "drizzle-orm";
@@ -52,7 +52,6 @@ const loginSchema = z.object({
   password: z.string().min(5, "パスワードは5文字以上で入力してください"),
   isAdminLogin: z.boolean()
 }).refine((data) => {
-  // 管理者ログインの場合のみusernameを必須に
   if (data.isAdminLogin && !data.username) {
     return false;
   }
@@ -67,7 +66,7 @@ export function setupAuth(app: Express) {
   
   const sessionSettings: session.SessionOptions = {
     secret: process.env.REPL_ID || "swimtrack-session-secret",
-    resave: true,
+    resave: false,
     saveUninitialized: false,
     rolling: true,
     store: new MemoryStore({
@@ -77,7 +76,7 @@ export function setupAuth(app: Express) {
     cookie: {
       maxAge: SESSION_MAX_AGE,
       httpOnly: true,
-      secure: false,
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
     },
@@ -97,20 +96,17 @@ export function setupAuth(app: Express) {
       try {
         console.log('[Auth] Processing authentication request');
         const isAdminLogin = req.body.isAdminLogin === true;
-        let user;
 
         if (isAdminLogin) {
-          // 管理者ログイン
+          // 管理者ログイン - 固定値との比較のみ
           if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) {
-            console.log('[Auth] Admin login failed: Invalid credentials');
             return done(null, false, {
-              message: username !== ADMIN_USERNAME 
-                ? "管理者ユーザー名が正しくありません。"
-                : "管理者パスワードが正しくありません。"
+              message: "管理者認証に失敗しました"
             });
           }
 
-          [user] = await db
+          // 管理者ユーザーを取得または作成
+          let [user] = await db
             .select()
             .from(users)
             .where(and(
@@ -120,7 +116,6 @@ export function setupAuth(app: Express) {
             .limit(1);
 
           if (!user) {
-            console.log('[Auth] Creating new admin user');
             [user] = await db
               .insert(users)
               .values({
@@ -130,53 +125,45 @@ export function setupAuth(app: Express) {
               })
               .returning();
           }
+          return done(null, user);
         } else {
-          // 一般ユーザーログイン
+          // 一般ユーザーログイン - settingsテーブルのパスワードのみを確認
           try {
-            console.log('[Auth] Validating general user password');
             const generalPassword = await getGeneralPassword();
             if (password !== generalPassword) {
-              console.log('[Auth] Invalid general password provided');
               return done(null, false, {
                 message: "パスワードが正しくありません"
               });
             }
-            console.log('[Auth] General password validation successful');
+
+            // ランダムな一般ユーザーを取得または作成
+            let [user] = await db
+              .select()
+              .from(users)
+              .where(and(
+                eq(users.role, 'student'),
+                eq(users.isActive, true)
+              ))
+              .orderBy(sql`RANDOM()`)
+              .limit(1);
+
+            if (!user) {
+              const timestamp = Date.now();
+              const randomSuffix = Math.random().toString(36).substring(2, 8);
+              [user] = await db
+                .insert(users)
+                .values({
+                  username: `user_${timestamp}_${randomSuffix}`,
+                  role: 'student',
+                  isActive: true
+                })
+                .returning();
+            }
+            return done(null, user);
           } catch (error) {
-            console.error('[Auth] General password validation error:', error);
             return done(error);
           }
-
-          // ランダムな一般ユーザーを取得または作成
-          [user] = await db
-            .select()
-            .from(users)
-            .where(and(
-              eq(users.role, 'student'),
-              eq(users.isActive, true)
-            ))
-            .orderBy(sql`RANDOM()`)
-            .limit(1);
-
-          if (!user) {
-            const timestamp = Date.now();
-            const randomSuffix = Math.random().toString(36).substring(2, 8);
-            const generalUsername = `user_${timestamp}_${randomSuffix}`;
-            
-            console.log('[Auth] Creating new general user');
-            [user] = await db
-              .insert(users)
-              .values({
-                username: generalUsername,
-                role: 'student',
-                isActive: true
-              })
-              .returning();
-          }
         }
-
-        console.log('[Auth] Login successful');
-        return done(null, user);
       } catch (err) {
         console.error('[Auth] Authentication error:', err);
         return done(err);
@@ -207,17 +194,6 @@ export function setupAuth(app: Express) {
     }
   });
 
-  // 管理者チェックミドルウェア
-  function requireAdmin(req: Express.Request, res: Express.Response, next: Express.NextFunction) {
-    if (!req.isAuthenticated() || !req.user || req.user.role !== 'coach') {
-      return res.status(403).json({ 
-        message: "管理者権限が必要です",
-        code: "ADMIN_REQUIRED"
-      });
-    }
-    next();
-  }
-
   // ログインエンドポイント
   app.post("/login", (req, res, next) => {
     console.log('[Auth] Processing login request');
@@ -234,15 +210,15 @@ export function setupAuth(app: Express) {
         console.error("[Auth] Login error:", err);
         return res.status(500).json({
           message: err.message || "ログイン処理中にエラーが発生しました",
-          field: "credentials"
+          code: "LOGIN_ERROR"
         });
       }
 
       if (!user) {
         console.log('[Auth] Login failed:', info.message);
         return res.status(401).json({
-          message: info.message ?? "ログインに失敗しました",
-          field: "credentials"
+          message: info.message ?? "パスワードが正しくありません",
+          code: "INVALID_CREDENTIALS"
         });
       }
 
@@ -252,12 +228,11 @@ export function setupAuth(app: Express) {
           return next(err);
         }
 
-        // セッションの有効期限を設定
         if (req.session) {
           req.session.cookie.maxAge = SESSION_MAX_AGE;
         }
 
-        console.log('[Auth] Login successful, session established');
+        console.log('[Auth] Login successful');
         return res.json({
           message: "ログインしました",
           user: { 
@@ -403,7 +378,14 @@ export function setupAuth(app: Express) {
   });
 
   // 設定管理API
-  app.get("/api/settings/general-password", requireAdmin, async (req, res) => {
+  app.get("/api/settings/general-password", async (req, res) => {
+    if (!req.user || req.user.role !== 'coach') {
+      return res.status(403).json({ 
+        message: "管理者権限が必要です",
+        code: "ADMIN_REQUIRED"
+      });
+    }
+
     try {
       const password = await getGeneralPassword();
       res.json({ value: password });
@@ -416,7 +398,14 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/settings/general-password", requireAdmin, async (req, res) => {
+  app.post("/api/settings/general-password", async (req, res) => {
+    if (!req.user || req.user.role !== 'coach') {
+      return res.status(403).json({ 
+        message: "管理者権限が必要です",
+        code: "ADMIN_REQUIRED"
+      });
+    }
+
     const { password } = req.body;
 
     // パスワードのバリデーション
