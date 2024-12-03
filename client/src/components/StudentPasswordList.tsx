@@ -1,2 +1,1 @@
-// This file is deprecated and will be removed
-// 管理者用パスワード管理機能は削除されました
+// This file has been removed as part of the password management system update

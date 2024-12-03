@@ -2,10 +2,16 @@ import { pgTable, text, integer, timestamp, boolean } from "drizzle-orm/pg-core"
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
+export const settings = pgTable("settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+});
+
 export const users = pgTable("users", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   username: text("username").unique().notNull(),
-  password: text("password").notNull(),
   role: text("role").notNull().default("student"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow()
@@ -71,5 +77,10 @@ export const insertRecordSchema = createInsertSchema(swimRecords);
 export const selectRecordSchema = createSelectSchema(swimRecords);
 export type InsertRecord = z.infer<typeof insertRecordSchema>;
 export type SwimRecord = z.infer<typeof selectRecordSchema>;
+
+export const insertSettingSchema = createInsertSchema(settings);
+export const selectSettingSchema = createSelectSchema(settings);
+export type InsertSetting = z.infer<typeof insertSettingSchema>;
+export type Setting = z.infer<typeof selectSettingSchema>;
 
 

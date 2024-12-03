@@ -20,24 +20,43 @@ export function UserPasswordEdit({ isOpen, onClose }: UserPasswordEditProps) {
   const [newPassword, setNewPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const validatePassword = (password: string): boolean => {
+    if (password.length < 5) {
+      setError("パスワードは5文字以上である必要があります");
+      return false;
+    }
+    
+    if (!/[A-Za-z]/.test(password)) {
+      setError("パスワードは少なくとも1つのアルファベットを含む必要があります");
+      return false;
+    }
+
+    setError(null);
+    return true;
+  };
 
   const handlePasswordUpdate = async () => {
     if (isSubmitting) return;
 
+    setError(null);
+
     // Validate password
-    if (newPassword.length < 5) {
+    if (!validatePassword(newPassword)) {
       toast({
         variant: "destructive",
-        title: "エラー",
-        description: "パスワードは5文字以上である必要があります",
+        title: "入力エラー",
+        description: error,
       });
       return;
     }
 
     if (newPassword !== confirmPassword) {
+      setError("パスワードが一致しません");
       toast({
         variant: "destructive",
-        title: "エラー",
+        title: "入力エラー",
         description: "パスワードが一致しません",
       });
       return;
@@ -52,23 +71,34 @@ export function UserPasswordEdit({ isOpen, onClose }: UserPasswordEditProps) {
         credentials: 'include',
       });
 
+      const data = await response.json().catch(() => ({
+        message: "サーバーからの応答の解析に失敗しました"
+      }));
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || "パスワードの更新に失敗しました");
+        const errorMessage = data.message || "パスワードの更新に失敗しました";
+        console.error('[Password] Update failed:', data);
+        throw new Error(errorMessage);
       }
 
+      console.log('[Password] Update successful');
       toast({
         title: "更新成功",
-        description: "パスワードが更新されました",
+        description: data.message || "パスワードが正常に更新されました",
+        duration: 3000,
       });
       setNewPassword("");
       setConfirmPassword("");
+      setError(null);
       onClose();
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "パスワードの更新に失敗しました";
+      setError(errorMessage);
       toast({
         variant: "destructive",
         title: "エラー",
-        description: error instanceof Error ? error.message : "パスワードの更新に失敗しました",
+        description: errorMessage,
+        duration: 5000,
       });
     } finally {
       setIsSubmitting(false);
@@ -89,13 +119,17 @@ export function UserPasswordEdit({ isOpen, onClose }: UserPasswordEditProps) {
             <Input
               type="password"
               value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="新しいパスワード (5文字以上)"
+              onChange={(e) => {
+                setNewPassword(e.target.value);
+                validatePassword(e.target.value);
+              }}
+              placeholder="新しいパスワード (5文字以上、アルファベットを含む)"
               disabled={isSubmitting}
+              className={error ? "border-red-500" : ""}
             />
-            {newPassword && newPassword.length < 5 && (
+            {error && (
               <p className="text-xs text-red-500">
-                パスワードは5文字以上である必要があります
+                {error}
               </p>
             )}
           </div>
@@ -106,6 +140,7 @@ export function UserPasswordEdit({ isOpen, onClose }: UserPasswordEditProps) {
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="パスワードの確認"
               disabled={isSubmitting}
+              className={confirmPassword && newPassword !== confirmPassword ? "border-red-500" : ""}
             />
             {confirmPassword && newPassword !== confirmPassword && (
               <p className="text-xs text-red-500">

@@ -3,15 +3,11 @@ import { IVerifyOptions, Strategy as LocalStrategy } from "passport-local";
 import { type Express } from "express";
 import session from "express-session";
 import createMemoryStore from "memorystore";
-import { users, type User as SelectUser } from "db/schema";
+import { users, settings, type User as SelectUser } from "db/schema";
 import { db } from "db";
 import { eq, and } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
-
-// 認証用の固定値
-const ADMIN_USERNAME = "丸山拓真";
-const ADMIN_PASSWORD = "dpjm3756";
 
 // セッション設定
 const SESSION_MAX_AGE = 12 * 60 * 60 * 1000; // 12時間
@@ -23,8 +19,8 @@ async function getGeneralPassword(): Promise<string> {
     console.log('[Auth] Fetching general password from settings');
     const [setting] = await db
       .select()
-      .from(sql.table('settings'))
-      .where(sql.eq('key', 'general_password'))
+      .from(settings)
+      .where(eq(settings.key, 'general_password'))
       .limit(1);
 
     if (!setting) {
@@ -76,12 +72,17 @@ export function setupAuth(app: Express) {
     cookie: {
       maxAge: SESSION_MAX_AGE,
       httpOnly: true,
-      secure: false,
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
     },
     name: 'swimtrack.sid'
   };
+
+  if (app.get('env') === 'production') {
+    app.set('trust proxy', 1);
+    sessionSettings.cookie!.secure = true;
+  }
 
   app.use(session(sessionSettings));
   app.use(passport.initialize());
@@ -95,17 +96,16 @@ export function setupAuth(app: Express) {
     }, async (req, username, password, done) => {
       try {
         console.log('[Auth] Processing authentication request');
-        const isAdminLogin = req.body.isAdminLogin === true;
-
-        if (isAdminLogin) {
-          // 管理者ログイン - 固定値との比較のみ
-          if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) {
+        
+        try {
+          const generalPassword = await getGeneralPassword();
+          if (password !== generalPassword) {
             return done(null, false, {
-              message: "管理者認証に失敗しました"
+              message: "パスワードが正しくありません"
             });
           }
 
-          // 管理者ユーザーを取得または作成
+          // ランダムな一般ユーザーを取得または作成
           let [user] = await db
             .select({
               id: users.id,
@@ -115,64 +115,27 @@ export function setupAuth(app: Express) {
             })
             .from(users)
             .where(and(
-              eq(users.username, ADMIN_USERNAME),
-              eq(users.role, 'coach')
+              eq(users.role, 'student'),
+              eq(users.isActive, true)
             ))
+            .orderBy(sql`RANDOM()`)
             .limit(1);
 
           if (!user) {
+            const timestamp = Date.now();
+            const randomSuffix = Math.random().toString(36).substring(2, 8);
             [user] = await db
               .insert(users)
               .values({
-                username: ADMIN_USERNAME,
-                role: 'coach',
+                username: `user_${timestamp}_${randomSuffix}`,
+                role: 'student',
                 isActive: true
               })
               .returning();
           }
           return done(null, user);
-        } else {
-          // 一般ユーザーログイン - settingsテーブルのパスワードのみを確認
-          try {
-            const generalPassword = await getGeneralPassword();
-            if (password !== generalPassword) {
-              return done(null, false, {
-                message: "パスワードが正しくありません"
-              });
-            }
-
-            // ランダムな一般ユーザーを取得または作成
-            let [user] = await db
-              .select({
-                id: users.id,
-                username: users.username,
-                role: users.role,
-                isActive: users.isActive
-              })
-              .from(users)
-              .where(and(
-                eq(users.role, 'student'),
-                eq(users.isActive, true)
-              ))
-              .orderBy(sql`RANDOM()`)
-              .limit(1);
-
-            if (!user) {
-              const timestamp = Date.now();
-              const randomSuffix = Math.random().toString(36).substring(2, 8);
-              [user] = await db
-                .insert(users)
-                .values({
-                  username: `user_${timestamp}_${randomSuffix}`,
-                  role: 'student',
-                  isActive: true
-                })
-                .returning();
-            }
-            return done(null, user);
-          } catch (error) {
-            return done(error);
-          }
+        } catch (error) {
+          return done(error);
         }
       } catch (err) {
         console.error('[Auth] Authentication error:', err);
@@ -399,45 +362,42 @@ export function setupAuth(app: Express) {
 
   // ユーザーパスワード変更API
   app.put("/api/user/password", async (req, res) => {
-    if (!req.user) {
-      return res.status(401).json({ 
-        message: "認証が必要です",
-        code: "AUTH_REQUIRED"
-      });
-    }
-
-    const { password } = req.body;
-
-    // パスワードのバリデーション
-    if (!password || typeof password !== 'string' || password.length < 5) {
-      return res.status(400).json({
-        message: "パスワードは5文字以上で入力してください",
-        code: "INVALID_PASSWORD"
-      });
-    }
-
     try {
-      await db
-        .insert(sql.table('settings'))
-        .values({
-          key: 'general_password',
+      if (!req.user) {
+        return res.status(401).json({ 
+          message: "認証が必要です"
+        });
+      }
+
+      const { password } = req.body;
+      
+      // バリデーション
+      if (!password || password.length < 5) {
+        return res.status(400).json({
+          message: "パスワードは5文字以上で入力してください"
+        });
+      }
+
+      // パスワード更新
+      const [result] = await db
+        .update(settings)
+        .set({
           value: password,
           updated_at: new Date()
         })
-        .onConflictDoUpdate({
-          target: ['key'],
-          set: {
-            value: password,
-            updated_at: new Date()
-          }
-        });
+        .where(eq(settings.key, 'general_password'))
+        .returning();
 
+      if (!result) {
+        throw new Error("パスワードの更新に失敗しました");
+      }
+
+      console.log('[Settings] Password updated successfully');
       res.json({ message: "パスワードを更新しました" });
     } catch (error) {
-      console.error('[Settings] Failed to update password:', error);
-      res.status(500).json({ 
-        message: "パスワードの更新に失敗しました",
-        code: "UPDATE_FAILED"
+      console.error('[Settings] Password update error:', error);
+      res.status(500).json({
+        message: "パスワードの更新に失敗しました"
       });
     }
   });
