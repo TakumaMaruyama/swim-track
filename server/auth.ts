@@ -371,14 +371,12 @@ export function setupAuth(app: Express) {
 
       const { password } = req.body;
       
-      // バリデーション
       if (!password || password.length < 5) {
         return res.status(400).json({
           message: "パスワードは5文字以上で入力してください"
         });
       }
 
-      // パスワード更新
       const [result] = await db
         .update(settings)
         .set({
