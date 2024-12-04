@@ -28,7 +28,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Trophy, Trash2, Edit2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useUser } from "../hooks/use-user";
+
 import type { ExtendedSwimRecord } from "../hooks/use-swim-records";
 import { lazy, Suspense } from 'react';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -72,7 +72,7 @@ export function TimeHistoryModal({
   onRecordDeleted 
 }: TimeHistoryModalProps) {
   const { toast } = useToast();
-  const { user } = useUser();
+  
   const [styleFilter, setStyleFilter] = React.useState<string>("all");
   const [sortBy, setSortBy] = React.useState<string>("date_desc");
   const [deletingRecord, setDeletingRecord] = React.useState<number | null>(null);
@@ -359,28 +359,26 @@ export function TimeHistoryModal({
                                 {record.poolLength}mプール
                               </div>
                             </div>
-                            {user?.role === 'coach' && (
+                            <div className="flex gap-2">
                               <div className="flex gap-2">
-                                <div className="flex gap-2">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => setEditingRecord(record)}
-                                    className="hover:bg-gray-100"
-                                  >
-                                    <Edit2 className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => setDeletingRecord(record.id)}
-                                    className="hover:bg-red-100"
-                                  >
-                                    <Trash2 className="h-4 w-4 text-red-500" />
-                                  </Button>
-                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setEditingRecord(record)}
+                                  className="hover:bg-gray-100"
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setDeletingRecord(record.id)}
+                                  className="hover:bg-red-100"
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
                               </div>
-                            )}
+                            </div>
                           </div>
                         );
                       })}

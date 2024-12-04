@@ -27,9 +27,9 @@ export default function Dashboard() {
   const { activities, isLoading: isActivitiesLoading, error: activitiesError } = useRecentActivities();
 
   // All hooks before any conditional returns
-  // Remove authentication-related handlers
+  // No authentication handlers needed
 
-  // Remove authentication check
+  // No authentication check needed
 
   return (
     <ErrorBoundary>

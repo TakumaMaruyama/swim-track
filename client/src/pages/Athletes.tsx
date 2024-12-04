@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useUser } from '../hooks/use-user';
+
 import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '../components/PageHeader';
 import { Badge } from "@/components/ui/badge";
@@ -60,7 +60,7 @@ const FormLoadingFallback = () => (
 );
 
 export default function Athletes() {
-  const { user } = useUser();
+  
   const { toast } = useToast();
   const { athletes, isLoading: athletesLoading, error: athletesError, mutate: mutateAthletes } = useAthletes();
   const { records, isLoading: recordsLoading, error: recordsError, mutate: mutateRecords } = useSwimRecords();
@@ -268,12 +268,10 @@ export default function Athletes() {
       <PageHeader
         title="選手一覧"
         children={
-          user?.role === 'coach' && (
-            <Button onClick={() => setEditingRecord({ id: null, studentId: null })}>
-              <Plus className="mr-2 h-4 w-4" />
-              新規記録追加
-            </Button>
-          )
+          <Button onClick={() => setEditingRecord({ id: null, studentId: null })}>
+            <Plus className="mr-2 h-4 w-4" />
+            新規記録追加
+          </Button>
         }
       />
       <div className="container px-4 md:px-8">
@@ -314,38 +312,34 @@ export default function Athletes() {
                       >
                         <History className="h-4 w-4" />
                       </Button>
-                      {user?.role === 'coach' && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleToggleStatus(athlete.id, athlete.isActive)}
-                          >
-                            <Power className={`h-4 w-4 ${athlete.isActive ? 'text-green-500' : 'text-red-500'}`} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setEditingAthlete(athlete.id)}
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setEditingRecord({ id: null, studentId: athlete.id })}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setDeletingAthlete(athlete.id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
-                        </>
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleToggleStatus(athlete.id, athlete.isActive)}
+                      >
+                        <Power className={`h-4 w-4 ${athlete.isActive ? 'text-green-500' : 'text-red-500'}`} />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setEditingAthlete(athlete.id)}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setEditingRecord({ id: null, studentId: athlete.id })}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setDeletingAthlete(athlete.id)}
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
                     </div>
                   </CardTitle>
                 </CardHeader>
@@ -354,18 +348,16 @@ export default function Athletes() {
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
                         <h3 className="font-medium text-sm text-muted-foreground">最近の記録:</h3>
-                        {user?.role === 'coach' && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setEditingRecord({
-                              id: latestRecord.id,
-                              studentId: athlete.id
-                            })}
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setEditingRecord({
+                            id: latestRecord.id,
+                            studentId: athlete.id
+                          })}
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div>

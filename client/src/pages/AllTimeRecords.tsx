@@ -5,7 +5,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Edit2, Trash2, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EditRecordForm } from '../components/EditRecordForm';
-import { useUser } from '../hooks/use-user';
+
 import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '../components/PageHeader';
 import { Badge } from "@/components/ui/badge";
@@ -40,7 +40,7 @@ const swimStyles = [
 ];
 
 export default function AllTimeRecords() {
-  const { user } = useUser();
+  
   const { toast } = useToast();
   const { records, isLoading, error, mutate } = useSwimRecords();
   const [editingRecord, setEditingRecord] = React.useState<number | null>(null);
@@ -223,26 +223,24 @@ export default function AllTimeRecords() {
                               <h3 className="text-lg font-semibold text-primary">
                                 {style}
                               </h3>
-                              {user?.role === 'coach' && (
-                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => setEditingRecord(record.id)}
-                                    className="h-8 w-8"
-                                  >
-                                    <Edit2 className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleDelete(record.id)}
-                                    className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              )}
+                              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setEditingRecord(record.id)}
+                                  className="h-8 w-8"
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleDelete(record.id)}
+                                  className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </div>
 
                             <div className="space-y-3">
