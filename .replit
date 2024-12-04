@@ -8,7 +8,7 @@ channel = "stable-24_05"
 [deployment]
 deploymentTarget = "cloudrun"
 build = ["npm", "run", "build"]
-run = ["sh", "-c", "tsx watch --clear-screen=false server/index.ts"]
+run = ["sh", "-c", "NODE_ENV=development PORT=5000 tsx watch --ignore='vite.config.ts*' --clear-screen=false server/index.ts"]
 
 [[ports]]
 localPort = 3000
@@ -43,34 +43,6 @@ author = "agent"
 task = "workflow.run"
 args = "Development Server"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Backend Server"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Client Dev Server"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Server Dev"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Backend"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "API Server"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Frontend"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Frontend Server"
-
 [[workflows.workflow]]
 name = "Development Server"
 author = "agent"
@@ -83,110 +55,5 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run dev"
-waitForPort = 3000
-
-[[workflows.workflow]]
-name = "Backend Server"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "tsx watch --clear-screen=false server/index.ts"
+args = "NODE_ENV=development PORT=5000 tsx watch --ignore='vite.config.ts*' --clear-screen=false server/index.ts"
 waitForPort = 5000
-
-[[workflows.workflow]]
-name = "Client Dev Server"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npm run client:dev"
-waitForPort = 3000
-
-[[workflows.workflow]]
-name = "Server Dev"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "tsx watch --clear-screen=false server/index.ts"
-waitForPort = 3000
-
-[[workflows.workflow]]
-name = "Backend"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "tsx watch --clear-screen=false server/index.ts"
-waitForPort = 5000
-
-[[workflows.workflow]]
-name = "API Server"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "tsx watch --clear-screen=false server/index.ts"
-waitForPort = 5000
-
-[[workflows.workflow]]
-name = "Frontend"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd client && npm run dev -- --host 0.0.0.0 --port 5173"
-waitForPort = 5173
-
-[[workflows.workflow]]
-name = "Frontend Server"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd client && npm run dev"
-waitForPort = 5173

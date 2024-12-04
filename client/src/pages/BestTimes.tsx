@@ -8,7 +8,6 @@ import { EditRecordForm } from '../components/EditRecordForm';
 import { useUser } from '../hooks/use-user';
 import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '../components/PageHeader';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type GroupedRecords = {
   [style: string]: {
@@ -37,16 +36,11 @@ export default function BestTimes() {
   const { toast } = useToast();
   const { records, isLoading, error, mutate } = useSwimRecords();
   const [editingRecord, setEditingRecord] = React.useState<number | null>(null);
-  const [poolLengthFilter, setPoolLengthFilter] = React.useState<string>("25"); // デフォルトは25mプール
 
   const groupedRecords: GroupedRecords = React.useMemo(() => {
     if (!records) return {};
 
-    const filteredRecords = records.filter(record => 
-      record.poolLength === parseInt(poolLengthFilter)
-    );
-    
-    return filteredRecords.reduce((acc, record) => {
+    return records.reduce((acc, record) => {
       if (!acc[record.style]) {
         acc[record.style] = {};
       }
@@ -66,7 +60,7 @@ export default function BestTimes() {
       
       return acc;
     }, {} as GroupedRecords);
-  }, [records, poolLengthFilter]);
+  }, [records]);
 
   const handleEdit = async (recordId: number, data: any) => {
     try {
@@ -205,67 +199,55 @@ export default function BestTimes() {
         }
       />
       <div className="container px-4 md:px-8">
-        <Tabs defaultValue="25" value={poolLengthFilter} onValueChange={setPoolLengthFilter}>
-          <TabsList className="mb-8">
-            <TabsTrigger value="15">15mプール</TabsTrigger>
-            <TabsTrigger value="25">25mプール</TabsTrigger>
-            <TabsTrigger value="50">50mプール</TabsTrigger>
-          </TabsList>
-
-          {['15', '25', '50'].map((poolLength) => (
-            <TabsContent key={poolLength} value={poolLength}>
-              <div className="grid gap-4 md:grid-cols-2">
-                {Object.entries(groupedRecords).map(([style, distances]) => (
-                  <Card key={style} className="hover:shadow-lg transition-shadow">
-                    <CardHeader>
-                      <CardTitle className="text-xl">{style}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {Object.entries(distances).map(([distance, record]) => (
-                          <div 
-                            key={distance} 
-                            className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-3 rounded-lg bg-muted/50"
-                          >
-                            <div className="mb-2 sm:mb-0">
-                              <p className="font-medium text-lg">
-                                {distance}m ({record.poolLength}mプール)
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {formatDate(record.date)} - {record.athleteName}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <p className="text-xl font-bold text-primary">{record.time}</p>
-                              {user?.role === 'coach' && (
-                                <div className="flex gap-2">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => setEditingRecord(record.id)}
-                                  >
-                                    <Edit2 className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleDelete(record.id)}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
+        <div className="grid gap-4 md:grid-cols-2">
+          {Object.entries(groupedRecords).map(([style, distances]) => (
+            <Card key={style} className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <CardTitle className="text-xl">{style}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {Object.entries(distances).map(([distance, record]) => (
+                    <div 
+                      key={distance} 
+                      className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-3 rounded-lg bg-muted/50"
+                    >
+                      <div className="mb-2 sm:mb-0">
+                        <p className="font-medium text-lg">
+                          {distance}m ({record.poolLength}mプール)
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {formatDate(record.date)} - {record.athleteName}
+                        </p>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </TabsContent>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xl font-bold text-primary">{record.time}</p>
+                        {user?.role === 'coach' && (
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setEditingRecord(record.id)}
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDelete(record.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           ))}
-        </Tabs>
+        </div>
       </div>
 
       <EditRecordForm

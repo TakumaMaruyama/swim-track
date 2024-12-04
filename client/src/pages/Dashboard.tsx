@@ -28,7 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { UserPasswordEdit } from '../components/UserPasswordEdit';
+import { UserPasswordList } from '../components/UserPasswordList';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 
 // Constants outside component
@@ -47,7 +47,7 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [showLogoutDialog, setShowLogoutDialog] = React.useState(false);
   const [showDeleteAccountDialog, setShowDeleteAccountDialog] = React.useState(false);
-  const [showPasswordEdit, setShowPasswordEdit] = React.useState(false);
+  const [showPasswordList, setShowPasswordList] = React.useState(false);
   const { activities, isLoading: isActivitiesLoading, error: activitiesError } = useRecentActivities();
 
   // All hooks before any conditional returns
@@ -136,15 +136,17 @@ export default function Dashboard() {
               <span className="ml-2 text-sm font-medium text-gray-700">{user.username}</span>
             </div>
             <div className="flex gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowPasswordEdit(true)}
-                className="text-gray-600 hover:text-gray-900"
-                title="パスワード変更"
-              >
-                <Key className="h-4 w-4" />
-              </Button>
+              {user?.role === 'coach' && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowPasswordList(true)}
+                  className="text-gray-600 hover:text-gray-900"
+                  title="パスワード管理"
+                >
+                  <Key className="h-4 w-4" />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
@@ -306,9 +308,9 @@ export default function Dashboard() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <UserPasswordEdit 
-        isOpen={showPasswordEdit}
-        onClose={() => setShowPasswordEdit(false)}
+      <UserPasswordList 
+        isOpen={showPasswordList}
+        onClose={() => setShowPasswordList(false)}
       />
       </div>
     </ErrorBoundary>

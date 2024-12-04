@@ -57,7 +57,13 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-
+// Password hashing utility functions
+const hashPassword = async (password: string): Promise<string> => {
+  const salt = randomBytes(SALT_LENGTH);
+  const hash = (await scryptAsync(password, salt, HASH_LENGTH)) as Buffer;
+  const hashedPassword = Buffer.concat([hash, salt]);
+  return hashedPassword.toString('hex');
+};
 
 export function registerRoutes(app: Express) {
   // Initialize upload directory during route registration
@@ -192,7 +198,52 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  
+  // Add password update endpoint
+  app.put("/api/users/:id/password", requireAuth, requireCoach, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { password } = req.body;
+      
+      // Hash the new password
+      const hashedPassword = await hashPassword(password);
+      
+      const [user] = await db
+        .update(users)
+        .set({ password: hashedPassword })
+        .where(eq(users.id, parseInt(id)))
+        .returning();
+
+      if (!user) {
+        return res.status(404).json({ message: "ユーザーが見つかりません" });
+      }
+
+      res.json({ message: "パスワードが更新されました" });
+    } catch (error) {
+      console.error('Error updating password:', error);
+      res.status(500).json({ message: "パスワードの更新に失敗しました" });
+    }
+  });
+
+  // Update the /api/users/passwords endpoint to get both students and coaches
+  app.get("/api/users/passwords", requireAuth, requireCoach, async (req, res) => {
+    try {
+      console.log('[Auth] Fetching user passwords list');
+      const usersList = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          role: users.role,
+          isActive: users.isActive,
+        })
+        .from(users)
+        .orderBy(users.username);
+
+      res.json(usersList);
+    } catch (error) {
+      console.error('Error fetching user list:', error);
+      res.status(500).json({ message: "ユーザー情報の取得に失敗しました" });
+    }
+  });
 
   // Categories API endpoints with error handling
   app.get("/api/categories", requireAuth, async (req, res) => {
@@ -829,7 +880,58 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // パスワード管理機能は一般ユーザー用の共通パスワードシステムに移行
+  // Password management endpoints
+  // Update the /api/users/passwords endpoint
+  // app.get("/api/users/passwords", requireAuth, requireCoach, async (req, res) => {
+  //   try {
+  //     const students = await db
+  //       .select({
+  //         id: users.id,
+  //         username: users.username,
+  //         role: users.role,
+  //         isActive: users.isActive,
+  //       })
+  //       .from(users)
+  //       .where(eq(users.role, "student"))
+  //       .orderBy(users.username);
+  //
+  //     res.json(students);
+  //   } catch (error) {
+  //     console.error('Error fetching student list:', error);
+  //     res.status(500).json({ message: "学生情報の取得に失敗しました" });
+  //   }
+  // });
+  //
+  // // Add password update endpoint
+  // app.put("/api/users/:id/password", requireAuth, requireCoach, async (req, res) => {
+  //   try {
+  //     const { id } = req.params;
+  //     const { password } = req.body;
+  //
+  //     if (!password || password.length < 8) {
+  //       return res.status(400).json({ message: "パスワードは8文字以上である必要があります" });
+  //     }
+  //
+  //     // Hash the new password
+  //     const hashedPassword = await crypto.hash(password);
+  //
+  //     // Update the user's password
+  //     const [updatedUser] = await db
+  //       .update(users)
+  //       .set({ password: hashedPassword })
+  //       .where(eq(users.id, parseInt(id)))
+  //       .returning();
+  //
+  //     if (!updatedUser) {
+  //       return res.status(404).json({ message: "ユーザーが見つかりません" });
+  //     }
+  //
+  //     res.json({ message: "パスワードが更新されました" });
+  //   } catch (error) {
+  //     console.error('Error updating password:', error);
+  //     res.status(500).json({ message: "パスワードの更新に失敗しました" });
+  //   }
+  // });
 
   return app;
 }
