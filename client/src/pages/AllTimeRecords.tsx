@@ -223,21 +223,7 @@ export default function AllTimeRecords() {
                               <h3 className="text-lg font-semibold text-primary">
                                 {style}
                               </h3>
-                              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => {
-                                    toast({
-                                      title: "情報",
-                                      description: "記録の編集は管理者のみが可能です",
-                                    });
-                                  }}
-                                  className="h-8 w-8"
-                                >
-                                  <Edit2 className="h-4 w-4" />
-                                </Button>
-                              </div>
+                              {/* 編集ボタンを削除 - パブリックアクセス用 */}
                             </div>
 
                             <div className="space-y-3">

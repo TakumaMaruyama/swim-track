@@ -360,21 +360,7 @@ export function TimeHistoryModal({
                               </div>
                             </div>
                             <div className="flex gap-2">
-                              <div className="flex gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => {
-                                    toast({
-                                      title: "情報",
-                                      description: "記録の編集は管理者のみが可能です",
-                                    });
-                                  }}
-                                  className="hover:bg-gray-100"
-                                >
-                                  <Edit2 className="h-4 w-4" />
-                                </Button>
-                              </div>
+                              {/* 編集ボタンを削除 - パブリックアクセス用 */}
                             </div>
                           </div>
                         );
