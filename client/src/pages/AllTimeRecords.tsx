@@ -200,12 +200,12 @@ export default function AllTimeRecords() {
               {Object.entries(groupedRecords).map(([distance, styles]) => (
                 <Card key={distance} className="overflow-hidden">
                   <CardHeader className="bg-muted/50">
-                    <CardTitle className="text-2xl">
+                    <CardTitle className="text-3xl font-bold tracking-tight">
                       {distance}m種目
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="pt-6">
-                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  <CardContent className="pt-8">
+                    <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
                       {Object.entries(styles)
                         .sort(([styleA], [styleB]) => {
                           const indexA = swimStyles.indexOf(styleA);
@@ -217,33 +217,35 @@ export default function AllTimeRecords() {
                         .map(([style, record]) => (
                           <div
                             key={`${distance}-${style}`}
-                            className="p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group"
+                            className="p-6 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group"
                           >
-                            <div className="flex items-center justify-between mb-4">
-                              <h3 className="text-lg font-semibold text-primary">
+                            <div className="flex items-center justify-between mb-3">
+                              <h3 className="text-xl font-semibold text-primary tracking-tight">
                                 {style}
                               </h3>
-                              {/* 編集ボタンを削除 - パブリックアクセス用 */}
+                              {record.isCompetition && (
+                                <Badge variant="secondary" className="flex items-center gap-1">
+                                  <Trophy className="h-3 w-3" />
+                                  大会記録
+                                </Badge>
+                              )}
                             </div>
 
-                            <div className="space-y-3">
-                              <div className="flex items-baseline gap-2">
-                                <span className="text-3xl font-bold tracking-tight">
+                            <div className="space-y-4">
+                              <div className="flex flex-col">
+                                <span className="text-4xl font-bold tracking-tighter text-foreground/90">
                                   {formatTime(record.time)}
                                 </span>
-                                {record.isCompetition && (
-                                  <Badge variant="secondary" className="flex items-center gap-1">
-                                    <Trophy className="h-3 w-3" />
-                                    大会記録
-                                  </Badge>
-                                )}
+                                <span className="text-sm font-medium text-muted-foreground mt-1">
+                                  {record.poolLength}mプール
+                                </span>
                               </div>
 
-                              <div className="space-y-1">
-                                <p className="font-medium">
+                              <div className="space-y-2">
+                                <p className="text-lg font-medium">
                                   {record.athleteName}
                                 </p>
-                                <time className="text-sm text-muted-foreground">
+                                <time className="text-sm text-muted-foreground block">
                                   {new Date(record.date).toLocaleDateString('ja-JP', {
                                     year: 'numeric',
                                     month: 'long',
