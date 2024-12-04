@@ -227,18 +227,15 @@ export default function AllTimeRecords() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  onClick={() => setEditingRecord(record.id)}
+                                  onClick={() => {
+                                    toast({
+                                      title: "情報",
+                                      description: "記録の編集は管理者のみが可能です",
+                                    });
+                                  }}
                                   className="h-8 w-8"
                                 >
                                   <Edit2 className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleDelete(record.id)}
-                                  className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
-                                >
-                                  <Trash2 className="h-4 w-4" />
                                 </Button>
                               </div>
                             </div>

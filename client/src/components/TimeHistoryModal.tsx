@@ -364,18 +364,15 @@ export function TimeHistoryModal({
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  onClick={() => setEditingRecord(record)}
+                                  onClick={() => {
+                                    toast({
+                                      title: "情報",
+                                      description: "記録の編集は管理者のみが可能です",
+                                    });
+                                  }}
                                   className="hover:bg-gray-100"
                                 >
                                   <Edit2 className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => setDeletingRecord(record.id)}
-                                  className="hover:bg-red-100"
-                                >
-                                  <Trash2 className="h-4 w-4 text-red-500" />
                                 </Button>
                               </div>
                             </div>

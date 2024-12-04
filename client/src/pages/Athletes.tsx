@@ -268,10 +268,20 @@ export default function Athletes() {
       <PageHeader
         title="選手一覧"
         children={
-          <Button onClick={() => setEditingRecord({ id: null, studentId: null })}>
-            <Plus className="mr-2 h-4 w-4" />
-            新規記録追加
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline"
+              onClick={() => {
+                toast({
+                  title: "情報",
+                  description: "記録の追加・編集は管理者のみが可能です",
+                });
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              新規記録追加
+            </Button>
+          </div>
         }
       />
       <div className="container px-4 md:px-8">
@@ -315,30 +325,26 @@ export default function Athletes() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleToggleStatus(athlete.id, athlete.isActive)}
-                      >
-                        <Power className={`h-4 w-4 ${athlete.isActive ? 'text-green-500' : 'text-red-500'}`} />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setEditingAthlete(athlete.id)}
+                        onClick={() => {
+                          toast({
+                            title: "情報",
+                            description: "選手情報の編集は管理者のみが可能です",
+                          });
+                        }}
                       >
                         <Edit2 className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => setEditingRecord({ id: null, studentId: athlete.id })}
+                        onClick={() => {
+                          toast({
+                            title: "情報",
+                            description: "記録の追加は管理者のみが可能です",
+                          });
+                        }}
                       >
                         <Plus className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setDeletingAthlete(athlete.id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
                       </Button>
                     </div>
                   </CardTitle>
