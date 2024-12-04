@@ -1,19 +1,11 @@
 import { Express } from "express";
-import { setupAuth } from "./auth";
 import multer from "multer";
 import { db } from "db";
-import { documents, users, swimRecords, categories, competitions } from "db/schema";
+import { documents, swimRecords, categories, competitions, users } from "db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import path from "path";
 import fs from "fs/promises";
 import { createReadStream } from "fs";
-import { scrypt, timingSafeEqual, randomBytes } from "crypto";
-import { promisify } from "util";
-
-const scryptAsync = promisify(scrypt);
-
-const SALT_LENGTH = 32;
-const HASH_LENGTH = 64;
 
 // Use absolute path in persistent storage directory
 const UPLOAD_DIR = path.join(process.env.HOME || process.cwd(), "storage/uploads");
@@ -57,37 +49,12 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-// Password hashing utility functions
-const hashPassword = async (password: string): Promise<string> => {
-  const salt = randomBytes(SALT_LENGTH);
-  const hash = (await scryptAsync(password, salt, HASH_LENGTH)) as Buffer;
-  const hashedPassword = Buffer.concat([hash, salt]);
-  return hashedPassword.toString('hex');
-};
-
 export function registerRoutes(app: Express) {
   // Initialize upload directory during route registration
   initializeUploadDirectory().catch(console.error);
-  
-  setupAuth(app);
-
-  // Authentication middleware
-  const requireAuth = (req: any, res: any, next: any) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "認証が必要です" });
-    }
-    next();
-  };
-
-  const requireCoach = (req: any, res: any, next: any) => {
-    if (req.user?.role !== "coach") {
-      return res.status(403).json({ message: "コーチ権限が必要です" });
-    }
-    next();
-  };
 
   // Document download endpoint with enhanced error handling
-  app.get("/api/documents/:id/download", requireAuth, async (req, res) => {
+  app.get("/api/documents/:id/download", async (req, res) => {
     try {
       const { id } = req.params;
       console.log('Download request for document:', id);
@@ -137,7 +104,7 @@ export function registerRoutes(app: Express) {
   });
 
   // Document upload endpoint with improved error handling
-  app.post("/api/documents/upload", requireAuth, requireCoach, upload.single('file'), async (req, res) => {
+  app.post("/api/documents/upload", upload.single('file'), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "ファイルが選択されていません" });
@@ -158,7 +125,6 @@ export function registerRoutes(app: Express) {
           title,
           filename: req.file.filename,
           mimeType: req.file.mimetype,
-          uploaderId: req.user!.id,
           categoryId: categoryId === "none" ? null : parseInt(categoryId),
         })
         .returning();
@@ -172,7 +138,7 @@ export function registerRoutes(app: Express) {
   });
 
   // Document deletion endpoint - only remove database entry, keep files
-  app.delete("/api/documents/:id", requireAuth, requireCoach, async (req, res) => {
+  app.delete("/api/documents/:id", async (req, res) => {
     try {
       const { id } = req.params;
 
@@ -186,7 +152,6 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ message: "ドキュメントが見つかりません" });
       }
 
-      // Only remove database entry, keep files for persistence
       await db
         .delete(documents)
         .where(eq(documents.id, parseInt(id)));
@@ -198,55 +163,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Add password update endpoint
-  app.put("/api/users/:id/password", requireAuth, requireCoach, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { password } = req.body;
-      
-      // Hash the new password
-      const hashedPassword = await hashPassword(password);
-      
-      const [user] = await db
-        .update(users)
-        .set({ password: hashedPassword })
-        .where(eq(users.id, parseInt(id)))
-        .returning();
-
-      if (!user) {
-        return res.status(404).json({ message: "ユーザーが見つかりません" });
-      }
-
-      res.json({ message: "パスワードが更新されました" });
-    } catch (error) {
-      console.error('Error updating password:', error);
-      res.status(500).json({ message: "パスワードの更新に失敗しました" });
-    }
-  });
-
-  // Update the /api/users/passwords endpoint to get both students and coaches
-  app.get("/api/users/passwords", requireAuth, requireCoach, async (req, res) => {
-    try {
-      console.log('[Auth] Fetching user passwords list');
-      const usersList = await db
-        .select({
-          id: users.id,
-          username: users.username,
-          role: users.role,
-          isActive: users.isActive,
-        })
-        .from(users)
-        .orderBy(users.username);
-
-      res.json(usersList);
-    } catch (error) {
-      console.error('Error fetching user list:', error);
-      res.status(500).json({ message: "ユーザー情報の取得に失敗しました" });
-    }
-  });
-
   // Categories API endpoints with error handling
-  app.get("/api/categories", requireAuth, async (req, res) => {
+  app.get("/api/categories", async (req, res) => {
     try {
       const allCategories = await db
         .select()
@@ -260,7 +178,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/categories", requireAuth, requireCoach, async (req, res) => {
+  app.post("/api/categories", async (req, res) => {
     try {
       const { name, description } = req.body;
       
@@ -273,7 +191,6 @@ export function registerRoutes(app: Express) {
         .values({
           name: name.trim(),
           description: description?.trim(),
-          createdBy: req.user!.id
         })
         .returning();
 
@@ -284,7 +201,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/categories/:id", requireAuth, requireCoach, async (req, res) => {
+  app.delete("/api/categories/:id", async (req, res) => {
     try {
       const { id } = req.params;
 
@@ -311,7 +228,7 @@ export function registerRoutes(app: Express) {
   });
 
   // Documents listing with categories
-  app.get("/api/documents", requireAuth, async (req, res) => {
+  app.get("/api/documents", async (req, res) => {
     try {
       const docs = await db
         .select({
@@ -319,15 +236,12 @@ export function registerRoutes(app: Express) {
           title: documents.title,
           filename: documents.filename,
           mimeType: documents.mimeType,
-          uploaderId: documents.uploaderId,
           categoryId: documents.categoryId,
           createdAt: documents.createdAt,
           categoryName: categories.name,
-          uploaderName: users.username
         })
         .from(documents)
         .leftJoin(categories, eq(documents.categoryId, categories.id))
-        .leftJoin(users, eq(documents.uploaderId, users.id))
         .orderBy(desc(documents.createdAt));
 
       res.json(docs);
@@ -337,10 +251,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  
-
   // Competitions API
-  app.get("/api/competitions", requireAuth, async (req, res) => {
+  app.get("/api/competitions", async (req, res) => {
     try {
       const competitionsData = await db
         .select({
@@ -363,7 +275,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/competitions", requireAuth, requireCoach, async (req, res) => {
+  app.post("/api/competitions", async (req, res) => {
     try {
       const { name, location, date } = req.body;
       
@@ -388,7 +300,7 @@ export function registerRoutes(app: Express) {
   });
 
   // Athletes API
-  app.get("/api/athletes", requireAuth, async (req, res) => {
+  app.get("/api/athletes", async (req, res) => {
     try {
       const athletes = await db
         .select({
@@ -409,100 +321,7 @@ export function registerRoutes(app: Express) {
   });
 
   // Records API endpoints
-  app.get("/api/records", requireAuth, async (req, res) => {
-  // Optimized records retrieval with aggregated data
-  app.get("/api/records/aggregated", requireAuth, async (req, res) => {
-    try {
-      const aggregatedRecords = await db
-        .select({
-          id: swimRecords.id,
-          style: swimRecords.style,
-          distance: swimRecords.distance,
-          time: swimRecords.time,
-          date: swimRecords.date,
-          poolLength: swimRecords.poolLength,
-          studentId: swimRecords.studentId,
-          athleteName: users.username,
-          isCompetition: swimRecords.isCompetition,
-          competitionName: swimRecords.competitionName,
-          competitionLocation: swimRecords.competitionLocation,
-          personalBest: sql<string>`MIN(${swimRecords.time}) OVER (
-            PARTITION BY ${swimRecords.studentId}, ${swimRecords.style}, ${swimRecords.distance}, ${swimRecords.poolLength}
-          )`,
-          averageTime: sql<string>`AVG(${swimRecords.time}) OVER (
-            PARTITION BY ${swimRecords.studentId}, ${swimRecords.style}, ${swimRecords.distance}, ${swimRecords.poolLength}
-          )`,
-          recordCount: sql<number>`COUNT(*) OVER (
-            PARTITION BY ${swimRecords.studentId}, ${swimRecords.style}, ${swimRecords.distance}, ${swimRecords.poolLength}
-          )`,
-          ranking: sql<number>`RANK() OVER (
-            PARTITION BY ${swimRecords.style}, ${swimRecords.distance}, ${swimRecords.poolLength}
-            ORDER BY ${swimRecords.time}
-          )`
-        })
-        .from(swimRecords)
-        .leftJoin(users, eq(swimRecords.studentId, users.id))
-        .orderBy(desc(swimRecords.date));
-
-      res.json(aggregatedRecords);
-    } catch (error) {
-      console.error('Error fetching aggregated records:', error);
-      res.status(500).json({ message: "記録の取得に失敗しました" });
-    }
-  });
-
-  // Get statistics by style and distance
-  app.get("/api/records/statistics", requireAuth, async (req, res) => {
-    try {
-      const statistics = await db
-        .select({
-          style: swimRecords.style,
-          distance: swimRecords.distance,
-          poolLength: swimRecords.poolLength,
-          recordCount: sql<number>`COUNT(*)`,
-          averageTime: sql<string>`AVG(${swimRecords.time})`,
-          bestTime: sql<string>`MIN(${swimRecords.time})`,
-          bestTimeAthlete: users.username,
-        })
-        .from(swimRecords)
-        .leftJoin(users, eq(swimRecords.studentId, users.id))
-        .groupBy(swimRecords.style, swimRecords.distance, swimRecords.poolLength, users.username)
-        .orderBy(swimRecords.style, swimRecords.distance);
-
-      res.json(statistics);
-    } catch (error) {
-      console.error('Error fetching record statistics:', error);
-      res.status(500).json({ message: "統計情報の取得に失敗しました" });
-    }
-  });
-
-  // Get athlete progress over time
-  app.get("/api/records/progress/:studentId", requireAuth, async (req, res) => {
-    try {
-      const { studentId } = req.params;
-      const progress = await db
-        .select({
-          id: swimRecords.id,
-          style: swimRecords.style,
-          distance: swimRecords.distance,
-          time: swimRecords.time,
-          date: swimRecords.date,
-          poolLength: swimRecords.poolLength,
-          improvement: sql<string>`LAG(${swimRecords.time}) OVER (
-            PARTITION BY ${swimRecords.style}, ${swimRecords.distance}, ${swimRecords.poolLength}
-            ORDER BY ${swimRecords.date}
-          )`,
-        })
-        .from(swimRecords)
-        .where(eq(swimRecords.studentId, parseInt(studentId)))
-        .orderBy(swimRecords.date);
-
-      res.json(progress);
-    } catch (error) {
-      console.error('Error fetching athlete progress:', error);
-      res.status(500).json({ message: "進捗データの取得に失敗しました" });
-    }
-  });
+  app.get("/api/records", async (req, res) => {
     try {
       const allRecords = await db
         .select({
@@ -529,8 +348,33 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Update record endpoint
-  app.put("/api/records/:id", requireAuth, requireCoach, async (req, res) => {
+  app.post("/api/records", async (req, res) => {
+    try {
+      const { style, distance, time, date, poolLength, studentId, isCompetition, competitionName, competitionLocation } = req.body;
+
+      const [record] = await db
+        .insert(swimRecords)
+        .values({
+          style,
+          distance,
+          time,
+          date: new Date(date),
+          poolLength,
+          studentId,
+          isCompetition: isCompetition ?? false,
+          competitionName: competitionName || null,
+          competitionLocation: competitionLocation || null
+        })
+        .returning();
+
+      res.json(record);
+    } catch (error) {
+      console.error('Error creating record:', error);
+      res.status(500).json({ message: "記録の作成に失敗しました" });
+    }
+  });
+
+  app.put("/api/records/:id", async (req, res) => {
     try {
       const { id } = req.params;
       const { style, distance, time, date, poolLength, studentId, isCompetition, competitionName, competitionLocation } = req.body;
@@ -575,19 +419,23 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Delete record endpoint
-  app.delete("/api/records/:id", requireAuth, requireCoach, async (req, res) => {
+  app.delete("/api/records/:id", async (req, res) => {
     try {
       const { id } = req.params;
       
-      const [deletedRecord] = await db
-        .delete(swimRecords)
+      const [record] = await db
+        .select()
+        .from(swimRecords)
         .where(eq(swimRecords.id, parseInt(id)))
-        .returning();
+        .limit(1);
 
-      if (!deletedRecord) {
+      if (!record) {
         return res.status(404).json({ message: "記録が見つかりません" });
       }
+
+      await db
+        .delete(swimRecords)
+        .where(eq(swimRecords.id, parseInt(id)));
 
       res.json({ message: "記録が削除されました" });
     } catch (error) {
@@ -595,8 +443,9 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ message: "記録の削除に失敗しました" });
     }
   });
+
   // Recent activities endpoint
-  app.get("/api/recent-activities", requireAuth, async (req, res) => {
+  app.get("/api/recent-activities", async (req, res) => {
     try {
       const recentCompetitions = await db
         .select({
@@ -636,39 +485,12 @@ export function registerRoutes(app: Express) {
     }
   });
 
-
-  app.post("/api/records", requireAuth, requireCoach, async (req, res) => {
-    try {
-      const { style, distance, time, date, poolLength, studentId, isCompetition, competitionName, competitionLocation } = req.body;
-
-      const [record] = await db
-        .insert(swimRecords)
-        .values({
-          style,
-          distance,
-          time,
-          date: new Date(date),
-          poolLength,
-          studentId,
-          isCompetition: isCompetition ?? false,
-          competitionName: competitionName || null,
-          competitionLocation: competitionLocation || null
-        })
-        .returning();
-
-      res.json(record);
-    } catch (error) {
-      console.error('Error creating record:', error);
-      res.status(500).json({ message: "記録の作成に失敗しました" });
-    }
-  });
-
   app.get("/health", (req, res) => {
     res.json({ status: "ok" });
   });
 
   // Delete athlete and associated records
-  app.delete("/api/athletes/:id", requireAuth, requireCoach, async (req, res) => {
+  app.delete("/api/athletes/:id", async (req, res) => {
     const { id } = req.params;
     
     try {
@@ -704,7 +526,7 @@ export function registerRoutes(app: Express) {
   });
 
   // Update athlete status
-  app.patch("/api/athletes/:id/status", requireAuth, requireCoach, async (req, res) => {
+  app.patch("/api/athletes/:id/status", async (req, res) => {
     try {
       const { id } = req.params;
       const { isActive } = req.body;
@@ -727,7 +549,7 @@ export function registerRoutes(app: Express) {
   });
 
   // Update athlete
-  app.put("/api/athletes/:id", requireAuth, requireCoach, async (req, res) => {
+  app.put("/api/athletes/:id", async (req, res) => {
     const { id } = req.params;
     const { username } = req.body;
 
@@ -771,30 +593,7 @@ export function registerRoutes(app: Express) {
   });
 
   // Swim Records API
-  app.get("/api/records", requireAuth, async (req, res) => {
-    try {
-      const records = await db
-        .select({
-          id: swimRecords.id,
-          studentId: swimRecords.studentId,
-          style: swimRecords.style,
-          distance: swimRecords.distance,
-          time: swimRecords.time,
-          date: swimRecords.date,
-          isCompetition: swimRecords.isCompetition,
-          poolLength: swimRecords.poolLength,
-          athleteName: users.username
-        })
-        .from(swimRecords)
-        .leftJoin(users, eq(swimRecords.studentId, users.id))
-        .orderBy(desc(swimRecords.date));
-      res.json(records);
-    } catch (error) {
-      res.status(500).json({ message: "記録の取得に失敗しました" });
-    }
-  });
-
-  app.get("/api/records/competitions", requireAuth, async (req, res) => {
+  app.get("/api/records/competitions", async (req, res) => {
     try {
       const records = await db
         .select({
@@ -818,120 +617,6 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Create new record
-  app.post("/api/records", requireAuth, requireCoach, async (req, res) => {
-    try {
-      const { studentId, style, distance, time, date, poolLength } = req.body;
-      
-      // Verify student exists
-      const [student] = await db
-        .select()
-        .from(users)
-        .where(and(eq(users.id, studentId), eq(users.role, "student")))
-        .limit(1);
-
-      if (!student) {
-        return res.status(404).json({ message: "選手が見つかりません" });
-      }
-
-      const [record] = await db
-        .insert(swimRecords)
-        .values({
-          studentId,
-          style,
-          distance,
-          time,
-          date: new Date(date),
-          poolLength: poolLength,
-        })
-        .returning();
-
-      res.json(record);
-    } catch (error) {
-      console.error('Error creating record:', error);
-      res.status(500).json({ message: "記録の作成に失敗しました" });
-    }
-  });
-
-  // Update record
-  // Delete record
-  app.delete("/api/records/:id", requireAuth, requireCoach, async (req, res) => {
-    try {
-      const { id } = req.params;
-      
-      const [record] = await db
-        .select()
-        .from(swimRecords)
-        .where(eq(swimRecords.id, parseInt(id)))
-        .limit(1);
-
-      if (!record) {
-        return res.status(404).json({ message: "記録が見つかりません" });
-      }
-
-      await db
-        .delete(swimRecords)
-        .where(eq(swimRecords.id, parseInt(id)));
-
-      res.json({ message: "記録を削除しました" });
-    } catch (error) {
-      console.error('Error deleting record:', error);
-      res.status(500).json({ message: "記録の削除に失敗しました" });
-    }
-  });
-
-  // Password management endpoints
-  // Update the /api/users/passwords endpoint
-  // app.get("/api/users/passwords", requireAuth, requireCoach, async (req, res) => {
-  //   try {
-  //     const students = await db
-  //       .select({
-  //         id: users.id,
-  //         username: users.username,
-  //         role: users.role,
-  //         isActive: users.isActive,
-  //       })
-  //       .from(users)
-  //       .where(eq(users.role, "student"))
-  //       .orderBy(users.username);
-  //
-  //     res.json(students);
-  //   } catch (error) {
-  //     console.error('Error fetching student list:', error);
-  //     res.status(500).json({ message: "学生情報の取得に失敗しました" });
-  //   }
-  // });
-  //
-  // // Add password update endpoint
-  // app.put("/api/users/:id/password", requireAuth, requireCoach, async (req, res) => {
-  //   try {
-  //     const { id } = req.params;
-  //     const { password } = req.body;
-  //
-  //     if (!password || password.length < 8) {
-  //       return res.status(400).json({ message: "パスワードは8文字以上である必要があります" });
-  //     }
-  //
-  //     // Hash the new password
-  //     const hashedPassword = await crypto.hash(password);
-  //
-  //     // Update the user's password
-  //     const [updatedUser] = await db
-  //       .update(users)
-  //       .set({ password: hashedPassword })
-  //       .where(eq(users.id, parseInt(id)))
-  //       .returning();
-  //
-  //     if (!updatedUser) {
-  //       return res.status(404).json({ message: "ユーザーが見つかりません" });
-  //     }
-  //
-  //     res.json({ message: "パスワードが更新されました" });
-  //   } catch (error) {
-  //     console.error('Error updating password:', error);
-  //     res.status(500).json({ message: "パスワードの更新に失敗しました" });
-  //   }
-  // });
 
   return app;
 }

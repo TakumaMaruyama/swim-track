@@ -1,13 +1,9 @@
-import React, { useEffect, useMemo, useCallback } from 'react'
+import React from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { 
   Users, 
   ClipboardList,
-  LogOut,
-  UserX,
-  Key,
   Trophy
 } from 'lucide-react'
 import { useLocation } from 'wouter'
