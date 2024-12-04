@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FileDown, Trash2, Loader2, ChevronRight } from "lucide-react";
 import { PageHeader } from '../components/PageHeader';
-import { useUser } from '../hooks/use-user';
+// Remove user hook import
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
@@ -49,7 +49,7 @@ type GroupedDocuments = {
 
 export default function Documents() {
   const { documents, isLoading, error, mutate } = useDocuments();
-  const { user } = useUser();
+  // Remove user hook usage
   const { toast } = useToast();
   const [deletingDocument, setDeletingDocument] = useState<number | null>(null);
   const [sortBy, setSortBy] = useState<string>("newest");
@@ -197,17 +197,15 @@ export default function Documents() {
                                 <FileDown className="mr-2 h-4 w-4" />
                                 ダウンロード
                               </Button>
-                              {user?.role === 'coach' && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => setDeletingDocument(doc.id)}
-                                  className="text-red-500 hover:text-red-600"
-                                >
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  削除
-                                </Button>
-                              )}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setDeletingDocument(doc.id)}
+                                className="text-red-500 hover:text-red-600"
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                削除
+                              </Button>
                             </div>
                           </CardTitle>
                         </CardHeader>
