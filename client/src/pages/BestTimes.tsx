@@ -2,10 +2,9 @@ import React from 'react';
 import { useSwimRecords } from '../hooks/use-swim-records';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Edit2, Trash2, Plus } from "lucide-react";
+import { AlertCircle, Edit2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EditRecordForm } from '../components/EditRecordForm';
-import { useUser } from '../hooks/use-user';
 import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '../components/PageHeader';
 
@@ -32,7 +31,6 @@ const formatDate = (date: Date) => {
 };
 
 export default function BestTimes() {
-  const { user } = useUser();
   const { toast } = useToast();
   const { records, isLoading, error, mutate } = useSwimRecords();
   const [editingRecord, setEditingRecord] = React.useState<number | null>(null);
@@ -124,36 +122,6 @@ export default function BestTimes() {
     }
   };
 
-  const handleDelete = async (recordId: number) => {
-    if (!confirm('この記録を削除してもよろしいですか？')) {
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/records/${recordId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete record');
-      }
-
-      await mutate();
-      toast({
-        title: "削除成功",
-        description: "記録が削除されました",
-      });
-    } catch (error) {
-      console.error('Error deleting record:', error);
-      toast({
-        variant: "destructive",
-        title: "エラー",
-        description: "記録の削除に失敗しました",
-      });
-    }
-  };
-
   const record = records?.find(r => r.id === editingRecord);
 
   if (isLoading) {
@@ -190,12 +158,17 @@ export default function BestTimes() {
       <PageHeader 
         title="ベストタイム"
         children={
-          user?.role === 'coach' && (
-            <Button onClick={() => setEditingRecord(-1)}>
-              <Plus className="mr-2 h-4 w-4" />
-              新規記録追加
-            </Button>
-          )
+          <Button
+            onClick={() => {
+              toast({
+                title: "情報",
+                description: "新規記録の追加は管理者のみが可能です",
+              });
+            }}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            新規記録追加
+          </Button>
         }
       />
       <div className="container px-4 md:px-8">
@@ -222,22 +195,20 @@ export default function BestTimes() {
                       </div>
                       <div className="flex items-center gap-2">
                         <p className="text-xl font-bold text-primary">{record.time}</p>
-                        {user?.role === 'coach' && (
-                          <div className="flex gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                toast({
-                                  title: "情報",
-                                  description: "記録の編集は管理者のみが可能です",
-                                });
-                              }}
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )}
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              toast({
+                                title: "情報",
+                                description: "記録の編集は管理者のみが可能です",
+                              });
+                            }}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}
