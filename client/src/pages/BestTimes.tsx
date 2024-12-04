@@ -203,7 +203,6 @@ export default function BestTimes() {
                               toast({
                                 title: "情報",
                                 description: "記録の編集は管理者のみが可能です",
-                                variant: "default"
                               });
                             }}
                           >
