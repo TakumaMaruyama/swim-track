@@ -3,15 +3,28 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic } from "./vite";
 import { createServer } from "http";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 
 const app = express();
+
+// Cookie parser middleware
+app.use(cookieParser());
+
+// CORS設定
 app.use(cors({
-  origin: ["http://localhost:5173", "http://0.0.0.0:5173", "http://172.31.196.23:5173"],
+  origin: process.env.NODE_ENV === "production"
+    ? ["https://your-production-domain.com"]
+    : ["http://localhost:5173", "http://127.0.0.1:5173"],
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-  allowedHeaders: ["Content-Type"],
-  optionsSuccessStatus: 200
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Cookie", "Set-Cookie", "Authorization"],
+  exposedHeaders: ["Set-Cookie"],
+  maxAge: 86400
 }));
+
+// セッション設定
+app.set('trust proxy', 1);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
