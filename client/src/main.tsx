@@ -13,12 +13,15 @@ const Documents = lazy(() => import("./pages/Documents"));
 const Athletes = lazy(() => import("./pages/Athletes"));
 const AllTimeRecords = lazy(() => import("./pages/AllTimeRecords"));
 const Competitions = lazy(() => import("./pages/Competitions"));
+const UserLogin = lazy(() => import("./pages/UserLogin"));
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <SWRConfig value={{ fetcher }}>
       <Suspense fallback={<div className="flex items-center justify-center min-h-screen">読み込み中...</div>}>
         <Switch>
+          <Route path="/" component={UserLogin} />
+          <Route path="/dashboard" component={Dashboard} />
           <Route path="/" component={Dashboard} />
           <Route path="/documents" component={Documents} />
           <Route path="/athletes" component={Athletes} />
