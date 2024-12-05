@@ -19,27 +19,13 @@ export default function UserLogin() {
     setLoading(true);
 
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          username: "general_user",
-          password,
-        }),
+      await login({
+        username: "general_user",
+        password,
       });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || "ログインに失敗しました");
-      }
-
-      const userData = await response.json();
-      await login(userData); // Update auth state
-      setLocation("/"); // Use wouter navigation
+      setLocation("/"); // ダッシュボードへリダイレクト
     } catch (err) {
-      setError(err instanceof Error ? err.message : "ログインに失敗しました");
+      setError(err instanceof Error ? err.message : "パスワードが正しくありません");
     } finally {
       setLoading(false);
     }
@@ -68,6 +54,7 @@ export default function UserLogin() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                placeholder="パスワードを入力してください"
               />
             </div>
             <Button

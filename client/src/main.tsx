@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { Switch, Route } from "wouter";
 import "./index.css";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, QueryClient } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { Suspense, lazy } from "react";
 import { useAuth } from "./hooks/use-auth";
@@ -30,7 +30,7 @@ function Router() {
     );
   }
 
-  // ログインしていない場合は一般ユーザーのログインページを表示
+  // ユーザーがログインしていない場合はログインページを表示
   if (!user) {
     return <UserLogin />;
   }
