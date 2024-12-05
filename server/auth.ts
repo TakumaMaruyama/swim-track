@@ -19,10 +19,12 @@ export const configureAuth = (app: any) => {
       secret: process.env.SESSION_SECRET || "your-secret-key",
       resave: false,
       saveUninitialized: false,
+      proxy: true,
       cookie: {
-        secure: process.env.NODE_ENV === "production",
+        secure: false,
         httpOnly: true,
-        maxAge: 24 * 60 * 60 * 1000 // 24時間
+        maxAge: 24 * 60 * 60 * 1000, // 24時間
+        sameSite: 'lax'
       }
     })
   );

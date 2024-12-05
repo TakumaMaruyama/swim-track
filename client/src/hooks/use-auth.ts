@@ -18,7 +18,20 @@ export function useAuth() {
   const { data: user, error, mutate } = useSWR<User>("/api/auth/session", {
     revalidateOnFocus: false,
     revalidateOnReconnect: false,
-    refreshInterval: 0
+    refreshInterval: 0,
+    fallbackData: null,
+    fetcher: async (url) => {
+      const response = await fetch(url, {
+        credentials: "include"
+      });
+      if (!response.ok) {
+        if (response.status === 401) {
+          return null;
+        }
+        throw new Error("認証に失敗しました");
+      }
+      return response.json();
+    }
   });
   const [, setLocation] = useLocation();
 
@@ -28,6 +41,7 @@ export function useAuth() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(credentials),
+        credentials: "include"
       });
 
       if (!response.ok) {
@@ -36,7 +50,7 @@ export function useAuth() {
       }
 
       const data = await response.json();
-      await mutate(data);
+      await mutate();
       return data;
     } catch (error) {
       throw error;

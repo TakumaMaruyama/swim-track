@@ -22,14 +22,12 @@ const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 function Router() {
   const { user, isLoading } = useAuth();
 
-  // ログイン画面を優先的に表示
-  if (!user && !isLoading) {
-    return <UserLogin />;
+  if (isLoading) {
+    return null; // 初期ローディング中は何も表示しない
   }
 
-  // ローディング表示を最小限に
-  if (isLoading) {
-    return <div className="flex items-center justify-center min-h-screen">読み込み中...</div>;
+  if (!user) {
+    return <UserLogin />;
   }
 
   return (
