@@ -185,25 +185,25 @@ export default function AllTimeRecords() {
     <>
       <PageHeader title="歴代記録" />
       
-      <div className="container px-4 md:px-8">
+      <div className="container px-2 sm:px-4 md:px-8">
         <Tabs defaultValue="25" value={poolLengthFilter} onValueChange={setPoolLengthFilter}>
-          <TabsList className="mb-8">
-            <TabsTrigger value="15">15mプール</TabsTrigger>
-            <TabsTrigger value="25">25mプール</TabsTrigger>
-            <TabsTrigger value="50">50mプール</TabsTrigger>
+          <TabsList className="mb-4 sm:mb-8 w-full">
+            <TabsTrigger value="15" className="flex-1">15mプール</TabsTrigger>
+            <TabsTrigger value="25" className="flex-1">25mプール</TabsTrigger>
+            <TabsTrigger value="50" className="flex-1">50mプール</TabsTrigger>
           </TabsList>
 
           {['15', '25', '50'].map((poolLength) => (
             <TabsContent key={poolLength} value={poolLength} className="space-y-8">
               {Object.entries(groupedRecords).map(([distance, styles]) => (
                 <Card key={distance} className="overflow-hidden">
-                  <CardHeader className="bg-muted/50">
-                    <CardTitle className="text-xl">
+                  <CardHeader className="bg-muted/50 py-3 sm:py-6">
+                    <CardTitle className="text-lg sm:text-xl">
                       {distance}m種目
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="pt-6">
-                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  <CardContent className="pt-3 sm:pt-6">
+                    <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                       {Object.entries(styles)
                         .sort(([styleA], [styleB]) => {
                           const indexA = swimStyles.indexOf(styleA);
@@ -215,17 +215,17 @@ export default function AllTimeRecords() {
                         .map(([style, record]) => (
                           <div
                             key={`${distance}-${style}`}
-                            className="p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group"
+                            className="p-3 sm:p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group"
                           >
-                            <div className="space-y-4">
-                              <p className="text-xl text-primary font-bold">{style}</p>
+                            <div className="space-y-2 sm:space-y-4">
+                              <p className="text-lg sm:text-xl text-primary font-bold">{style}</p>
                               
-                              <div className="flex items-center gap-3">
-                                <p className="text-xl">{record.athleteName}</p>
-                                <p className="text-xl">{formatTime(record.time)}</p>
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                                <p className="text-base sm:text-xl font-medium">{record.athleteName}</p>
+                                <p className="text-lg sm:text-xl font-semibold">{formatTime(record.time)}</p>
                               </div>
 
-                              <time className="text-sm text-muted-foreground block">
+                              <time className="text-xs sm:text-sm text-muted-foreground block">
                                 {new Date(record.date).toLocaleDateString('ja-JP', {
                                   year: 'numeric',
                                   month: 'long',
@@ -234,7 +234,7 @@ export default function AllTimeRecords() {
                               </time>
 
                               {record.isCompetition && (
-                                <Badge variant="secondary" className="inline-flex items-center gap-1">
+                                <Badge variant="secondary" className="inline-flex items-center gap-1 text-xs sm:text-sm">
                                   <Trophy className="h-3 w-3" />
                                   大会記録
                                 </Badge>

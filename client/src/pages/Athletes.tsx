@@ -284,8 +284,8 @@ export default function Athletes() {
           </div>
         }
       />
-      <div className="container px-4 md:px-8">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="container px-2 sm:px-4 md:px-8">
+        <div className="grid gap-2 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {athletes?.map((athlete) => {
             const latestRecord = getLatestPerformance(athlete.id);
             return (
@@ -293,23 +293,23 @@ export default function Athletes() {
                 key={athlete.id}
                 className={`hover:shadow-lg transition-shadow ${!athlete.isActive ? 'opacity-60' : ''}`}
               >
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-4">
-                    <Avatar className="h-12 w-12">
-                      <AvatarFallback className="bg-primary text-primary-foreground">
+                <CardHeader className="p-3 sm:p-6">
+                  <CardTitle className="flex items-center gap-2 sm:gap-4">
+                    <Avatar className="h-10 w-10 sm:h-12 sm:w-12">
+                      <AvatarFallback className="bg-primary text-primary-foreground text-sm sm:text-base">
                         {athlete.username.substring(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <div>
-                          <span className="text-lg">{athlete.username}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className="min-w-0">
+                          <span className="text-base sm:text-lg truncate block">{athlete.username}</span>
                         </div>
-                        <Badge variant={athlete.isActive ? "default" : "secondary"}>
+                        <Badge variant={athlete.isActive ? "default" : "secondary"} className="text-xs sm:text-sm">
                           {athlete.isActive ? '有効' : '無効'}
                         </Badge>
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1">選手</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground mt-1">選手</p>
                     </div>
                     <div className="flex gap-2">
                       <Button
@@ -349,38 +349,39 @@ export default function Athletes() {
                     </div>
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
                   {latestRecord ? (
-                    <div className="space-y-3">
+                    <div className="space-y-2 sm:space-y-3">
                       <div className="flex justify-between items-center">
-                        <h3 className="font-medium text-sm text-muted-foreground">最近の記録:</h3>
+                        <h3 className="font-medium text-xs sm:text-sm text-muted-foreground">最近の記録:</h3>
                         <Button
                           variant="ghost"
                           size="icon"
+                          className="h-8 w-8 sm:h-9 sm:w-9"
                           onClick={() => setEditingRecord({
                             id: latestRecord.id,
                             studentId: athlete.id
                           })}
                         >
-                          <Edit2 className="h-4 w-4" />
+                          <Edit2 className="h-3 w-3 sm:h-4 sm:w-4" />
                         </Button>
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-2 gap-1 sm:gap-2">
                         <div>
-                          <p className="text-sm font-medium">種目</p>
-                          <p className="text-base">{latestRecord.style}</p>
+                          <p className="text-xs sm:text-sm font-medium">種目</p>
+                          <p className="text-sm sm:text-base truncate">{latestRecord.style}</p>
                         </div>
                         <div>
-                          <p className="text-sm font-medium">距離</p>
-                          <p className="text-base">{latestRecord.distance}m</p>
+                          <p className="text-xs sm:text-sm font-medium">距離</p>
+                          <p className="text-sm sm:text-base">{latestRecord.distance}m</p>
                         </div>
                         <div>
-                          <p className="text-sm font-medium">タイム</p>
-                          <p className="text-base font-bold">{latestRecord.time}</p>
+                          <p className="text-xs sm:text-sm font-medium">タイム</p>
+                          <p className="text-sm sm:text-base font-bold">{latestRecord.time}</p>
                         </div>
                         <div>
-                          <p className="text-sm font-medium">日付</p>
-                          <p className="text-base">
+                          <p className="text-xs sm:text-sm font-medium">日付</p>
+                          <p className="text-sm sm:text-base">
                             {new Date(latestRecord.date).toLocaleDateString()}
                           </p>
                         </div>
