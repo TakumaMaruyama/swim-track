@@ -218,9 +218,9 @@ export default function AllTimeRecords() {
                             className="p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group"
                           >
                             <div className="space-y-4">
-                              <p className="text-xl text-primary">{style}</p>
+                              <p className="text-xl text-primary font-bold">{style}</p>
                               
-                              <div className="flex justify-between items-center">
+                              <div className="flex items-center gap-3">
                                 <p className="text-xl">{record.athleteName}</p>
                                 <p className="text-xl">{formatTime(record.time)}</p>
                               </div>
