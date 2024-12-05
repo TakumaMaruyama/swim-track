@@ -5,7 +5,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Edit2, Trash2, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EditRecordForm } from '../components/EditRecordForm';
-
 import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '../components/PageHeader';
 import { Badge } from "@/components/ui/badge";
@@ -40,11 +39,10 @@ const swimStyles = [
 ];
 
 export default function AllTimeRecords() {
-  
   const { toast } = useToast();
   const { records, isLoading, error, mutate } = useSwimRecords();
   const [editingRecord, setEditingRecord] = React.useState<number | null>(null);
-  const [poolLengthFilter, setPoolLengthFilter] = React.useState<string>("25"); // デフォルトは25mプール
+  const [poolLengthFilter, setPoolLengthFilter] = React.useState<string>("25");
 
   const formatTime = (time: string) => {
     const [minutes, seconds] = time.split(':');
@@ -200,12 +198,12 @@ export default function AllTimeRecords() {
               {Object.entries(groupedRecords).map(([distance, styles]) => (
                 <Card key={distance} className="overflow-hidden">
                   <CardHeader className="bg-muted/50">
-                    <CardTitle className="text-3xl font-bold tracking-tight">
+                    <CardTitle className="text-xl">
                       {distance}m種目
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="pt-8">
-                    <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+                  <CardContent className="pt-6">
+                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                       {Object.entries(styles)
                         .sort(([styleA], [styleB]) => {
                           const indexA = swimStyles.indexOf(styleA);
@@ -217,41 +215,41 @@ export default function AllTimeRecords() {
                         .map(([style, record]) => (
                           <div
                             key={`${distance}-${style}`}
-                            className="p-6 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group"
+                            className="p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group"
                           >
-                            <div className="flex items-center justify-between mb-3">
-                              <h3 className="text-xl font-semibold text-primary tracking-tight">
-                                {style}
-                              </h3>
-                              {record.isCompetition && (
-                                <Badge variant="secondary" className="flex items-center gap-1">
-                                  <Trophy className="h-3 w-3" />
-                                  大会記録
-                                </Badge>
-                              )}
-                            </div>
-
                             <div className="space-y-4">
-                              <div className="flex flex-col">
-                                <span className="text-4xl font-bold tracking-tighter text-foreground/90">
-                                  {formatTime(record.time)}
-                                </span>
-                                <span className="text-sm font-medium text-muted-foreground mt-1">
-                                  {record.poolLength}mプール
-                                </span>
-                              </div>
-
-                              <div className="space-y-2">
-                                <p className="text-lg font-medium">
+                              <div>
+                                <p className="text-xl">
                                   {record.athleteName}
                                 </p>
-                                <time className="text-sm text-muted-foreground block">
+                                <time className="text-sm text-muted-foreground block mt-1">
                                   {new Date(record.date).toLocaleDateString('ja-JP', {
                                     year: 'numeric',
                                     month: 'long',
                                     day: 'numeric'
                                   })}
                                 </time>
+                              </div>
+
+                              <div>
+                                <p className="text-xl">
+                                  {formatTime(record.time)}
+                                </p>
+                                <span className="text-sm text-muted-foreground block mt-1">
+                                  {record.poolLength}mプール
+                                  {record.isCompetition && (
+                                    <Badge variant="secondary" className="ml-2 inline-flex items-center gap-1">
+                                      <Trophy className="h-3 w-3" />
+                                      大会記録
+                                    </Badge>
+                                  )}
+                                </span>
+                              </div>
+
+                              <div>
+                                <p className="text-xl text-primary">
+                                  {style}
+                                </p>
                               </div>
                             </div>
                           </div>
