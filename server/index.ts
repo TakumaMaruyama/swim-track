@@ -7,7 +7,10 @@ import cors from "cors";
 const app = express();
 app.use(cors({
   origin: ["http://localhost:5173", "http://0.0.0.0:5173", "http://172.31.196.23:5173"],
-  credentials: true
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+  allowedHeaders: ["Content-Type"],
+  optionsSuccessStatus: 200
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));

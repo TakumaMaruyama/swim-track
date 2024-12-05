@@ -21,16 +21,27 @@ export function useAuth() {
     refreshInterval: 0,
     fallbackData: null,
     fetcher: async (url) => {
-      const response = await fetch(url, {
-        credentials: "include"
-      });
-      if (!response.ok) {
-        if (response.status === 401) {
-          return null;
+      try {
+        const response = await fetch(url, {
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+        
+        if (!response.ok) {
+          if (response.status === 401) {
+            return null;
+          }
+          const error = await response.json();
+          throw new Error(error.message || "認証に失敗しました");
         }
-        throw new Error("認証に失敗しました");
+        
+        return response.json();
+      } catch (error) {
+        console.error("Session fetch error:", error);
+        return null;
       }
-      return response.json();
     }
   });
   const [, setLocation] = useLocation();
