@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +10,7 @@ export default function UserLogin() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [, setLocation] = useLocation();
   const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -33,8 +35,9 @@ export default function UserLogin() {
         throw new Error(data.message || "ログインに失敗しました");
       }
 
-      // ログイン成功時の処理
-      window.location.href = "/";
+      const userData = await response.json();
+      await login(userData); // Update auth state
+      setLocation("/"); // Use wouter navigation
     } catch (err) {
       setError(err instanceof Error ? err.message : "ログインに失敗しました");
     } finally {
