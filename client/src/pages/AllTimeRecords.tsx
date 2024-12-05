@@ -218,39 +218,27 @@ export default function AllTimeRecords() {
                             className="p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group"
                           >
                             <div className="space-y-4">
-                              <div>
-                                <p className="text-xl">
-                                  {record.athleteName}
-                                </p>
-                                <time className="text-sm text-muted-foreground block mt-1">
-                                  {new Date(record.date).toLocaleDateString('ja-JP', {
-                                    year: 'numeric',
-                                    month: 'long',
-                                    day: 'numeric'
-                                  })}
-                                </time>
+                              <p className="text-xl text-primary">{style}</p>
+                              
+                              <div className="flex justify-between items-center">
+                                <p className="text-xl">{record.athleteName}</p>
+                                <p className="text-xl">{formatTime(record.time)}</p>
                               </div>
 
-                              <div>
-                                <p className="text-xl">
-                                  {formatTime(record.time)}
-                                </p>
-                                <span className="text-sm text-muted-foreground block mt-1">
-                                  {record.poolLength}mプール
-                                  {record.isCompetition && (
-                                    <Badge variant="secondary" className="ml-2 inline-flex items-center gap-1">
-                                      <Trophy className="h-3 w-3" />
-                                      大会記録
-                                    </Badge>
-                                  )}
-                                </span>
-                              </div>
+                              <time className="text-sm text-muted-foreground block">
+                                {new Date(record.date).toLocaleDateString('ja-JP', {
+                                  year: 'numeric',
+                                  month: 'long',
+                                  day: 'numeric'
+                                })}
+                              </time>
 
-                              <div>
-                                <p className="text-xl text-primary">
-                                  {style}
-                                </p>
-                              </div>
+                              {record.isCompetition && (
+                                <Badge variant="secondary" className="inline-flex items-center gap-1">
+                                  <Trophy className="h-3 w-3" />
+                                  大会記録
+                                </Badge>
+                              )}
                             </div>
                           </div>
                         ))}
