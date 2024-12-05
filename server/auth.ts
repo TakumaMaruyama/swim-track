@@ -36,6 +36,21 @@ export const configureAuth = (app: any) => {
         return res.status(400).json({ message: "ユーザー名とパスワードは必須です" });
       }
 
+      // 一般ユーザーの固定パスワードチェック
+      if (username === "general_user" && password === "seiji") {
+        // 一般ユーザー用のセッション情報を設定
+        req.session.userId = 0; // 一般ユーザー用の固定ID
+        req.session.role = "user"; // 一般ユーザーロール
+        
+        return res.json({
+          id: 0,
+          username: "general_user",
+          role: "user",
+          isActive: true
+        });
+      }
+
+      // 管理者ユーザーの認証
       const [user] = await db
         .select()
         .from(users)
