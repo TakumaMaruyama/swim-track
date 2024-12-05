@@ -15,7 +15,11 @@ interface LoginCredentials {
 }
 
 export function useAuth() {
-  const { data: user, error, mutate } = useSWR<User>("/api/auth/session");
+  const { data: user, error, mutate } = useSWR<User>("/api/auth/session", {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+    refreshInterval: 0
+  });
   const [, setLocation] = useLocation();
 
   const login = useCallback(async (credentials: LoginCredentials) => {
