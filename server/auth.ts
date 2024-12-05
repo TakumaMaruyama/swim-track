@@ -24,7 +24,8 @@ export const configureAuth = (app: any) => {
         secure: false,
         httpOnly: true,
         maxAge: 24 * 60 * 60 * 1000, // 24時間
-        sameSite: 'lax'
+        sameSite: 'lax',
+        path: '/'
       }
     })
   );

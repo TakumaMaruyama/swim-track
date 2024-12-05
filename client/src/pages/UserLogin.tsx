@@ -19,13 +19,28 @@ export default function UserLogin() {
     setLoading(true);
 
     try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          username: "general_user",
+          password
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error("パスワードが正しくありません");
+      }
+
+      const data = await response.json();
       await login({
         username: "general_user",
-        password,
+        password
       });
-      setLocation("/"); // ダッシュボードへリダイレクト
+      setLocation("/");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "パスワードが正しくありません");
+      setError(err instanceof Error ? err.message : "ログインに失敗しました");
     } finally {
       setLoading(false);
     }
