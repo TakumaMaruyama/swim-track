@@ -45,7 +45,7 @@ type TimeHistoryModalProps = {
   records: ExtendedSwimRecord[];
   athleteName: string;
   onRecordDeleted?: () => void;
-  isAdmin?: boolean;
+  isAdmin: boolean;
 };
 
 type GroupedRecords = {
@@ -70,7 +70,8 @@ export function TimeHistoryModal({
   onClose, 
   records, 
   athleteName,
-  onRecordDeleted 
+  onRecordDeleted,
+  isAdmin
 }: TimeHistoryModalProps) {
   const { toast } = useToast();
   
