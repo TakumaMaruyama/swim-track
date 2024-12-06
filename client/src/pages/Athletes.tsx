@@ -405,6 +405,16 @@ export default function Athletes() {
                 <CardContent>
                   {latestRecord ? (
                     <div className="space-y-3">
+                      {isAdmin && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEditingRecord({ id: null, studentId: athlete.id })}
+                        >
+                          <Plus className="mr-2 h-4 w-4" />
+                          記録追加
+                        </Button>
+                      )}
                       <div className="flex justify-between items-center">
                         <h3 className="font-medium text-sm text-muted-foreground">最近の記録:</h3>
                       </div>
