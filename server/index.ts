@@ -5,8 +5,9 @@ import { createServer } from "http";
 import cors from "cors";
 
 const app = express();
+const PORT = process.env.PORT || 5000;
 
-// CORS設定
+// CORS設定を先に適用
 app.use(cors({
   origin: process.env.NODE_ENV === "production"
     ? ["https://your-production-domain.com"]
@@ -14,45 +15,31 @@ app.use(cors({
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Cookie", "Set-Cookie"],
+  exposedHeaders: ["Set-Cookie"]
 }));
 
+// ボディパーサーを設定
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-(async () => {
-  try {
-    registerRoutes(app);
-    const server = createServer(app);
+// ルートを登録する前にセッション設定を適用
+registerRoutes(app);
 
-    // Error handling middleware
-    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-      console.error('Error:', err);
-      const status = err.status || err.statusCode || 500;
-      const message = err.message || "Internal Server Error";
-      res.status(status).json({ message });
-    });
+const server = createServer(app);
 
-    // Setup Vite or serve static files
-    if (app.get("env") === "development") {
-      await setupVite(app, server);
-    } else {
-      serveStatic(app);
-    }
+// Setup Vite or serve static files
+if (app.get("env") === "development") {
+  await setupVite(app, server);
+} else {
+  serveStatic(app);
+}
 
-    // Start the server
-    const PORT = process.env.PORT || 5000;
-    server.listen(PORT, "0.0.0.0", () => {
-      const formattedTime = new Date().toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: true,
-      });
+// エラーハンドリングミドルウェアを最後に追加
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  console.error('Server error:', err);
+  res.status(500).json({ message: "Internal Server Error" });
+});
 
-      console.log(`${formattedTime} [express] Server is running on port ${PORT}`);
-    });
-  } catch (error) {
-    console.error('Server startup error:', error);
-    process.exit(1);
-  }
-})();
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server is running on port ${PORT}`);
+});
