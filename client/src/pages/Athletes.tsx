@@ -323,14 +323,21 @@ export default function Athletes() {
       <PageHeader
         title="選手一覧"
         children={
-          !isAdmin ? (
+          isAdmin ? (
+            <Button
+              variant="outline"
+              onClick={() => logout()}
+            >
+              ログアウト
+            </Button>
+          ) : (
             <Button
               variant="outline"
               onClick={() => navigate("/admin/login")}
             >
               管理者ログイン
             </Button>
-          ) : null
+          )
         }
       />
       <div className="container px-4 md:px-8">

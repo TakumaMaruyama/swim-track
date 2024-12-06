@@ -2,10 +2,14 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic } from "./vite";
 import { createServer } from "http";
+import { configureAuth } from "./auth";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Configure authentication
+configureAuth(app);
 
 (async () => {
   registerRoutes(app);
