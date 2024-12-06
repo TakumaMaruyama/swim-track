@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function AdminLogin() {
   const [username, setUsername] = useState("");
@@ -12,30 +13,22 @@ export default function AdminLogin() {
   const [loading, setLoading] = useState(false);
   const [, setLocation] = useLocation();
 
+  const { login } = useAuth();
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
+      const result = await login({ username, password });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "ログインに失敗しました");
-      }
-
-      if (data.role !== "admin") {
-        throw new Error("管理者アカウントではありません");
+      if (!result.ok) {
+        throw new Error(result.message || "ログインに失敗しました");
       }
 
       // ログイン成功後、ダッシュボードへリダイレクト
-      setLocation("/");
+      setLocation("/athletes");
     } catch (err) {
       setError(err instanceof Error ? err.message : "ログインに失敗しました");
     } finally {
