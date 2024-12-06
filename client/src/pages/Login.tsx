@@ -17,17 +17,24 @@ export default function Login() {
     try {
       const response = await fetch("/api/auth/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
         credentials: "include",
         body: JSON.stringify({ password })
       });
 
       if (!response.ok) {
-        throw new Error("認証に失敗しました");
+        const errorData = await response.json();
+        throw new Error(errorData.message || "認証に失敗しました");
       }
 
+      const data = await response.json();
+      console.log("Login successful:", data);
       setLocation("/");
     } catch (error) {
+      console.error("Login error:", error);
       toast({
         variant: "destructive",
         title: "エラー",
