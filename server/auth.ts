@@ -37,8 +37,10 @@ export const configureAuth = (app: any) => {
   app.post("/api/auth/login", async (req: Request, res: Response) => {
     try {
       const { username, password } = req.body;
+      console.log(`Login attempt for username: ${username}`);
 
       if (!username || !password) {
+        console.log("Login failed: Missing username or password");
         return res.status(400).json({ message: "ユーザー名とパスワードは必須です" });
       }
 
@@ -48,16 +50,24 @@ export const configureAuth = (app: any) => {
         .where(eq(users.username, username))
         .limit(1);
 
+      console.log(`User lookup result: ${user ? 'Found' : 'Not found'}`);
+      
       if (!user) {
+        console.log(`Login failed: User not found - ${username}`);
         return res.status(401).json({ message: "認証に失敗しました" });
       }
 
+      console.log("Comparing password hashes...");
       const isValidPassword = await bcrypt.compare(password, user.password);
+      console.log(`Password validation result: ${isValidPassword ? 'Valid' : 'Invalid'}`);
+      
       if (!isValidPassword) {
+        console.log(`Login failed: Invalid password for user - ${username}`);
         return res.status(401).json({ message: "認証に失敗しました" });
       }
 
       if (!user.isActive) {
+        console.log(`Login failed: Inactive account - ${username}`);
         return res.status(403).json({ message: "アカウントが無効化されています" });
       }
 
