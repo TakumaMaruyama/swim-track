@@ -324,15 +324,14 @@ export default function Athletes() {
         title="選手一覧"
         children={
           <div className="flex gap-2">
-            {!isAdmin && (
+            {!isAdmin ? (
               <Button
                 variant="outline"
                 onClick={() => navigate("/admin/login")}
               >
                 管理者ログイン
               </Button>
-            )}
-            {isAdmin && (
+            ) : (
               <Button 
                 variant="outline"
                 onClick={() => setEditingRecord({ id: null, studentId: null })}
@@ -382,24 +381,6 @@ export default function Athletes() {
                       >
                         <History className="h-4 w-4" />
                       </Button>
-                      {isAdmin && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setEditingAthlete(athlete.id)}
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleToggleStatus(athlete.id, athlete.isActive)}
-                          >
-                            <Power className="h-4 w-4" />
-                          </Button>
-                        </>
-                      )}
                     </div>
                   </CardTitle>
                 </CardHeader>
@@ -408,18 +389,6 @@ export default function Athletes() {
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
                         <h3 className="font-medium text-sm text-muted-foreground">最近の記録:</h3>
-                        {isAdmin && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setEditingRecord({
-                              id: latestRecord.id,
-                              studentId: athlete.id
-                            })}
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                        )}
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
