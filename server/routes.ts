@@ -1,7 +1,7 @@
 import { Express } from "express";
 import multer from "multer";
 import { db } from "db";
-import { documents, swimRecords, categories, competitions, users } from "db/schema";
+import { documents, swimRecords, categories, users } from "db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import path from "path";
 import fs from "fs/promises";
@@ -254,53 +254,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Competitions API
-  app.get("/api/competitions", async (req, res) => {
-    try {
-      const competitionsData = await db
-        .select({
-          id: competitions.id,
-          name: competitions.name,
-          location: competitions.location,
-          date: competitions.date,
-          recordCount: sql<number>`(
-            SELECT COUNT(*) FROM swim_records 
-            WHERE competition_id = competitions.id
-          )::int`,
-        })
-        .from(competitions)
-        .orderBy(desc(competitions.date));
-
-      res.json(competitionsData);
-    } catch (error) {
-      console.error('Error fetching competitions:', error);
-      res.status(500).json({ message: "大会情報の取得に失敗しました" });
-    }
-  });
-
-  app.post("/api/competitions", async (req, res) => {
-    try {
-      const { name, location, date } = req.body;
-      
-      if (!name || !location || !date) {
-        return res.status(400).json({ message: "必須フィールドが不足しています" });
-      }
-
-      const [competition] = await db
-        .insert(competitions)
-        .values({
-          name,
-          location,
-          date: new Date(date),
-        })
-        .returning();
-
-      res.json(competition);
-    } catch (error) {
-      console.error('Error creating competition:', error);
-      res.status(500).json({ message: "大会情報の作成に失敗しました" });
-    }
-  });
+  
 
   // Athletes API
   app.get("/api/athletes", async (req, res) => {
@@ -595,30 +549,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Swim Records API
-  app.get("/api/records/competitions", async (req, res) => {
-    try {
-      const records = await db
-        .select({
-          id: swimRecords.id,
-          studentId: swimRecords.studentId,
-          style: swimRecords.style,
-          distance: swimRecords.distance,
-          time: swimRecords.time,
-          date: swimRecords.date,
-          isCompetition: swimRecords.isCompetition,
-          poolLength: swimRecords.poolLength,
-          athleteName: users.username
-        })
-        .from(swimRecords)
-        .leftJoin(users, eq(swimRecords.studentId, users.id))
-        .where(eq(swimRecords.isCompetition, true))
-        .orderBy(desc(swimRecords.date));
-      res.json(records);
-    } catch (error) {
-      res.status(500).json({ message: "大会記録の取得に失敗しました" });
-    }
-  });
+  
 
 
   return app;

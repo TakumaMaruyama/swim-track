@@ -59,16 +59,10 @@ const editRecordSchema = z.object({
   time: z.string().regex(timeRegex, "タイム形式は MM:SS.ms である必要があります"),
   date: z.string().min(1, "日付を選択してください"),
   poolLength: z.number().refine(val => poolLengths.includes(val), "有効なプール長を選択してください"),
-  isCompetition: z.boolean().default(false),
-  competitionId: z.number().optional(),
+  
 });
 
-type Competition = {
-  id: number;
-  name: string;
-  location: string;
-  date: string;
-};
+
 
 type EditRecordFormProps = {
   record?: SwimRecord;
@@ -81,7 +75,7 @@ type EditRecordFormProps = {
 export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }: EditRecordFormProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const { data: competitions } = useSWR<Competition[]>('/api/competitions');
+  
 
   const form = useForm({
     resolver: zodResolver(editRecordSchema),
@@ -252,55 +246,7 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="isCompetition"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                  <FormControl>
-                    <input
-                      type="checkbox"
-                      checked={field.value}
-                      onChange={field.onChange}
-                      disabled={isSubmitting}
-                      className="h-4 w-4 rounded border-gray-300"
-                    />
-                  </FormControl>
-                  <FormLabel className="text-sm font-medium leading-none">
-                    大会記録
-                  </FormLabel>
-                </FormItem>
-              )}
-            />
-
-            {form.watch("isCompetition") && (
-              <FormField
-                control={form.control}
-                name="competitionId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>大会</FormLabel>
-                    <FormControl>
-                      <select
-                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                        {...field}
-                        onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
-                        value={field.value || ""}
-                        disabled={isSubmitting}
-                      >
-                        <option value="">大会を選択</option>
-                        {competitions?.map((competition) => (
-                          <option key={competition.id} value={competition.id}>
-                            {competition.name} ({new Date(competition.date).toLocaleDateString('ja-JP')})
-                          </option>
-                        ))}
-                      </select>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
+            
             
             <DialogFooter>
               <Button
