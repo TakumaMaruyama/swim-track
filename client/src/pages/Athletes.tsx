@@ -371,6 +371,24 @@ export default function Athletes() {
                       <p className="text-sm text-muted-foreground mt-1">選手</p>
                     </div>
                     <div className="flex gap-2">
+                      {isAdmin && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setEditingAthlete(athlete.id)}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleToggleStatus(athlete.id, athlete.isActive)}
+                          >
+                            <Power className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"
