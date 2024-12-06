@@ -14,8 +14,14 @@ interface LoginCredentials {
   password: string;
 }
 
+interface ApiResponse<T = any> {
+  ok: boolean;
+  message?: string;
+  user?: T;
+}
+
 export function useAuth() {
-  const { data: user, error, mutate } = useSWR<User>("/api/auth/session");
+  const { data, error, mutate } = useSWR<ApiResponse<User>>("/api/auth/session");
   const [, setLocation] = useLocation();
 
   const login = useCallback(async (credentials: LoginCredentials) => {
@@ -24,38 +30,53 @@ export function useAuth() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(credentials),
+        credentials: "include",
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "ログインに失敗しました");
+      const data = await response.json();
+      
+      if (!response.ok || !data.ok) {
+        throw new Error(data.message || "ログインに失敗しました");
       }
 
-      const data = await response.json();
       await mutate(data);
       return data;
     } catch (error) {
-      throw error;
+      if (error instanceof Error) {
+        throw new Error(error.message);
+      }
+      throw new Error("ログインに失敗しました");
     }
   }, [mutate]);
 
   const logout = useCallback(async () => {
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      const response = await fetch("/api/auth/logout", { 
+        method: "POST",
+        credentials: "include"
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok || !data.ok) {
+        throw new Error(data.message || "ログアウトに失敗しました");
+      }
+
       await mutate(null);
       setLocation("/admin/login");
     } catch (error) {
       console.error("Logout error:", error);
+      throw error;
     }
   }, [mutate, setLocation]);
 
   return {
-    user,
-    isLoading: !error && !user,
+    user: data?.user,
+    isLoading: !error && !data,
     error,
     login,
     logout,
-    isAuthenticated: !!user,
-    isAdmin: user?.role === "admin"
+    isAuthenticated: !!data?.user,
+    isAdmin: data?.user?.role === "admin"
   };
 }

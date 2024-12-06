@@ -41,7 +41,10 @@ export const configureAuth = (app: any) => {
 
       if (!username || !password) {
         console.log("Login failed: Missing username or password");
-        return res.status(400).json({ message: "ユーザー名とパスワードは必須です" });
+        return res.status(400).json({ 
+          ok: false,
+          message: "ユーザー名とパスワードは必須です" 
+        });
       }
 
       const [user] = await db
@@ -54,7 +57,10 @@ export const configureAuth = (app: any) => {
       
       if (!user) {
         console.log(`Login failed: User not found - ${username}`);
-        return res.status(401).json({ message: "認証に失敗しました" });
+        return res.status(401).json({ 
+          ok: false,
+          message: "認証に失敗しました" 
+        });
       }
 
       console.log("Comparing password hashes...");
@@ -63,19 +69,25 @@ export const configureAuth = (app: any) => {
       
       if (!isValidPassword) {
         console.log(`Login failed: Invalid password for user - ${username}`);
-        return res.status(401).json({ message: "認証に失敗しました" });
+        return res.status(401).json({ 
+          ok: false,
+          message: "認証に失敗しました" 
+        });
       }
 
       if (!user.isActive) {
         console.log(`Login failed: Inactive account - ${username}`);
-        return res.status(403).json({ message: "アカウントが無効化されています" });
+        return res.status(403).json({ 
+          ok: false,
+          message: "アカウントが無効化されています" 
+        });
       }
 
       // セッションにユーザー情報を保存
       req.session.userId = user.id;
       req.session.role = user.role;
 
-      // セッションを保存
+      // セッションを保存して完了を待つ
       await new Promise<void>((resolve, reject) => {
         req.session.save((err) => {
           if (err) reject(err);
@@ -85,10 +97,16 @@ export const configureAuth = (app: any) => {
 
       // パスワードを除外してユーザー情報を返す
       const { password: _, ...userWithoutPassword } = user;
-      res.json(userWithoutPassword);
+      res.json({
+        ok: true,
+        user: userWithoutPassword
+      });
     } catch (error) {
       console.error("Login error:", error);
-      res.status(500).json({ message: "ログイン処理中にエラーが発生しました" });
+      res.status(500).json({ 
+        ok: false,
+        message: "ログイン処理中にエラーが発生しました" 
+      });
     }
   });
 
@@ -97,9 +115,15 @@ export const configureAuth = (app: any) => {
     req.session.destroy((err) => {
       if (err) {
         console.error("Logout error:", err);
-        return res.status(500).json({ message: "ログアウト処理中にエラーが発生しました" });
+        return res.status(500).json({ 
+          ok: false,
+          message: "ログアウト処理中にエラーが発生しました" 
+        });
       }
-      res.json({ message: "ログアウトしました" });
+      res.json({ 
+        ok: true,
+        message: "ログアウトしました" 
+      });
     });
   });
 
@@ -107,7 +131,10 @@ export const configureAuth = (app: any) => {
   app.get("/api/auth/session", async (req: Request, res: Response) => {
     try {
       if (!req.session.userId) {
-        return res.status(401).json({ message: "未認証です" });
+        return res.status(401).json({ 
+          ok: false,
+          message: "未認証です" 
+        });
       }
 
       // セッションのユーザーIDを使用してユーザー情報を取得
@@ -118,22 +145,34 @@ export const configureAuth = (app: any) => {
         .limit(1);
 
       if (!user) {
-        return res.status(401).json({ message: "ユーザーが見つかりません" });
+        return res.status(401).json({ 
+          ok: false,
+          message: "ユーザーが見つかりません" 
+        });
       }
 
       // パスワードを除外してユーザー情報を返す
       const { password: _, ...userWithoutPassword } = user;
-      res.json(userWithoutPassword);
+      res.json({
+        ok: true,
+        user: userWithoutPassword
+      });
     } catch (error) {
       console.error("Session check error:", error);
-      res.status(500).json({ message: "セッション確認中にエラーが発生しました" });
+      res.status(500).json({ 
+        ok: false,
+        message: "セッション確認中にエラーが発生しました" 
+      });
     }
   });
 
   // 管理者確認ミドルウェア
   app.use("/api/admin/*", (req: Request, res: Response, next: Function) => {
     if (req.session.role !== "admin") {
-      return res.status(403).json({ message: "管理者権限が必要です" });
+      return res.status(403).json({ 
+        ok: false,
+        message: "管理者権限が必要です" 
+      });
     }
     next();
   });
