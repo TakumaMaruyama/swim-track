@@ -72,4 +72,8 @@ export const selectRecordSchema = createSelectSchema(swimRecords);
 export type InsertRecord = z.infer<typeof insertRecordSchema>;
 export type SwimRecord = z.infer<typeof selectRecordSchema>;
 
+export const insertCompetitionSchema = createInsertSchema(competitions);
+export const selectCompetitionSchema = createSelectSchema(competitions);
+export type InsertCompetition = z.infer<typeof insertCompetitionSchema>;
+export type Competition = z.infer<typeof selectCompetitionSchema>;
 
