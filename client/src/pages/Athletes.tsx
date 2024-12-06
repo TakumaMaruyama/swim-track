@@ -323,24 +323,14 @@ export default function Athletes() {
       <PageHeader
         title="選手一覧"
         children={
-          <div className="flex gap-2">
-            {!isAdmin ? (
-              <Button
-                variant="outline"
-                onClick={() => navigate("/admin/login")}
-              >
-                管理者ログイン
-              </Button>
-            ) : (
-              <Button 
-                variant="outline"
-                onClick={() => setEditingRecord({ id: null, studentId: null })}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                新規記録追加
-              </Button>
-            )}
-          </div>
+          !isAdmin ? (
+            <Button
+              variant="outline"
+              onClick={() => navigate("/admin/login")}
+            >
+              管理者ログイン
+            </Button>
+          ) : null
         }
       />
       <div className="container px-4 md:px-8">
