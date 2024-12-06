@@ -480,6 +480,7 @@ export default function Athletes() {
                 records={getAthleteRecords(viewingHistory.athleteId)}
                 athleteName={viewingHistory.athleteName}
                 onRecordDeleted={() => mutateRecords()}
+                isAdmin={isAdmin}
               />
             </Suspense>
           )}

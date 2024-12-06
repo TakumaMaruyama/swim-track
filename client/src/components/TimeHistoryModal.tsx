@@ -45,6 +45,7 @@ type TimeHistoryModalProps = {
   records: ExtendedSwimRecord[];
   athleteName: string;
   onRecordDeleted?: () => void;
+  isAdmin?: boolean;
 };
 
 type GroupedRecords = {
@@ -350,7 +351,24 @@ export function TimeHistoryModal({
                               </div>
                             </div>
                             <div className="flex gap-2">
-                              {/* 編集ボタンを削除 - パブリックアクセス用 */}
+                              {isAdmin && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setEditingRecord(record)}
+                                  >
+                                    <Edit2 className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setDeletingRecord(record.id)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              )}
                             </div>
                           </div>
                         );
