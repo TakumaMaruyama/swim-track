@@ -9,7 +9,7 @@ import {
 import { useLocation } from 'wouter'
 import { useMobile } from '../hooks/use-mobile'
 import { MobileNav } from '../components/MobileNav'
-import { useRecentActivities } from '../hooks/use-recent-activities'
+
 import { PageHeader } from '../components/PageHeader'
 import { ErrorBoundary } from '../components/ErrorBoundary';
 
@@ -23,7 +23,7 @@ const NAV_ITEMS = [
 export default function Dashboard() {
   const [, navigate] = useLocation();
   const isMobile = useMobile();
-  const { activities, isLoading: isActivitiesLoading, error: activitiesError } = useRecentActivities();
+  
 
   // All hooks before any conditional returns
   // No authentication handlers needed
@@ -80,60 +80,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>最近の大会と記録</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {isActivitiesLoading && (
-                    <p className="text-muted-foreground">読み込み中...</p>
-                  )}
-                  {activitiesError && (
-                    <p className="text-destructive">データの取得に失敗しました</p>
-                  )}
-                  {!isActivitiesLoading && !activitiesError && (!activities || activities.length === 0) && (
-                    <p className="text-muted-foreground">最近の活動はありません</p>
-                  )}
-                  {!isActivitiesLoading && !activitiesError && activities && activities.length > 0 && (
-                    activities.map((activity) => (
-                      <div
-                        key={`${activity.type}-${activity.id}`}
-                        className="flex items-center justify-between p-4 rounded-lg border bg-card text-card-foreground shadow-sm"
-                      >
-                        {activity.type === 'competition' && activity.details?.name ? (
-                          <>
-                            <div>
-                              <p className="font-medium">{activity.details.name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {activity.details.location}
-                              </p>
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {new Date(activity.date).toLocaleDateString('ja-JP')}
-                            </div>
-                          </>
-                        ) : activity.details?.style && activity.details?.distance ? (
-                          <>
-                            <div>
-                              <p className="font-medium">
-                                {activity.details.style} {activity.details.distance}m
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {activity.details.athleteName} - {activity.details.time}
-                              </p>
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {new Date(activity.date).toLocaleDateString('ja-JP')}
-                            </div>
-                          </>
-                        ) : null}
-                      </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+            
           </div>
         </div>
       </main>
