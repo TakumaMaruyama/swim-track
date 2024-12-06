@@ -4,6 +4,7 @@ import { users } from "db/schema";
 import bcrypt from "bcryptjs";
 import { Request, Response } from "express";
 import session from "express-session";
+import MemoryStore from "memorystore";
 
 declare module "express-session" {
   interface SessionData {
@@ -13,12 +14,17 @@ declare module "express-session" {
 }
 
 export const configureAuth = (app: any) => {
+  const MemoryStoreSession = MemoryStore(session);
+
   // セッション設定
   app.use(
     session({
       secret: process.env.SESSION_SECRET || "your-secret-key",
       resave: false,
       saveUninitialized: false,
+      store: new MemoryStoreSession({
+        checkPeriod: 86400000 // 24時間でメモリをクリーンアップ
+      }),
       cookie: {
         secure: process.env.NODE_ENV === "production",
         httpOnly: true,
@@ -51,9 +57,21 @@ export const configureAuth = (app: any) => {
         return res.status(401).json({ message: "認証に失敗しました" });
       }
 
+      if (!user.isActive) {
+        return res.status(403).json({ message: "アカウントが無効化されています" });
+      }
+
       // セッションにユーザー情報を保存
       req.session.userId = user.id;
       req.session.role = user.role;
+
+      // セッションを保存
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err) => {
+          if (err) reject(err);
+          resolve();
+        });
+      });
 
       // パスワードを除外してユーザー情報を返す
       const { password: _, ...userWithoutPassword } = user;
@@ -76,14 +94,30 @@ export const configureAuth = (app: any) => {
   });
 
   // セッション確認エンドポイント
-  app.get("/api/auth/session", (req: Request, res: Response) => {
-    if (!req.session.userId) {
-      return res.status(401).json({ message: "未認証です" });
+  app.get("/api/auth/session", async (req: Request, res: Response) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "未認証です" });
+      }
+
+      // セッションのユーザーIDを使用してユーザー情報を取得
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, req.session.userId))
+        .limit(1);
+
+      if (!user) {
+        return res.status(401).json({ message: "ユーザーが見つかりません" });
+      }
+
+      // パスワードを除外してユーザー情報を返す
+      const { password: _, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Session check error:", error);
+      res.status(500).json({ message: "セッション確認中にエラーが発生しました" });
     }
-    res.json({
-      userId: req.session.userId,
-      role: req.session.role
-    });
   });
 
   // 管理者確認ミドルウェア
