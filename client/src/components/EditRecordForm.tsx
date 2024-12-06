@@ -59,7 +59,9 @@ const editRecordSchema = z.object({
   time: z.string().regex(timeRegex, "タイム形式は MM:SS.ms である必要があります"),
   date: z.string().min(1, "日付を選択してください"),
   poolLength: z.number().refine(val => poolLengths.includes(val), "有効なプール長を選択してください"),
-  
+  isCompetition: z.boolean().default(false),
+  competitionName: z.string().optional(),
+  competitionLocation: z.string().optional(),
 });
 
 
@@ -246,7 +248,58 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
               )}
             />
 
-            
+            <FormField
+              control={form.control}
+              name="isCompetition"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                  <FormControl>
+                    <input
+                      type="checkbox"
+                      checked={field.value}
+                      onChange={field.onChange}
+                      disabled={isSubmitting}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                  </FormControl>
+                  <FormLabel className="text-sm font-medium leading-none">
+                    大会記録
+                  </FormLabel>
+                </FormItem>
+              )}
+            />
+
+            {form.watch("isCompetition") && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="competitionName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>大会名</FormLabel>
+                      <FormControl>
+                        <Input {...field} disabled={isSubmitting} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="competitionLocation"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>開催場所</FormLabel>
+                      <FormControl>
+                        <Input {...field} disabled={isSubmitting} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
+            )}
             
             <DialogFooter>
               <Button
