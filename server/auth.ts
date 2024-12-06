@@ -1,79 +1,102 @@
-import { type Express, Request, Response } from "express";
+import { eq } from "drizzle-orm";
+import { db } from "db";
+import { users } from "db/schema";
+import bcrypt from "bcryptjs";
+import { Request, Response } from "express";
 import session from "express-session";
-import createMemoryStore from "memorystore";
 
-export function configureAuth(app: Express) {
-  // セッション設定
-  const MemoryStore = createMemoryStore(session);
-  const sessionSettings: session.SessionOptions = {
-    secret: process.env.REPL_ID || "swimtrack-secret",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {},
-    store: new MemoryStore({
-      checkPeriod: 86400000, // 24時間ごとに期限切れのエントリを削除
-    }),
-  };
-
-  if (app.get("env") === "production") {
-    app.set("trust proxy", 1);
-    sessionSettings.cookie = {
-      secure: true,
-    };
+declare module "express-session" {
+  interface SessionData {
+    userId: number;
+    role: string;
   }
+}
 
-  app.use(session(sessionSettings));
+export const configureAuth = (app: any) => {
+  // セッション設定
+  app.use(
+    session({
+      secret: process.env.SESSION_SECRET || "your-secret-key",
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        secure: process.env.NODE_ENV === "production",
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000 // 24時間
+      }
+    })
+  );
 
   // ログインエンドポイント
   app.post("/api/auth/login", async (req: Request, res: Response) => {
     try {
-      const { password } = req.body;
+      const { username, password } = req.body;
 
-      if (!password) {
-        return res.status(400).json({ message: "パスワードは必須です" });
+      if (!username || !password) {
+        return res.status(400).json({ message: "ユーザー名とパスワードは必須です" });
       }
 
-      // 固定パスワードチェック
-      if (password === "seiji") {
-        // セッション情報を設定
-        req.session.userId = 0; // 一般ユーザー用の固定ID
-        req.session.role = "user"; // 一般ユーザーロール
-        
-        return res.json({
-          id: 0,
-          username: "一般ユーザー",
-          role: "user",
-          isActive: true
-        });
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.username, username))
+        .limit(1);
+
+      if (!user) {
+        return res.status(401).json({ message: "認証に失敗しました" });
       }
 
-      return res.status(401).json({ message: "認証に失敗しました" });
+      const isValidPassword = await bcrypt.compare(password, user.password);
+      if (!isValidPassword) {
+        return res.status(401).json({ message: "認証に失敗しました" });
+      }
+
+      // セッションにユーザー情報を保存
+      req.session.userId = user.id;
+      req.session.role = user.role;
+
+      // パスワードを除外してユーザー情報を返す
+      const { password: _, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
     } catch (error) {
       console.error("Login error:", error);
       res.status(500).json({ message: "ログイン処理中にエラーが発生しました" });
     }
   });
 
-  // セッション確認エンドポイント
-  app.get("/api/auth/session", (req: Request, res: Response) => {
-    if (req.session.userId !== undefined) {
-      return res.json({
-        id: req.session.userId,
-        username: "一般ユーザー",
-        role: req.session.role,
-        isActive: true
-      });
-    }
-    res.status(401).json({ message: "未認証" });
-  });
-
   // ログアウトエンドポイント
   app.post("/api/auth/logout", (req: Request, res: Response) => {
     req.session.destroy((err) => {
       if (err) {
-        return res.status(500).json({ message: "ログアウトに失敗しました" });
+        console.error("Logout error:", err);
+        return res.status(500).json({ message: "ログアウト処理中にエラーが発生しました" });
       }
       res.json({ message: "ログアウトしました" });
     });
   });
-}
+
+  // セッション確認エンドポイント
+  app.get("/api/auth/session", (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "未認証です" });
+    }
+    res.json({
+      userId: req.session.userId,
+      role: req.session.role
+    });
+  });
+
+  // 管理者確認ミドルウェア
+  app.use("/api/admin/*", (req: Request, res: Response, next: Function) => {
+    if (req.session.role !== "admin") {
+      return res.status(403).json({ message: "管理者権限が必要です" });
+    }
+    next();
+  });
+};
+
+// パスワードのハッシュ化ユーティリティ
+export const hashPassword = async (password: string): Promise<string> => {
+  const salt = await bcrypt.genSalt(10);
+  return bcrypt.hash(password, salt);
+};

@@ -1,50 +1,61 @@
-import { useState, useEffect } from "react";
+import useSWR from "swr";
+import { useCallback } from "react";
 import { useLocation } from "wouter";
 
 interface User {
   id: number;
   username: string;
   role: string;
+  isActive: boolean;
+}
+
+interface LoginCredentials {
+  username: string;
+  password: string;
 }
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: user, error, mutate } = useSWR<User>("/api/auth/session");
   const [, setLocation] = useLocation();
 
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
+  const login = useCallback(async (credentials: LoginCredentials) => {
     try {
-      const response = await fetch("/api/auth/session", {
-        credentials: "include"
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setUser(data);
-      }
-    } catch (error) {
-      console.error("Auth check failed:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const logout = async () => {
-    try {
-      await fetch("/api/auth/logout", {
+      const response = await fetch("/api/auth/login", {
         method: "POST",
-        credentials: "include"
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(credentials),
       });
-      setUser(null);
-      setLocation("/login");
-    } catch (error) {
-      console.error("Logout failed:", error);
-    }
-  };
 
-  return { user, loading, logout };
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "ログインに失敗しました");
+      }
+
+      const data = await response.json();
+      await mutate(data);
+      return data;
+    } catch (error) {
+      throw error;
+    }
+  }, [mutate]);
+
+  const logout = useCallback(async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      await mutate(null);
+      setLocation("/admin/login");
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  }, [mutate, setLocation]);
+
+  return {
+    user,
+    isLoading: !error && !user,
+    error,
+    login,
+    logout,
+    isAuthenticated: !!user,
+    isAdmin: user?.role === "admin"
+  };
 }

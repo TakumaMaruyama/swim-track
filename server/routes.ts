@@ -53,7 +53,6 @@ const upload = multer({ storage });
 export function registerRoutes(app: Express) {
   // 認証設定を追加
   configureAuth(app);
-  
   // Initialize upload directory during route registration
   initializeUploadDirectory().catch(console.error);
 
