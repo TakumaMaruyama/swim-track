@@ -18,9 +18,11 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth';
 import { PageHeader } from '../components/PageHeader';
 import { Badge } from "@/components/ui/badge";
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { useLocation } from 'wouter';
 
 // Lazy load components with proper loading states
 const EditAthleteForm = lazy(() =>
@@ -60,8 +62,9 @@ const FormLoadingFallback = () => (
 );
 
 export default function Athletes() {
-  
   const { toast } = useToast();
+  const { user, isAdmin } = useAuth();
+  const [, navigate] = useLocation();
   const { athletes, isLoading: athletesLoading, error: athletesError, mutate: mutateAthletes } = useAthletes();
   const { records, isLoading: recordsLoading, error: recordsError, mutate: mutateRecords } = useSwimRecords();
   const [editingAthlete, setEditingAthlete] = React.useState<number | null>(null);
@@ -88,6 +91,15 @@ export default function Athletes() {
   };
 
   const handleToggleStatus = async (athleteId: number, currentStatus: boolean) => {
+    if (!isAdmin) {
+      toast({
+        title: "権限エラー",
+        description: "選手のステータスを変更するには管理者権限が必要です",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       const response = await fetch(`/api/athletes/${athleteId}/status`, {
         method: 'PATCH',
@@ -118,6 +130,15 @@ export default function Athletes() {
   };
 
   const handleEdit = async (athleteId: number, data: { username: string }) => {
+    if (!isAdmin) {
+      toast({
+        title: "権限エラー",
+        description: "選手情報の編集には管理者権限が必要です",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       const response = await fetch(`/api/athletes/${athleteId}`, {
         method: 'PUT',
@@ -133,13 +154,31 @@ export default function Athletes() {
       }
 
       await mutateAthletes();
+      toast({
+        title: "更新成功",
+        description: "選手情報が更新されました",
+      });
     } catch (error) {
       console.error('Error updating athlete:', error);
+      toast({
+        variant: "destructive",
+        title: "エラー",
+        description: "選手情報の更新に失敗しました",
+      });
       throw error;
     }
   };
 
   const handleCreateRecord = async (data: any) => {
+    if (!isAdmin) {
+      toast({
+        title: "権限エラー",
+        description: "記録の追加には管理者権限が必要です",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       const response = await fetch('/api/records', {
         method: 'POST',
@@ -171,6 +210,14 @@ export default function Athletes() {
   };
 
   const handleEditRecord = async (recordId: number, data: any) => {
+    if (!isAdmin) {
+      toast({
+        title: "権限エラー",
+        description: "記録の編集には管理者権限が必要です。",
+        variant: "destructive"
+      });
+      return;
+    }
     try {
       const response = await fetch(`/api/records/${recordId}`, {
         method: 'PUT',
@@ -202,6 +249,14 @@ export default function Athletes() {
   };
 
   const handleDelete = async (athleteId: number) => {
+    if (!isAdmin) {
+      toast({
+        title: "権限エラー",
+        description: "選手の削除には管理者権限が必要です",
+        variant: "destructive"
+      });
+      return;
+    }
     try {
       const response = await fetch(`/api/athletes/${athleteId}`, {
         method: 'DELETE',
@@ -269,18 +324,23 @@ export default function Athletes() {
         title="選手一覧"
         children={
           <div className="flex gap-2">
-            <Button 
-              variant="outline"
-              onClick={() => {
-                toast({
-                  title: "情報",
-                  description: "記録の追加・編集は管理者のみが可能です",
-                });
-              }}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              新規記録追加
-            </Button>
+            {!isAdmin && (
+              <Button
+                variant="outline"
+                onClick={() => navigate("/admin/login")}
+              >
+                管理者ログイン
+              </Button>
+            )}
+            {isAdmin && (
+              <Button 
+                variant="outline"
+                onClick={() => setEditingRecord({ id: null, studentId: null })}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                新規記録追加
+              </Button>
+            )}
           </div>
         }
       />
@@ -322,30 +382,24 @@ export default function Athletes() {
                       >
                         <History className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          toast({
-                            title: "情報",
-                            description: "選手情報の編集は管理者のみが可能です",
-                          });
-                        }}
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          toast({
-                            title: "情報",
-                            description: "記録の追加は管理者のみが可能です",
-                          });
-                        }}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
+                      {isAdmin && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setEditingAthlete(athlete.id)}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleToggleStatus(athlete.id, athlete.isActive)}
+                          >
+                            <Power className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </CardTitle>
                 </CardHeader>
@@ -354,16 +408,18 @@ export default function Athletes() {
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
                         <h3 className="font-medium text-sm text-muted-foreground">最近の記録:</h3>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setEditingRecord({
-                            id: latestRecord.id,
-                            studentId: athlete.id
-                          })}
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
+                        {isAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setEditingRecord({
+                              id: latestRecord.id,
+                              studentId: athlete.id
+                            })}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
@@ -396,7 +452,7 @@ export default function Athletes() {
         </div>
 
         <ErrorBoundary>
-          {athlete && (
+          {athlete && isAdmin && (
             <Suspense fallback={<FormLoadingFallback />}>
               <EditAthleteForm
                 athlete={athlete}
@@ -404,26 +460,30 @@ export default function Athletes() {
                 onClose={() => setEditingAthlete(null)}
                 onSubmit={async (data) => {
                   await handleEdit(athlete.id, data);
+                  setEditingAthlete(null);
                 }}
               />
             </Suspense>
           )}
 
-          <Suspense fallback={<FormLoadingFallback />}>
-            <EditRecordForm
-              record={record}
-              studentId={editingRecord.studentId ?? undefined}
-              isOpen={!!editingRecord.studentId}
-              onClose={() => setEditingRecord({ id: null, studentId: null })}
-              onSubmit={async (data) => {
-                if (editingRecord.id) {
-                  await handleEditRecord(editingRecord.id, data);
-                } else {
-                  await handleCreateRecord(data);
-                }
-              }}
-            />
-          </Suspense>
+          {isAdmin && (
+            <Suspense fallback={<FormLoadingFallback />}>
+              <EditRecordForm
+                record={records?.find(r => r.id === editingRecord.id)}
+                studentId={editingRecord.studentId ?? undefined}
+                isOpen={!!editingRecord.studentId}
+                onClose={() => setEditingRecord({ id: null, studentId: null })}
+                onSubmit={async (data) => {
+                  if (editingRecord.id) {
+                    await handleEditRecord(editingRecord.id, data);
+                  } else {
+                    await handleCreateRecord(data);
+                  }
+                  setEditingRecord({ id: null, studentId: null });
+                }}
+              />
+            </Suspense>
+          )}
 
           {viewingHistory.athleteId && (
             <Suspense fallback={<FormLoadingFallback />}>
