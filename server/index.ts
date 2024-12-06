@@ -3,12 +3,8 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic } from "./vite";
 import { createServer } from "http";
 import cors from "cors";
-import cookieParser from "cookie-parser";
 
 const app = express();
-
-// Cookie parser middleware
-app.use(cookieParser());
 
 // CORS設定
 app.use(cors({
@@ -18,11 +14,7 @@ app.use(cors({
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Cookie", "Set-Cookie"],
-  exposedHeaders: ["Set-Cookie"]
 }));
-
-// セッション設定
-app.set('trust proxy', 1);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));

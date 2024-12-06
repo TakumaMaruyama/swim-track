@@ -4,7 +4,8 @@ import { Switch, Route } from "wouter";
 import "./index.css";
 import { QueryClientProvider, QueryClient } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
-import { Suspense, lazy, useEffect, useState } from "react";
+import { Suspense, lazy } from "react";
+import { useAuth } from "./hooks/use-auth";
 
 // Create a client
 const queryClient = new QueryClient();
@@ -18,32 +19,13 @@ const Competitions = lazy(() => import("./pages/Competitions"));
 const Login = lazy(() => import("./pages/Login"));
 
 function Router() {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const { user, loading } = useAuth();
 
-  useEffect(() => {
-    // セッションの確認
-    fetch("/api/auth/session", {
-      credentials: "include"
-    })
-      .then(response => {
-        if (response.ok) {
-          setIsAuthenticated(true);
-        } else {
-          setIsAuthenticated(false);
-        }
-      })
-      .catch(() => {
-        setIsAuthenticated(false);
-      });
-  }, []);
-
-  // 初期ローディング中
-  if (isAuthenticated === null) {
+  if (loading) {
     return <div className="flex items-center justify-center min-h-screen">読み込み中...</div>;
   }
 
-  // 未認証の場合はログインページを表示
-  if (!isAuthenticated) {
+  if (!user) {
     return <Login />;
   }
 
