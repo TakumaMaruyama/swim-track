@@ -13,6 +13,7 @@ const Documents = lazy(() => import("./pages/Documents"));
 const Athletes = lazy(() => import("./pages/Athletes"));
 const AllTimeRecords = lazy(() => import("./pages/AllTimeRecords"));
 const Competitions = lazy(() => import("./pages/Competitions"));
+const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -24,6 +25,7 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/athletes" component={Athletes} />
           <Route path="/all-time-records" component={AllTimeRecords} />
           <Route path="/competitions" component={Competitions} />
+          <Route path="/admin/login" component={AdminLogin} />
           <Route>404 ページが見つかりません</Route>
         </Switch>
       </Suspense>
