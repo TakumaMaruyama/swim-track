@@ -224,56 +224,54 @@ export function TimeHistoryModal({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-4">
-            <div className="grid grid-cols-2 sm:flex gap-2 sm:gap-4">
-              <Select value={styleFilter} onValueChange={setStyleFilter}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <SelectValue placeholder="種目で絞り込み" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">すべての種目</SelectItem>
-                  {swimStyles.map(style => (
-                    <SelectItem key={style} value={style}>{style}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div className="flex gap-4 mb-4">
+            <Select value={styleFilter} onValueChange={setStyleFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="種目で絞り込み" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">すべての種目</SelectItem>
+                {swimStyles.map(style => (
+                  <SelectItem key={style} value={style}>{style}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-              <Select value={periodFilter} onValueChange={setPeriodFilter}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <SelectValue placeholder="期間で絞り込み" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">すべての期間</SelectItem>
-                  <SelectItem value="1month">過去1ヶ月</SelectItem>
-                  <SelectItem value="3months">過去3ヶ月</SelectItem>
-                  <SelectItem value="6months">過去6ヶ月</SelectItem>
-                  <SelectItem value="1year">過去1年</SelectItem>
-                  <SelectItem value="custom">カスタム期間</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <Select value={periodFilter} onValueChange={setPeriodFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="期間で絞り込み" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">すべての期間</SelectItem>
+                <SelectItem value="1month">過去1ヶ月</SelectItem>
+                <SelectItem value="3months">過去3ヶ月</SelectItem>
+                <SelectItem value="6months">過去6ヶ月</SelectItem>
+                <SelectItem value="1year">過去1年</SelectItem>
+                <SelectItem value="custom">カスタム期間</SelectItem>
+              </SelectContent>
+            </Select>
 
             {periodFilter === "custom" && (
-              <div className="grid grid-cols-2 sm:flex gap-2">
+              <div className="flex gap-2">
                 <input
                   type="date"
                   value={customStartDate}
                   onChange={(e) => setCustomStartDate(e.target.value)}
-                  className="w-full px-3 py-2 border rounded text-sm sm:text-base"
+                  className="px-3 py-2 border rounded"
                   placeholder="開始日"
                 />
                 <input
                   type="date"
                   value={customEndDate}
                   onChange={(e) => setCustomEndDate(e.target.value)}
-                  className="w-full px-3 py-2 border rounded text-sm sm:text-base"
+                  className="px-3 py-2 border rounded"
                   placeholder="終了日"
                 />
               </div>
             )}
 
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="並び替え" />
               </SelectTrigger>
               <SelectContent>
@@ -329,35 +327,35 @@ export function TimeHistoryModal({
                         return (
                           <div
                             key={record.id}
-                            className="p-2 sm:p-3 rounded-lg flex flex-col gap-1 sm:gap-2 md:flex-row md:justify-between md:items-center bg-muted/10 hover:bg-muted/20 transition-colors"
+                            className="p-3 rounded-lg flex flex-col gap-2 md:flex-row md:justify-between md:items-center"
                           >
-                            <div className="flex flex-col gap-1 sm:gap-2">
-                              <span className="text-lg sm:text-xl font-bold">{record.time}</span>
-                              <div className="flex flex-wrap gap-1 sm:gap-2">
+                            <div className="flex flex-col gap-2">
+                              <span className="text-xl font-bold">{record.time}</span>
+                              <div className="flex flex-wrap gap-2">
                                 {record.time === personalBests[`${record.style}-${record.distance}-${record.poolLength}`] && (
-                                  <Badge variant="secondary" className="flex items-center gap-1 text-xs sm:text-sm">
+                                  <Badge variant="secondary" className="flex items-center gap-1">
                                     <Trophy className="h-3 w-3" />
-                                    自己ベスト ({record.poolLength}m)
+                                    自己ベスト ({record.poolLength}mプール)
                                   </Badge>
                                 )}
                                 {record.isCompetition && (
-                                  <Badge variant="outline" className="flex items-center gap-1 text-xs sm:text-sm">
+                                  <Badge variant="outline" className="flex items-center gap-1">
                                     大会記録
                                   </Badge>
                                 )}
                                 {record.competitionName && (
-                                  <span className="text-xs sm:text-sm text-muted-foreground">
+                                  <span className="text-sm text-muted-foreground">
                                     {record.competitionName}
                                     {record.competitionLocation && ` (${record.competitionLocation})`}
                                   </span>
                                 )}
                               </div>
                             </div>
-                            <div className="flex flex-row md:flex-col items-start justify-between md:items-end gap-1 mt-1 md:mt-0">
-                              <div className="text-xs sm:text-sm text-muted-foreground">
+                            <div className="flex flex-col items-start md:items-end gap-1">
+                              <div className="text-sm text-muted-foreground">
                                 {formatDate(record.date)}
                               </div>
-                              <div className="text-xs sm:text-sm text-muted-foreground">
+                              <div className="text-sm text-muted-foreground">
                                 {record.poolLength}mプール
                               </div>
                             </div>
