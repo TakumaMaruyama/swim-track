@@ -62,16 +62,13 @@ export function useAuth() {
         throw new Error(data.message || "ログアウトに失敗しました");
       }
 
-      // Clear all authentication data
-      await mutate(null, { revalidate: false });
-      // Force revalidation of all queries
-      queryClient.clear();
+      await mutate(null);
       setLocation("/admin/login");
     } catch (error) {
       console.error("Logout error:", error);
       throw error;
     }
-  }, [mutate, setLocation, queryClient]);
+  }, [mutate, setLocation]);
 
   return {
     user: data?.user,

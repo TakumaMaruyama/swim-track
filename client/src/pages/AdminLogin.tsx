@@ -13,13 +13,7 @@ export default function AdminLogin() {
   const [loading, setLoading] = useState(false);
   const [, setLocation] = useLocation();
 
-  const { login, user, isLoading } = useAuth();
-  
-  React.useEffect(() => {
-    if (!isLoading && user) {
-      setLocation("/athletes");
-    }
-  }, [user, isLoading, setLocation]);
+  const { login } = useAuth();
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
