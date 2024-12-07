@@ -179,7 +179,11 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
                       disabled={isSubmitting}
                     >
                       {poolLengths.map(length => (
-                        <option key={length} value={length}>{length}メートル</option>
+                        <option key={length} value={length}>
+                          {length === 15 ? "15ｍプール" :
+                           length === 25 ? "25ｍプール（短水路）" :
+                           "50ｍプール（長水路）"}
+                        </option>
                       ))}
                     </select>
                   </FormControl>
