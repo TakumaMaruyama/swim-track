@@ -8,7 +8,7 @@ channel = "stable-24_05"
 [deployment]
 deploymentTarget = "cloudrun"
 build = ["npm", "run", "build"]
-run = ["sh", "-c", "cd client && npm run dev"]
+run = ["sh", "-c", "npm run dev"]
 
 [[ports]]
 localPort = 3000
@@ -41,14 +41,22 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Development Server"
+args = "Backend Server"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
 args = "Backend Server"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Development Server"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Production Server"
+
 [[workflows.workflow]]
-name = "Development Server"
+name = "Backend Server"
 author = "agent"
 
 [workflows.workflow.metadata]
@@ -59,8 +67,8 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd client && npm run dev"
-waitForPort = 5173
+args = "npm run dev"
+waitForPort = 5000
 
 [[workflows.workflow]]
 name = "Backend Server"
@@ -75,4 +83,34 @@ task = "packager.installForAll"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "tsx watch --clear-screen=false server/index.ts"
+waitForPort = 5000
+
+[[workflows.workflow]]
+name = "Development Server"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd client && NODE_ENV=production npm run dev -- --port 5173 --host 0.0.0.0"
+waitForPort = 5173
+
+[[workflows.workflow]]
+name = "Production Server"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "NODE_ENV=production npm run dev"
 waitForPort = 5000
