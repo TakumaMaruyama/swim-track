@@ -63,7 +63,7 @@ const FormLoadingFallback = () => (
 
 export default function Athletes() {
   const { toast } = useToast();
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, logout } = useAuth();
   const [, navigate] = useLocation();
   const { athletes, isLoading: athletesLoading, error: athletesError, mutate: mutateAthletes } = useAthletes();
   const { records, isLoading: recordsLoading, error: recordsError, mutate: mutateRecords } = useSwimRecords();
@@ -326,7 +326,15 @@ export default function Athletes() {
           isAdmin ? (
             <Button
               variant="outline"
-              onClick={() => logout()}
+              onClick={() => {
+                logout().catch(() => {
+                  toast({
+                    variant: "destructive",
+                    title: "エラー",
+                    description: "ログアウトに失敗しました",
+                  });
+                });
+              }}
             >
               ログアウト
             </Button>
