@@ -112,5 +112,5 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "NODE_ENV=production npm run dev"
+args = "NODE_ENV=production npm run start"
 waitForPort = 5000
