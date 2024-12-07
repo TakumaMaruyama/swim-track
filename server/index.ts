@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic } from "./vite";
 import { createServer } from "http";
 import { configureAuth } from "./auth";
+import configuration from "./config";
 
 const app = express();
 app.use(express.json());
@@ -25,16 +26,14 @@ configureAuth(app);
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
+  if (configuration.nodeEnv === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client
-  const PORT = 5000;
-  server.listen(PORT, "0.0.0.0", () => {
+  // Serve the app using configuration port
+  server.listen(configuration.port, "0.0.0.0", () => {
     const formattedTime = new Date().toLocaleTimeString("en-US", {
       hour: "2-digit",
       minute: "2-digit",
@@ -42,6 +41,6 @@ configureAuth(app);
       hour12: true,
     });
 
-    console.log(`${formattedTime} [express] serving on port ${PORT}`);
+    console.log(`${formattedTime} [express] serving on port ${configuration.port}`);
   });
 })();
