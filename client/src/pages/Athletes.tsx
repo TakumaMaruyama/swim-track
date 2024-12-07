@@ -326,14 +326,17 @@ export default function Athletes() {
           isAdmin ? (
             <Button
               variant="outline"
-              onClick={() => {
-                logout().catch(() => {
+              onClick={async () => {
+                try {
+                  await logout();
+                  navigate("/admin/login");
+                } catch (error) {
                   toast({
                     variant: "destructive",
                     title: "エラー",
                     description: "ログアウトに失敗しました",
                   });
-                });
+                }
               }}
             >
               ログアウト
