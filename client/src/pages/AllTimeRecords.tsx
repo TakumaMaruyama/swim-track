@@ -188,9 +188,9 @@ export default function AllTimeRecords() {
       <div className="container px-4 md:px-8">
         <Tabs defaultValue="25" value={poolLengthFilter} onValueChange={setPoolLengthFilter}>
           <TabsList className="mb-8">
-            <TabsTrigger value="15">15mプール</TabsTrigger>
-            <TabsTrigger value="25">25mプール</TabsTrigger>
-            <TabsTrigger value="50">50mプール</TabsTrigger>
+            <TabsTrigger value="15">15メートル</TabsTrigger>
+            <TabsTrigger value="25">25メートル</TabsTrigger>
+            <TabsTrigger value="50">50メートル</TabsTrigger>
           </TabsList>
 
           {['15', '25', '50'].map((poolLength) => (

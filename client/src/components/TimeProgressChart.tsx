@@ -69,7 +69,7 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
   const data = {
     labels: filteredRecords.map(r => formatDate(r.date)),
     datasets: poolLengths.map((poolLength, index) => ({
-      label: `${poolLength}mプール`,
+      label: `${poolLength}メートル`,
       data: filteredRecords
         .filter(r => r.poolLength === poolLength)
         .map(r => ({

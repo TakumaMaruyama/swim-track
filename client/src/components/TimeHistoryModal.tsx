@@ -337,7 +337,7 @@ export function TimeHistoryModal({
                                 {record.time === personalBests[`${record.style}-${record.distance}-${record.poolLength}`] && (
                                   <Badge variant="secondary" className="flex items-center gap-1">
                                     <Trophy className="h-3 w-3" />
-                                    自己ベスト ({record.poolLength}mプール)
+                                    自己ベスト ({record.poolLength}メートル)
                                   </Badge>
                                 )}
                                 
@@ -348,7 +348,7 @@ export function TimeHistoryModal({
                                 {formatDate(record.date)}
                               </div>
                               <div className="text-sm text-muted-foreground">
-                                {record.poolLength}mプール
+                                {record.poolLength}メートル
                               </div>
                             </div>
                             <div className="flex gap-2">
