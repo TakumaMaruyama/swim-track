@@ -4,7 +4,7 @@ import { Switch, Route } from "wouter";
 import "./index.css";
 import { SWRConfig } from "swr";
 import { fetcher } from "./lib/fetcher";
-import { Toaster } from "./components/ui/toaster";
+import { Toaster } from "@/components/ui/toaster";
 import { Suspense, lazy } from "react";
 
 // Lazy load pages
