@@ -1,4 +1,5 @@
 import React from 'react';
+import { useIsMobile } from '../hooks/use-mobile';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -90,15 +91,34 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
     })),
   };
 
+  const { isMobile } = useIsMobile();
+  
   const options: ChartOptions<'line'> = {
     responsive: true,
     plugins: {
       legend: {
-        position: 'top' as const,
+        position: isMobile ? 'bottom' as const : 'top' as const,
+        align: 'center',
+        labels: {
+          boxWidth: isMobile ? 6 : 40,
+          padding: isMobile ? 6 : 20,
+          font: {
+            size: isMobile ? 9 : 12,
+            family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+          },
+          usePointStyle: true,
+          pointStyle: 'circle'
+        }
       },
       title: {
         display: true,
         text: `${style} ${distance}m の記録推移`,
+        font: {
+          size: isMobile ? 13 : 16,
+          family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+          weight: '500'
+        },
+        padding: { top: isMobile ? 0 : 10, bottom: isMobile ? 5 : 10 }
       },
       tooltip: {
         callbacks: {
@@ -115,7 +135,7 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
       y: {
         reverse: true,
         title: {
-          display: true,
+          display: !isMobile,
           text: 'タイム (秒)',
         },
         ticks: {
@@ -125,19 +145,38 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
             const seconds = (value % 60).toFixed(2);
             return `${minutes}:${seconds.padStart(5, '0')}`;
           },
+          font: {
+            size: isMobile ? 10 : 12
+          }
         },
       },
+      x: {
+        ticks: {
+          maxRotation: isMobile ? 45 : 0,
+          font: {
+            size: isMobile ? 10 : 12
+          }
+        }
+      }
     },
   };
 
   return (
-    <div className="w-full h-[800px] sm:h-[700px] md:h-[400px]">
+    <div className="w-full h-[250px] sm:h-[300px] md:h-[400px] p-1 sm:p-2">
       <Line 
         data={data} 
         options={{
           ...options,
           maintainAspectRatio: false,
-          responsive: true
+          responsive: true,
+          layout: {
+            padding: {
+              left: isMobile ? 5 : 20,
+              right: isMobile ? 5 : 20,
+              top: isMobile ? 5 : 20,
+              bottom: isMobile ? 20 : 20
+            }
+          }
         }} 
       />
     </div>
