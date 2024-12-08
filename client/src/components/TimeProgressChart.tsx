@@ -1,5 +1,4 @@
 import React from 'react';
-import { useIsMobile } from '../hooks/use-mobile';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -38,8 +37,6 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
   style, 
   distance
 }) => {
-  const isMobile = useIsMobile();
-  
   const filteredRecords = records
     .filter(r => {
       return r.style === style &&
@@ -58,10 +55,7 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
 
   const formatDate = (date: Date | string | null) => {
     if (!date) return '';
-    return new Date(date).toLocaleDateString('ja-JP', {
-      month: 'numeric',
-      day: 'numeric'
-    });
+    return new Date(date).toLocaleDateString('ja-JP');
   };
 
   // Group records by pool length
@@ -76,8 +70,8 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
     labels: filteredRecords.map(r => formatDate(r.date)),
     datasets: poolLengths.map((poolLength, index) => ({
       label: poolLength === 15 ? "15ｍプール" :
-             poolLength === 25 ? "25ｍプール" :
-             "50ｍプール",
+             poolLength === 25 ? "25ｍプール（短水路）" :
+             "50ｍプール（長水路）",
       data: filteredRecords
         .filter(r => r.poolLength === poolLength)
         .map(r => ({
@@ -92,36 +86,19 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
         .map(r => r.isCompetition ? 'star' : 'circle'),
       pointRadius: filteredRecords
         .filter(r => r.poolLength === poolLength)
-        .map(r => r.isCompetition ? (isMobile ? 4 : 6) : (isMobile ? 2 : 3)),
+        .map(r => r.isCompetition ? 8 : 4),
     })),
   };
 
   const options: ChartOptions<'line'> = {
     responsive: true,
-    maintainAspectRatio: false,
     plugins: {
       legend: {
-        position: 'bottom',
-        labels: {
-          boxWidth: isMobile ? 6 : 10,
-          padding: isMobile ? 2 : 8,
-          font: { 
-            size: isMobile ? 8 : 10,
-            family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-          },
-          usePointStyle: true,
-          pointStyle: 'circle'
-        }
+        position: 'top' as const,
       },
       title: {
         display: true,
         text: `${style} ${distance}m の記録推移`,
-        font: {
-          size: isMobile ? 12 : 14,
-          family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-          weight: '500'
-        },
-        padding: { top: 0, bottom: isMobile ? 2 : 8 }
       },
       tooltip: {
         callbacks: {
@@ -138,11 +115,8 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
       y: {
         reverse: true,
         title: {
-          display: !isMobile,
-          text: 'タイム',
-          font: {
-            size: isMobile ? 8 : 12
-          }
+          display: true,
+          text: 'タイム (秒)',
         },
         ticks: {
           callback: function(this: Scale<CoreScaleOptions>, value: number | string): string {
@@ -151,77 +125,21 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
             const seconds = (value % 60).toFixed(2);
             return `${minutes}:${seconds.padStart(5, '0')}`;
           },
-          font: {
-            size: isMobile ? 8 : 11
-          },
-          maxTicksLimit: isMobile ? 6 : 8
         },
-        grid: {
-          display: !isMobile
-        }
       },
-      x: {
-        grid: {
-          display: !isMobile
-        },
-        ticks: {
-          maxRotation: 45,
-          minRotation: 45,
-          font: {
-            size: isMobile ? 8 : 10
-          },
-          maxTicksLimit: isMobile ? 4 : 6,
-          padding: isMobile ? 2 : 8
-        }
-      }
     },
-    layout: {
-      padding: {
-        left: isMobile ? 2 : 8,
-        right: isMobile ? 2 : 8,
-        top: isMobile ? 2 : 4,
-        bottom: isMobile ? 4 : 8
-      }
-    }
   };
 
   return (
-    <div className="w-2/3 mx-auto h-[360px] sm:h-[500px] lg:h-[700px] p-1 sm:p-2 lg:p-4">
-      <div className="w-full h-full">
-        <Line 
-          data={data} 
-          options={{
-            ...options,
-            maintainAspectRatio: false,
-            responsive: true,
-            scales: {
-              ...options.scales,
-              x: {
-                ...options.scales.x,
-                ticks: {
-                  ...options.scales.x.ticks,
-                  maxRotation: 45,
-                  minRotation: 45,
-                  autoSkip: true,
-                  maxTicksLimit: isMobile ? 4 : 6,
-                  font: {
-                    size: isMobile ? 8 : 10
-                  }
-                }
-              }
-            },
-            layout: {
-              padding: {
-                left: isMobile ? 8 : 16,
-                right: isMobile ? 8 : 16,
-                top: isMobile ? 8 : 16,
-                bottom: isMobile ? 32 : 40  // 凡例のためのスペースを確保
-              }
-            }
-          }}
-          className="!w-full !h-full"
-        />
-      </div>
+    <div className="w-full h-[800px] sm:h-[700px] md:h-[400px]">
+      <Line 
+        data={data} 
+        options={{
+          ...options,
+          maintainAspectRatio: false,
+          responsive: true
+        }} 
+      />
     </div>
   );
 };
