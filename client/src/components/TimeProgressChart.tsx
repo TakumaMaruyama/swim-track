@@ -186,11 +186,39 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
   };
 
   return (
-    <div className="w-full h-[200px] sm:h-[280px] lg:h-[400px] p-1 sm:p-2 lg:p-4">
-      <div className="w-full">
+    <div className="w-full h-[180px] sm:h-[250px] lg:h-[350px] p-1 sm:p-2 lg:p-4">
+      <div className="w-full h-full">
         <Line 
           data={data} 
-          options={options}
+          options={{
+            ...options,
+            maintainAspectRatio: false,
+            responsive: true,
+            scales: {
+              ...options.scales,
+              x: {
+                ...options.scales.x,
+                ticks: {
+                  ...options.scales.x.ticks,
+                  maxRotation: 45,
+                  minRotation: 45,
+                  autoSkip: true,
+                  maxTicksLimit: isMobile ? 4 : 6,
+                  font: {
+                    size: isMobile ? 8 : 10
+                  }
+                }
+              }
+            },
+            layout: {
+              padding: {
+                left: isMobile ? 4 : 8,
+                right: isMobile ? 4 : 8,
+                top: isMobile ? 4 : 8,
+                bottom: isMobile ? 20 : 24  // 凡例のためのスペースを確保
+              }
+            }
+          }}
           className="!w-full !h-full"
         />
       </div>
