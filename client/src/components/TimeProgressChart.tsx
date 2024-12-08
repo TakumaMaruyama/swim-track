@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { useIsMobile } from '../hooks/use-mobile';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -101,13 +101,13 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        position: isMobile ? 'bottom' : 'top',
+        position: 'bottom',
         align: 'start',
         labels: {
-          boxWidth: isMobile ? 6 : 12,
-          padding: isMobile ? 4 : 10,
+          boxWidth: isMobile ? 4 : 12,
+          padding: isMobile ? 2 : 10,
           font: {
-            size: isMobile ? 8 : 11,
+            size: isMobile ? 7 : 11,
             family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           },
           usePointStyle: true,
@@ -118,11 +118,11 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
         display: true,
         text: `${style} ${distance}m の記録推移`,
         font: {
-          size: isMobile ? 12 : 14,
+          size: isMobile ? 10 : 14,
           family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
           weight: '500'
         },
-        padding: { top: isMobile ? 4 : 8, bottom: isMobile ? 4 : 8 }
+        padding: { top: 0, bottom: isMobile ? 2 : 8 }
       },
       tooltip: {
         callbacks: {
@@ -142,7 +142,7 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
           display: !isMobile,
           text: 'タイム',
           font: {
-            size: isMobile ? 10 : 12
+            size: isMobile ? 8 : 12
           }
         },
         ticks: {
@@ -153,40 +153,41 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
             return `${minutes}:${seconds.padStart(5, '0')}`;
           },
           font: {
-            size: isMobile ? 9 : 11
+            size: isMobile ? 8 : 11
           },
-          maxTicksLimit: isMobile ? 6 : 8
+          maxTicksLimit: 6
         },
         grid: {
-          display: !isMobile
+          display: false
         }
       },
       x: {
         grid: {
-          display: !isMobile
+          display: false
         },
         ticks: {
-          maxRotation: isMobile ? 45 : 0,
-          minRotation: isMobile ? 45 : 0,
+          maxRotation: 45,
+          minRotation: 45,
           font: {
-            size: isMobile ? 9 : 10
+            size: isMobile ? 8 : 10
           },
-          maxTicksLimit: isMobile ? 6 : 10
+          maxTicksLimit: 6,
+          padding: isMobile ? 2 : 8
         }
       }
     },
     layout: {
       padding: {
-        left: isMobile ? 4 : 8,
-        right: isMobile ? 4 : 8,
-        top: isMobile ? 4 : 8,
-        bottom: isMobile ? 20 : 8
+        left: isMobile ? 2 : 8,
+        right: isMobile ? 2 : 8,
+        top: 0,
+        bottom: isMobile ? 16 : 8
       }
     }
   };
 
   return (
-    <div className="w-full h-[200px] sm:h-[300px] md:h-[400px] p-1 sm:p-4">
+    <div className="w-full h-[180px] sm:h-[280px] lg:h-[400px] p-0.5 sm:p-2 lg:p-4 -mx-1 sm:mx-0">
       <Line 
         data={data} 
         options={options}
