@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-export const useIsMobile = () => {
+export function useMobile() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => {
@@ -8,10 +8,11 @@ export const useIsMobile = () => {
       setIsMobile(window.innerWidth < 768);
     };
 
-    checkMobile(); // Initial check
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   return isMobile;
-};
+}
+
+export { useMobile as useIsMobile };
