@@ -1,5 +1,5 @@
 import React from 'react';
-import { useMobile as useIsMobile } from '../hooks/use-mobile';
+import { useIsMobile } from '../hooks/use-mobile';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -92,7 +92,7 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
         .map(r => r.isCompetition ? 'star' : 'circle'),
       pointRadius: filteredRecords
         .filter(r => r.poolLength === poolLength)
-        .map(r => r.isCompetition ? 6 : 3),
+        .map(r => r.isCompetition ? (isMobile ? 4 : 6) : (isMobile ? 2 : 3)),
     })),
   };
 
@@ -101,13 +101,13 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        position: 'top',
+        position: 'bottom',
         align: 'start',
         labels: {
           boxWidth: isMobile ? 6 : 12,
           padding: isMobile ? 2 : 10,
           font: {
-            size: isMobile ? 9 : 11,
+            size: isMobile ? 7 : 11,
             family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           },
           usePointStyle: true,
@@ -122,7 +122,7 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
           family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
           weight: '500'
         },
-        padding: { top: 0, bottom: isMobile ? 2 : 8 }
+        padding: { top: 0, bottom: isMobile ? 4 : 8 }
       },
       tooltip: {
         callbacks: {
@@ -155,39 +155,39 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
           font: {
             size: isMobile ? 8 : 11
           },
-          maxTicksLimit: 6
+          maxTicksLimit: isMobile ? 5 : 6
         },
         grid: {
-          display: false
+          display: !isMobile
         }
       },
       x: {
         grid: {
-          display: false
+          display: !isMobile
         },
         ticks: {
-          maxRotation: isMobile ? 30 : 45,
-          minRotation: isMobile ? 30 : 45,
+          maxRotation: isMobile ? 45 : 45,
+          minRotation: isMobile ? 45 : 45,
           font: {
-            size: isMobile ? 7 : 10
+            size: isMobile ? 8 : 10
           },
           maxTicksLimit: isMobile ? 4 : 6,
-          padding: isMobile ? 0 : 8
+          padding: isMobile ? 2 : 8
         }
       }
     },
     layout: {
       padding: {
-        left: isMobile ? 0 : 8,
-        right: isMobile ? 0 : 8,
-        top: isMobile ? 4 : 0,
+        left: isMobile ? 2 : 8,
+        right: isMobile ? 2 : 8,
+        top: isMobile ? 2 : 4,
         bottom: isMobile ? 4 : 8
       }
     }
   };
 
   return (
-    <div className="w-full h-[200px] sm:h-[280px] lg:h-[400px] p-0.5 sm:p-2 lg:p-4">
+    <div className="w-full h-[140px] sm:h-[280px] lg:h-[400px] p-0.5 sm:p-2 lg:p-4">
       <Line 
         data={data} 
         options={options}
