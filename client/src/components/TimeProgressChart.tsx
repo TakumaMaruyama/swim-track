@@ -186,7 +186,7 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
   };
 
   return (
-    <div className="w-full h-[180px] sm:h-[250px] lg:h-[350px] p-1 sm:p-2 lg:p-4">
+    <div className="w-2/3 mx-auto h-[360px] sm:h-[500px] lg:h-[700px] p-1 sm:p-2 lg:p-4">
       <div className="w-full h-full">
         <Line 
           data={data} 
@@ -212,10 +212,10 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
             },
             layout: {
               padding: {
-                left: isMobile ? 4 : 8,
-                right: isMobile ? 4 : 8,
-                top: isMobile ? 4 : 8,
-                bottom: isMobile ? 20 : 24  // 凡例のためのスペースを確保
+                left: isMobile ? 8 : 16,
+                right: isMobile ? 8 : 16,
+                top: isMobile ? 8 : 16,
+                bottom: isMobile ? 32 : 40  // 凡例のためのスペースを確保
               }
             }
           }}
