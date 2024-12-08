@@ -1,5 +1,5 @@
-import React from 'react';
-import { useIsMobile } from '../hooks/use-mobile';
+import * as React from 'react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -38,6 +38,8 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
   style, 
   distance
 }) => {
+  const isMobile = useIsMobile();
+  
   const filteredRecords = records
     .filter(r => {
       return r.style === style &&
@@ -94,8 +96,6 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
     })),
   };
 
-  const isMobile = useIsMobile();
-  
   const options: ChartOptions<'line'> = {
     responsive: true,
     maintainAspectRatio: false,
@@ -104,8 +104,8 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
         position: isMobile ? 'bottom' : 'top',
         align: 'start',
         labels: {
-          boxWidth: isMobile ? 8 : 12,
-          padding: isMobile ? 8 : 10,
+          boxWidth: isMobile ? 6 : 12,
+          padding: isMobile ? 4 : 10,
           font: {
             size: isMobile ? 8 : 11,
             family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
@@ -122,7 +122,7 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
           family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
           weight: '500'
         },
-        padding: { top: isMobile ? 2 : 8, bottom: isMobile ? 4 : 8 }
+        padding: { top: isMobile ? 4 : 8, bottom: isMobile ? 4 : 8 }
       },
       tooltip: {
         callbacks: {
@@ -157,6 +157,9 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
           },
           maxTicksLimit: isMobile ? 6 : 8
         },
+        grid: {
+          display: !isMobile
+        }
       },
       x: {
         grid: {
@@ -166,7 +169,7 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
           maxRotation: isMobile ? 45 : 0,
           minRotation: isMobile ? 45 : 0,
           font: {
-            size: isMobile ? 8 : 10
+            size: isMobile ? 9 : 10
           },
           maxTicksLimit: isMobile ? 6 : 10
         }
@@ -174,19 +177,20 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
     },
     layout: {
       padding: {
-        left: isMobile ? 2 : 8,
-        right: isMobile ? 2 : 8,
-        top: isMobile ? 2 : 8,
-        bottom: isMobile ? 15 : 8
+        left: isMobile ? 4 : 8,
+        right: isMobile ? 4 : 8,
+        top: isMobile ? 4 : 8,
+        bottom: isMobile ? 20 : 8
       }
     }
   };
 
   return (
-    <div className="w-full h-[200px] sm:h-[250px] md:h-[350px] p-1 sm:p-2">
+    <div className="w-full h-[200px] sm:h-[300px] md:h-[400px] p-1 sm:p-4">
       <Line 
         data={data} 
         options={options}
+        className="!w-full !h-full"
       />
     </div>
   );
