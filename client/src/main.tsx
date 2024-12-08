@@ -1,11 +1,10 @@
-import { StrictMode } from "react";
+import React, { StrictMode, Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { Switch, Route } from "wouter";
 import "./index.css";
 import { SWRConfig } from "swr";
 import { fetcher } from "./lib/fetcher";
 import { Toaster } from "./components/ui/toaster";
-import { Suspense, lazy } from "react";
 
 // Lazy load pages
 const Dashboard = lazy(() => import("./pages/Dashboard"));
