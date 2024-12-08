@@ -1,5 +1,5 @@
 import React from 'react';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { useIsMobile } from '../hooks/use-mobile';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -101,12 +101,12 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        position: isMobile ? 'bottom' : 'bottom',
+        position: 'bottom',
         labels: {
-          boxWidth: isMobile ? 8 : 12,
-          padding: isMobile ? 4 : 10,
-          font: {
-            size: isMobile ? 8 : 11,
+          boxWidth: isMobile ? 6 : 10,
+          padding: isMobile ? 2 : 8,
+          font: { 
+            size: isMobile ? 8 : 10,
             family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           },
           usePointStyle: true,
@@ -165,13 +165,13 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
           display: !isMobile
         },
         ticks: {
-          maxRotation: isMobile ? 45 : 0,
-          minRotation: isMobile ? 45 : 0,
+          maxRotation: 45,
+          minRotation: 45,
           font: {
             size: isMobile ? 8 : 10
           },
-          maxTicksLimit: isMobile ? 6 : 8,
-          padding: isMobile ? 4 : 8
+          maxTicksLimit: isMobile ? 4 : 6,
+          padding: isMobile ? 2 : 8
         }
       }
     },
@@ -186,8 +186,8 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
   };
 
   return (
-    <div className="w-full h-[200px] sm:h-[280px] lg:h-[400px] overflow-x-auto p-1 sm:p-2 lg:p-4">
-      <div className="min-w-[300px]">
+    <div className="w-full h-[200px] sm:h-[280px] lg:h-[400px] p-1 sm:p-2 lg:p-4">
+      <div className="w-full">
         <Line 
           data={data} 
           options={options}

@@ -218,7 +218,7 @@ export function TimeHistoryModal({
         setEditingRecord(null);
         onClose();
       }}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
             <DialogTitle>{athleteName}の記録履歴</DialogTitle>
             <DialogDescription>
