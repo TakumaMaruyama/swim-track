@@ -8,17 +8,17 @@ export class FetchError extends Error {
   }
 }
 
-// Fetcher function for SWR that includes credentials and handles non-200 responses
+// SWR用のfetcher関数：クレデンシャルとエラーハンドリングを含む
 export const fetcher = async (url: string) => {
   const res = await fetch(url, {
-    credentials: "include",
+    credentials: 'include',
   });
 
   if (!res.ok) {
     const error = new FetchError(
-      `A ${res.status} error occurred while fetching the data.`,
+      `APIリクエストでエラーが発生しました（ステータス: ${res.status}）`,
       await res.json(),
-      res.status,
+      res.status
     );
     throw error;
   }
