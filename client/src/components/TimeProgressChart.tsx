@@ -56,7 +56,10 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
 
   const formatDate = (date: Date | string | null) => {
     if (!date) return '';
-    return new Date(date).toLocaleDateString('ja-JP');
+    return new Date(date).toLocaleDateString('ja-JP', {
+      month: 'numeric',
+      day: 'numeric'
+    });
   };
 
   // Group records by pool length
@@ -71,8 +74,8 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
     labels: filteredRecords.map(r => formatDate(r.date)),
     datasets: poolLengths.map((poolLength, index) => ({
       label: poolLength === 15 ? "15ｍプール" :
-             poolLength === 25 ? "25ｍプール（短水路）" :
-             "50ｍプール（長水路）",
+             poolLength === 25 ? "25ｍプール" :
+             "50ｍプール",
       data: filteredRecords
         .filter(r => r.poolLength === poolLength)
         .map(r => ({
@@ -87,23 +90,24 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
         .map(r => r.isCompetition ? 'star' : 'circle'),
       pointRadius: filteredRecords
         .filter(r => r.poolLength === poolLength)
-        .map(r => r.isCompetition ? 8 : 4),
+        .map(r => r.isCompetition ? 6 : 3),
     })),
   };
 
-  const { isMobile } = useIsMobile();
+  const isMobile = useIsMobile();
   
   const options: ChartOptions<'line'> = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
       legend: {
-        position: isMobile ? 'bottom' as const : 'top' as const,
-        align: 'center',
+        position: isMobile ? 'bottom' : 'top',
+        align: 'start',
         labels: {
-          boxWidth: isMobile ? 6 : 40,
-          padding: isMobile ? 6 : 20,
+          boxWidth: isMobile ? 8 : 12,
+          padding: isMobile ? 8 : 10,
           font: {
-            size: isMobile ? 9 : 12,
+            size: isMobile ? 8 : 11,
             family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           },
           usePointStyle: true,
@@ -114,11 +118,11 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
         display: true,
         text: `${style} ${distance}m の記録推移`,
         font: {
-          size: isMobile ? 13 : 16,
+          size: isMobile ? 12 : 14,
           family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
           weight: '500'
         },
-        padding: { top: isMobile ? 0 : 10, bottom: isMobile ? 5 : 10 }
+        padding: { top: isMobile ? 2 : 8, bottom: isMobile ? 4 : 8 }
       },
       tooltip: {
         callbacks: {
@@ -136,7 +140,10 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
         reverse: true,
         title: {
           display: !isMobile,
-          text: 'タイム (秒)',
+          text: 'タイム',
+          font: {
+            size: isMobile ? 10 : 12
+          }
         },
         ticks: {
           callback: function(this: Scale<CoreScaleOptions>, value: number | string): string {
@@ -146,38 +153,40 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
             return `${minutes}:${seconds.padStart(5, '0')}`;
           },
           font: {
-            size: isMobile ? 10 : 12
-          }
+            size: isMobile ? 9 : 11
+          },
+          maxTicksLimit: isMobile ? 6 : 8
         },
       },
       x: {
+        grid: {
+          display: !isMobile
+        },
         ticks: {
           maxRotation: isMobile ? 45 : 0,
+          minRotation: isMobile ? 45 : 0,
           font: {
-            size: isMobile ? 10 : 12
-          }
+            size: isMobile ? 8 : 10
+          },
+          maxTicksLimit: isMobile ? 6 : 10
         }
       }
     },
+    layout: {
+      padding: {
+        left: isMobile ? 2 : 8,
+        right: isMobile ? 2 : 8,
+        top: isMobile ? 2 : 8,
+        bottom: isMobile ? 15 : 8
+      }
+    }
   };
 
   return (
-    <div className="w-full h-[250px] sm:h-[300px] md:h-[400px] p-1 sm:p-2">
+    <div className="w-full h-[200px] sm:h-[250px] md:h-[350px] p-1 sm:p-2">
       <Line 
         data={data} 
-        options={{
-          ...options,
-          maintainAspectRatio: false,
-          responsive: true,
-          layout: {
-            padding: {
-              left: isMobile ? 5 : 20,
-              right: isMobile ? 5 : 20,
-              top: isMobile ? 5 : 20,
-              bottom: isMobile ? 20 : 20
-            }
-          }
-        }} 
+        options={options}
       />
     </div>
   );
