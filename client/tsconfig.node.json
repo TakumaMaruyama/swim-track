@@ -9,11 +9,11 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "@/components/*": ["src/components/*"],
-      "@/lib/*": ["src/lib/*"],
-      "@/hooks/*": ["src/hooks/*"],
-      "@/pages/*": ["src/pages/*"],
-      "db/*": ["../db/*"]
+      "@/components": ["src/components"],
+      "@/lib": ["src/lib"],
+      "@/hooks": ["src/hooks"],
+      "@/pages": ["src/pages"],
+      "db": ["../db"]
     }
   },
   "include": ["vite.config.ts"]
