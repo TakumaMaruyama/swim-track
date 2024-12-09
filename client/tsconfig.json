@@ -22,7 +22,7 @@
       "@/lib/*": ["src/lib/*"],
       "@/hooks/*": ["src/hooks/*"],
       "@/pages/*": ["src/pages/*"],
-      "db": ["../db"],
+      "db": ["../db/index"],
       "db/*": ["../db/*"]
     },
     "types": ["vite/client"]
