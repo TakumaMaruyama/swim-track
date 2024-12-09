@@ -7,12 +7,12 @@ import { Toaster } from "./components/ui/toaster";
 import "./index.css";
 
 // Lazy load pages
-const Dashboard = lazy(() => import("./pages/Dashboard"));
-const Documents = lazy(() => import("./pages/Documents"));
-const Athletes = lazy(() => import("./pages/Athletes"));
-const AllTimeRecords = lazy(() => import("./pages/AllTimeRecords"));
-const Competitions = lazy(() => import("./pages/Competitions"));
-const AdminLogin = lazy(() => import("./pages/AdminLogin"));
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const Documents = lazy(() => import("@/pages/Documents"));
+const Athletes = lazy(() => import("@/pages/Athletes"));
+const AllTimeRecords = lazy(() => import("@/pages/AllTimeRecords"));
+const Competitions = lazy(() => import("@/pages/Competitions"));
+const AdminLogin = lazy(() => import("@/pages/AdminLogin"));
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
