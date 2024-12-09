@@ -218,71 +218,73 @@ export function TimeHistoryModal({
         setEditingRecord(null);
         onClose();
       }}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{athleteName}の記録履歴</DialogTitle>
+        <DialogContent className="max-w-4xl h-[90vh] sm:h-[80vh] overflow-y-auto p-4 sm:p-6">
+          <DialogHeader className="mb-4">
+            <DialogTitle className="text-xl sm:text-2xl">{athleteName}の記録履歴</DialogTitle>
             <DialogDescription>
               選手の記録の推移と詳細を表示します
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex gap-4 mb-4">
-            <Select value={styleFilter} onValueChange={setStyleFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="種目で絞り込み" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">すべての種目</SelectItem>
-                {swimStyles.map(style => (
-                  <SelectItem key={style} value={style}>{style}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex flex-col sm:flex-row gap-4 mb-4">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Select value={styleFilter} onValueChange={setStyleFilter}>
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="種目で絞り込み" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">すべての種目</SelectItem>
+                  {swimStyles.map(style => (
+                    <SelectItem key={style} value={style}>{style}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            <Select value={periodFilter} onValueChange={setPeriodFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="期間で絞り込み" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">すべての期間</SelectItem>
-                <SelectItem value="1month">過去1ヶ月</SelectItem>
-                <SelectItem value="3months">過去3ヶ月</SelectItem>
-                <SelectItem value="6months">過去6ヶ月</SelectItem>
-                <SelectItem value="1year">過去1年</SelectItem>
-                <SelectItem value="custom">カスタム期間</SelectItem>
-              </SelectContent>
-            </Select>
+              <Select value={periodFilter} onValueChange={setPeriodFilter}>
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="期間で絞り込み" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">すべての期間</SelectItem>
+                  <SelectItem value="1month">過去1ヶ月</SelectItem>
+                  <SelectItem value="3months">過去3ヶ月</SelectItem>
+                  <SelectItem value="6months">過去6ヶ月</SelectItem>
+                  <SelectItem value="1year">過去1年</SelectItem>
+                  <SelectItem value="custom">カスタム期間</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="並び替え" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="date_desc">日付 (新しい順)</SelectItem>
+                  <SelectItem value="date_asc">日付 (古い順)</SelectItem>
+                  <SelectItem value="time_asc">タイム (速い順)</SelectItem>
+                  <SelectItem value="time_desc">タイム (遅い順)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
             {periodFilter === "custom" && (
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="date"
                   value={customStartDate}
                   onChange={(e) => setCustomStartDate(e.target.value)}
-                  className="px-3 py-2 border rounded"
+                  className="w-full sm:w-auto px-3 py-2 border rounded"
                   placeholder="開始日"
                 />
                 <input
                   type="date"
                   value={customEndDate}
                   onChange={(e) => setCustomEndDate(e.target.value)}
-                  className="px-3 py-2 border rounded"
+                  className="w-full sm:w-auto px-3 py-2 border rounded"
                   placeholder="終了日"
                 />
               </div>
             )}
-
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="並び替え" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="date_desc">日付 (新しい順)</SelectItem>
-                <SelectItem value="date_asc">日付 (古い順)</SelectItem>
-                <SelectItem value="time_asc">タイム (速い順)</SelectItem>
-                <SelectItem value="time_desc">タイム (遅い順)</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
           <div className="space-y-6">
@@ -294,21 +296,21 @@ export function TimeHistoryModal({
                 <Card key={key}>
                   <CardContent className="pt-6">
                     <div className="mb-4">
-                      <h3 className="text-lg font-semibold">
+                      <h3 className="text-base sm:text-lg font-semibold">
                         {style} {distance}m
                       </h3>
                     </div>
                     
                     <ErrorBoundary
                       fallback={
-                        <div className="w-full h-[400px] flex items-center justify-center text-destructive">
+                        <div className="w-full h-[250px] sm:h-[400px] flex items-center justify-center text-destructive">
                           グラフの読み込み中にエラーが発生しました
                         </div>
                       }
                     >
                       <Suspense 
                         fallback={
-                          <div className="w-full h-[400px] flex items-center justify-center">
+                          <div className="w-full h-[250px] sm:h-[400px] flex items-center justify-center">
                             <div className="flex flex-col items-center gap-2">
                               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                               <p className="text-sm text-muted-foreground">グラフを読み込んでいます...</p>
