@@ -1,5 +1,5 @@
 import React from 'react';
-import { useSwimRecords } from '../hooks/use-swim-records';
+import { useSwimRecords } from '@/hooks/use-swim-records';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Edit2, Plus } from "lucide-react";
