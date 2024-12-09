@@ -29,7 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { Trophy, Trash2, Edit2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-import type { ExtendedSwimRecord } from "../hooks/use-swim-records";
+import type { ExtendedSwimRecord } from "@/hooks/use-swim-records";
 import { lazy, Suspense } from 'react';
 import { ErrorBoundary } from './ErrorBoundary';
 const TimeProgressChart = lazy(() => 
