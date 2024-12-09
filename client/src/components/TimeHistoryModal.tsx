@@ -5,7 +5,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from "@/components/ui/dialog";
+} from "./ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,21 +15,21 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+} from "./ui/alert-dialog";
+import { Card, CardContent } from "./ui/card";
+import { Button } from "./ui/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
+} from "./ui/select";
+import { Badge } from "./ui/badge";
 import { Trophy, Trash2, Edit2 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "../hooks/use-toast";
 
-import type { ExtendedSwimRecord } from "@/hooks/use-swim-records";
+import type { ExtendedSwimRecord } from "../hooks/use-swim-records";
 import { lazy, Suspense } from 'react';
 import { ErrorBoundary } from './ErrorBoundary';
 const TimeProgressChart = lazy(() => 
