@@ -11,12 +11,12 @@
     "moduleResolution": "bundler",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./client/src/*"],
-      "@/components/*": ["./client/src/components/*"],
-      "@/components/ui/*": ["./client/src/components/ui/*"],
-      "@/lib/*": ["./client/src/lib/*"],
-      "@/hooks/*": ["./client/src/hooks/*"],
-      "db/*": ["./db/*"]
+      "@/*": ["client/src/*"],
+      "@/components/*": ["client/src/components/*"],
+      "@/lib/*": ["client/src/lib/*"],
+      "@/hooks/*": ["client/src/hooks/*"],
+      "@/pages/*": ["client/src/pages/*"],
+      "db/*": ["db/*"]
     }
   }
 }
