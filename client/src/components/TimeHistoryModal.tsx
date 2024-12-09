@@ -37,7 +37,7 @@ const TimeProgressChart = lazy(() =>
     default: module.default
   }))
 );
-import { EditRecordForm } from './EditRecordForm';
+import { EditRecordForm } from '@/components/EditRecordForm';
 
 type TimeHistoryModalProps = {
   isOpen: boolean;
