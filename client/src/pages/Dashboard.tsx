@@ -1,17 +1,16 @@
 import React from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
-import { Button } from "../components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { 
   Users, 
   ClipboardList,
   Trophy
 } from 'lucide-react'
 import { useLocation } from 'wouter'
-import { useMobile } from '../hooks/use-mobile'
-import { MobileNav } from '../components/MobileNav'
-
+import { useMobile } from '@/hooks/use-mobile'
+import { MobileNav } from '@/components/MobileNav'
 import { PageHeader } from '@/components/PageHeader'
-import { ErrorBoundary } from '../components/ErrorBoundary';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 // Constants outside component
 const NAV_ITEMS = [

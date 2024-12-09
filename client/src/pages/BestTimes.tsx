@@ -4,9 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Edit2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { EditRecordForm } from '../components/EditRecordForm';
+import { EditRecordForm } from '@/components/EditRecordForm';
 import { useToast } from '@/hooks/use-toast';
-import { PageHeader } from '../components/PageHeader';
+import { PageHeader } from '@/components/PageHeader';
 
 type GroupedRecords = {
   [style: string]: {
