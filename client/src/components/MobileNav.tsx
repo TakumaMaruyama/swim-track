@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { Button } from "./ui/button";
+import { Button } from "@/components/ui/button";
 import { 
   Sheet, 
   SheetContent, 
   SheetTrigger,
   SheetTitle,
   SheetDescription 
-} from "./ui/sheet";
+} from "@/components/ui/sheet";
 import { Menu } from 'lucide-react';
 import { useLocation } from 'wouter';
 

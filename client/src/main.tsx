@@ -2,17 +2,17 @@ import React, { StrictMode, Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { Switch, Route } from "wouter";
 import { SWRConfig } from "swr";
-import { fetcher } from "./lib/fetcher";
-import { Toaster } from "./components/ui/toaster";
-import "./index.css";
+import { fetcher } from "@/lib/fetcher";
+import { Toaster } from "@/components/ui/toaster";
+import "@/index.css";
 
 // Lazy load pages
-const Dashboard = lazy(() => import("./pages/Dashboard"));
-const Documents = lazy(() => import("./pages/Documents"));
-const Athletes = lazy(() => import("./pages/Athletes"));
-const AllTimeRecords = lazy(() => import("./pages/AllTimeRecords"));
-const Competitions = lazy(() => import("./pages/Competitions"));
-const AdminLogin = lazy(() => import("./pages/AdminLogin"));
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const Documents = lazy(() => import("@/pages/Documents"));
+const Athletes = lazy(() => import("@/pages/Athletes"));
+const AllTimeRecords = lazy(() => import("@/pages/AllTimeRecords"));
+const Competitions = lazy(() => import("@/pages/Competitions"));
+const AdminLogin = lazy(() => import("@/pages/AdminLogin"));
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
