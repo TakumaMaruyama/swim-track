@@ -10,7 +10,7 @@ import { useLocation } from 'wouter'
 import { useMobile } from '../hooks/use-mobile'
 import { MobileNav } from '../components/MobileNav'
 
-import { PageHeader } from '../components/PageHeader'
+import { PageHeader } from '@/components/PageHeader'
 import { ErrorBoundary } from '../components/ErrorBoundary';
 
 // Constants outside component
