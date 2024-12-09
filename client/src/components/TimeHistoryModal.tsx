@@ -303,14 +303,14 @@ export function TimeHistoryModal({
                     
                     <ErrorBoundary
                       fallback={
-                        <div className="w-full h-[250px] sm:h-[400px] flex items-center justify-center text-destructive">
+                        <div className="w-full h-[200px] sm:h-[300px] lg:h-[400px] flex items-center justify-center text-destructive">
                           グラフの読み込み中にエラーが発生しました
                         </div>
                       }
                     >
                       <Suspense 
                         fallback={
-                          <div className="w-full h-[250px] sm:h-[400px] flex items-center justify-center">
+                          <div className="w-full h-[200px] sm:h-[300px] lg:h-[400px] flex items-center justify-center">
                             <div className="flex flex-col items-center gap-2">
                               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                               <p className="text-sm text-muted-foreground">グラフを読み込んでいます...</p>
