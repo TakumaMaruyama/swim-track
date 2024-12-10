@@ -32,54 +32,68 @@ function useChart() {
   return context
 }
 
-const ChartContainer = React.forwardRef<
-  HTMLDivElement,
-  React.ComponentProps<"div"> & {
-    config: ChartConfig
-    children: React.ComponentProps<
-      typeof RechartsPrimitive.ResponsiveContainer
-    >["children"]
-  }
->(({ id, className, children, config, ...props }, ref) => {
-  const uniqueId = React.useId()
-  const chartId = `chart-${id || uniqueId.replace(/:/g, "")}`
+const ChartContainer = React.memo(
+  React.forwardRef<
+    HTMLDivElement,
+    React.ComponentProps<"div"> & {
+      config: ChartConfig
+      children: React.ComponentProps<
+        typeof RechartsPrimitive.ResponsiveContainer
+      >["children"]
+    }
+  >(({ id, className, children, config, ...props }, ref) => {
+    const uniqueId = React.useId()
+    const chartId = React.useMemo(() => `chart-${id || uniqueId.replace(/:/g, "")}`, [id, uniqueId])
+    
+    const memoizedClassName = React.useMemo(() => 
+      cn(
+        "flex aspect-video justify-center text-xs transition-opacity duration-200 [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-none [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted/10 [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-sector]:outline-none [&_.recharts-surface]:outline-none hover:opacity-95",
+        className
+      ),
+      [className]
+    )
 
-  return (
-    <ChartContext.Provider value={{ config }}>
-      <div
-        data-chart={chartId}
-        ref={ref}
-        className={cn(
-          "flex aspect-video justify-center text-xs transition-opacity duration-200 [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-none [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted/10 [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-sector]:outline-none [&_.recharts-surface]:outline-none hover:opacity-95",
-          className
-        )}
-        {...props}
-      >
-        <ChartStyle id={chartId} config={config} />
-        <RechartsPrimitive.ResponsiveContainer>
-          {children}
-        </RechartsPrimitive.ResponsiveContainer>
-      </div>
-    </ChartContext.Provider>
-  )
-})
+    return (
+      <ChartContext.Provider value={{ config }}>
+        <div
+          data-chart={chartId}
+          ref={ref}
+          className={memoizedClassName}
+          {...props}
+        >
+          <ChartStyle id={chartId} config={config} />
+          <RechartsPrimitive.ResponsiveContainer>
+            {children}
+          </RechartsPrimitive.ResponsiveContainer>
+        </div>
+      </ChartContext.Provider>
+    )
+  }),
+  (prevProps, nextProps) => {
+    // カスタム比較関数で不要な再レンダリングを防止
+    return (
+      prevProps.config === nextProps.config &&
+      prevProps.className === nextProps.className &&
+      prevProps.children === nextProps.children
+    )
+  }
+)
 ChartContainer.displayName = "Chart"
 
-const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
-  const colorConfig = Object.entries(config).filter(
-    ([_, config]) => config.theme || config.color
+const ChartStyle = React.memo(({ id, config }: { id: string; config: ChartConfig }) => {
+  const colorConfig = React.useMemo(
+    () => Object.entries(config).filter(([_, config]) => config.theme || config.color),
+    [config]
   )
 
   if (!colorConfig.length) {
     return null
   }
 
-  return (
-    <style
-      dangerouslySetInnerHTML={{
-        __html: Object.entries(THEMES)
-          .map(
-            ([theme, prefix]) => `
+  const styleContent = React.useMemo(
+    () => Object.entries(THEMES)
+      .map(
+        ([theme, prefix]) => `
 ${prefix} [data-chart=${id}] {
 ${colorConfig
   .map(([key, itemConfig]) => {
@@ -91,12 +105,21 @@ ${colorConfig
   .join("\n")}
 }
 `
-          )
-          .join("\n"),
+      )
+      .join("\n"),
+    [id, colorConfig]
+  )
+
+  return (
+    <style
+      dangerouslySetInnerHTML={{
+        __html: styleContent,
       }}
     />
   )
-}
+})
+
+ChartStyle.displayName = "ChartStyle"
 
 const ChartTooltip = RechartsPrimitive.Tooltip
 
