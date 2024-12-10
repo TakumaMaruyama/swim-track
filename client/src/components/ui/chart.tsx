@@ -86,12 +86,12 @@ const ChartStyle = React.memo(({ id, config }: { id: string; config: ChartConfig
     [config]
   )
 
-  if (!colorConfig.length) {
-    return null
-  }
+  const styleContent = React.useMemo(() => {
+    if (!colorConfig.length) {
+      return null;
+    }
 
-  const styleContent = React.useMemo(
-    () => Object.entries(THEMES)
+    return Object.entries(THEMES)
       .map(
         ([theme, prefix]) => `
 ${prefix} [data-chart=${id}] {
@@ -102,13 +102,17 @@ ${colorConfig
       itemConfig.color
     return color ? `  --color-${key}: ${color};` : null
   })
+  .filter(Boolean)
   .join("\n")}
 }
 `
       )
-      .join("\n"),
-    [id, colorConfig]
-  )
+      .join("\n");
+  }, [id, colorConfig]);
+
+  if (!styleContent) {
+    return null;
+  }
 
   return (
     <style
@@ -116,14 +120,17 @@ ${colorConfig
         __html: styleContent,
       }}
     />
-  )
-})
+  );
+}, (prevProps, nextProps) => {
+  return prevProps.id === nextProps.id && 
+         JSON.stringify(prevProps.config) === JSON.stringify(nextProps.config);
+});
 
 ChartStyle.displayName = "ChartStyle"
 
 const ChartTooltip = RechartsPrimitive.Tooltip
 
-const ChartTooltipContent = React.forwardRef<
+const ChartTooltipContent = React.memo(React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<typeof RechartsPrimitive.Tooltip> &
     React.ComponentProps<"div"> & {
