@@ -66,78 +66,89 @@ const preloadRoute = (route: string) => {
   }
 };
 
-createRoot(document.getElementById("root")!).render(
+const root = createRoot(document.getElementById("root")!);
+
+root.render(
   <StrictMode>
-    <SWRConfig value={{ 
-      fetcher,
-      // キャッシュ戦略の最適化
-      revalidateOnFocus: false,
-      revalidateOnReconnect: true,
-      dedupingInterval: 5000,
-      // エラーリトライの設定
-      errorRetryCount: 3,
-      errorRetryInterval: 3000,
-      // キャッシュの永続化とメモリ最適化
-      provider: (cache) => {
-        // 初期状態の復元
-        if (typeof window !== 'undefined') {
-          const stored = sessionStorage.getItem('app-cache')
-          if (stored) {
-            try {
-              const parsedCache = JSON.parse(stored)
-              Object.entries(parsedCache).forEach(([key, value]) => {
-                cache.set(key, value)
-              })
-            } catch (error) {
-              console.error('キャッシュの復元に失敗しました:', error)
-              sessionStorage.removeItem('app-cache')
+    <SWRConfig
+      value={{
+        fetcher,
+        revalidateOnFocus: false,
+        revalidateOnReconnect: true,
+        dedupingInterval: 5000,
+        errorRetryCount: 3,
+        errorRetryInterval: 3000,
+        provider: () => {
+          const cache = new Map();
+
+          // 初期状態の復元
+          if (typeof window !== 'undefined') {
+            const stored = sessionStorage.getItem('app-cache');
+            if (stored) {
+              try {
+                const parsedCache = JSON.parse(stored);
+                Object.entries(parsedCache).forEach(([key, value]) => {
+                  if (value && typeof value === 'object') {
+                    cache.set(key, value);
+                  }
+                });
+              } catch (error) {
+                console.error('キャッシュの復元に失敗しました:', error);
+                sessionStorage.removeItem('app-cache');
+              }
             }
           }
+
+          // キャッシュの自動クリーンアップ
+          const cleanup = setInterval(() => {
+            const keys = Array.from(cache.keys());
+            const now = Date.now();
+            keys.forEach(key => {
+              const value = cache.get(key);
+              if (value && value.timestamp && now - value.timestamp > 1800000) {
+                cache.delete(key);
+              }
+            });
+          }, 300000);
+
+          // アンマウント時にクリーンアップ
+          if (typeof window !== 'undefined') {
+            window.addEventListener('beforeunload', () => {
+              clearInterval(cleanup);
+              const cacheData = Object.fromEntries(cache.entries());
+              sessionStorage.setItem('app-cache', JSON.stringify(cacheData));
+            });
+          }
+
+          return cache;
         }
-
-        // キャッシュの自動クリーンアップ
-        const cleanup = setInterval(() => {
-          const keys = Array.from(cache.keys())
-          const now = Date.now()
-          keys.forEach(key => {
-            const value = cache.get(key)
-            if (value && value.timestamp && now - value.timestamp > 1800000) { // 30分
-              cache.delete(key)
-            }
-          })
-        }, 300000) // 5分ごとにクリーンアップ
-
-        // アンマウント時にクリーンアップ
-        window.addEventListener('beforeunload', () => {
-          clearInterval(cleanup)
-          const cacheData = Object.fromEntries(cache.entries())
-          sessionStorage.setItem('app-cache', JSON.stringify(cacheData))
-        })
-        
-        return cache
-      }
-    }}>
-      <Suspense fallback={
+      }}
+    >
+      <Suspense
+        fallback={
           <div className="flex items-center justify-center min-h-screen">
             <div className="animate-pulse text-muted-foreground">
               <div className="flex items-center gap-2">
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                 <span>読み込み中...</span>
               </div>
             </div>
           </div>
-        }>
-        <Switch>
-          <Route path="/" component={Dashboard} />
-          <Route path="/documents" component={Documents} />
-          <Route path="/athletes" component={Athletes} />
-          <Route path="/all-time-records" component={AllTimeRecords} />
-          <Route path="/competitions" component={Competitions} />
-          <Route path="/admin/login" component={AdminLogin} />
-          <Route>404 ページが見つかりません</Route>
-        </Switch>
+        }
+      >
+        <>
+          <Switch>
+            <Route path="/" component={Dashboard} />
+            <Route path="/documents" component={Documents} />
+            <Route path="/athletes" component={Athletes} />
+            <Route path="/all-time-records" component={AllTimeRecords} />
+            <Route path="/competitions" component={Competitions} />
+            <Route path="/admin/login" component={AdminLogin} />
+            <Route>404 ページが見つかりません</Route>
+          </Switch>
+          <Toaster />
+        </>
       </Suspense>
-      <Toaster />
     </SWRConfig>
   </StrictMode>
 );

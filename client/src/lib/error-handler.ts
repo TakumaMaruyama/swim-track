@@ -7,6 +7,8 @@ type ErrorType = {
   message: string;
   code?: string;
   status?: number;
+  isHandled?: boolean;
+  retryCount?: number;
 };
 
 // エラーメッセージのマッピング
@@ -17,8 +19,15 @@ const ERROR_MESSAGES: Record<string, string> = {
   NOT_FOUND: "要求されたリソースが見つかりません。",
   VALIDATION_ERROR: "入力内容に誤りがあります。",
   SERVER_ERROR: "サーバーエラーが発生しました。しばらく待ってから再度お試しください。",
+  TIMEOUT_ERROR: "リクエストがタイムアウトしました。ネットワーク状態を確認してください。",
+  PROMISE_REJECTION: "データの取得中にエラーが発生しました。再試行します。",
   DEFAULT: "予期せぬエラーが発生しました。しばらく待ってから再度お試しください。"
 };
+
+// 最大リトライ回数
+const MAX_RETRY_COUNT = 3;
+// リトライ間隔（ミリ秒）
+const RETRY_INTERVAL = 1000;
 
 // エラーの種類を判定する関数
 function getErrorType(error: unknown): ErrorType {
@@ -114,7 +123,41 @@ export function setupErrorHandlers() {
     console.error('Unhandled promise rejection:', event.reason);
     
     const error = getErrorType(event.reason);
-    showThrottledToast(error);
+    
+    // リトライカウンターの初期化
+    if (!error.retryCount) {
+      error.retryCount = 0;
+    }
+    
+    // リトライ可能なエラーの場合、再試行を実行
+    if (error.retryCount < MAX_RETRY_COUNT && 
+        (error.name === 'NetworkError' || error.status === 408 || error.status === 429)) {
+      error.retryCount++;
+      error.message = `${error.message} (リトライ ${error.retryCount}/${MAX_RETRY_COUNT})`;
+      
+      // 指数バックオフでリトライ
+      setTimeout(() => {
+        // リトライ時にはエラーをスローせずに処理
+        try {
+          if (event.reason?.config?.url) {
+            fetch(event.reason.config.url, event.reason.config)
+              .then(response => {
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                return response.json();
+              })
+              .catch(retryError => {
+                const retryErrorType = getErrorType(retryError);
+                showThrottledToast(retryErrorType);
+              });
+          }
+        } catch (retryError) {
+          console.error('Retry failed:', retryError);
+        }
+      }, RETRY_INTERVAL * Math.pow(2, error.retryCount - 1));
+    } else {
+      // リトライ不可能なエラーまたはリトライ回数超過の場合
+      showThrottledToast(error);
+    }
 
     // エラーイベントをキャンセルしてコンソールエラーを防ぐ
     event.preventDefault();
