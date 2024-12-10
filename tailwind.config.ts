@@ -4,8 +4,8 @@ import type { Config } from "tailwindcss";
 export default {
     darkMode: ["class"],
     content: [
-      "./src/**/*.{js,ts,jsx,tsx}",
-      "./index.html",
+      "./client/src/**/*.{js,ts,jsx,tsx}",
+      "./client/index.html",
     ],
   theme: {
   	extend: {

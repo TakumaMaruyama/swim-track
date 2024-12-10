@@ -27,10 +27,12 @@ export class ErrorBoundary extends Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       return this.props.fallback || (
-        <Alert variant="destructive" className="m-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            エラーが発生しました。ページを再読み込みしてください。
+        <Alert variant="destructive" className="m-4 flex items-center gap-2">
+          <AlertCircle className="h-5 w-5" />
+          <AlertDescription className="text-sm">
+            申し訳ありません。データの取得中にエラーが発生しました。
+            <br />
+            しばらく待ってから再度お試しください。
           </AlertDescription>
         </Alert>
       );
