@@ -76,6 +76,45 @@
   }
 }
 
+  .nav-item {
+    @apply flex items-center gap-2 px-4 py-2 rounded-md hover:bg-accent text-foreground hover:text-accent-foreground transition-colors;
+  }
+  
+  .nav-item.active {
+    @apply bg-primary text-primary-foreground hover:bg-primary/90;
+  }
+  
+  .card {
+    @apply p-6 bg-card text-card-foreground rounded-lg border border-border shadow-sm;
+  }
+  
+  .card-header {
+    @apply flex flex-col space-y-1.5 pb-4;
+  }
+  
+  .card-title {
+    @apply text-2xl font-semibold leading-none tracking-tight;
+  }
+  
+  .card-description {
+    @apply text-sm text-muted-foreground;
+  }
+  
+  .card-content {
+    @apply p-0 pt-0;
+  }
+  
+  .card-footer {
+    @apply flex items-center pt-4;
+  }
+
+  .mobile-nav {
+    @apply md:hidden fixed bottom-0 left-0 right-0 border-t bg-background p-2;
+  }
+  
+  .mobile-nav-items {
+    @apply grid grid-cols-4 gap-2;
+  }
 @layer components {
   .btn-primary {
     @apply bg-primary text-primary-foreground hover:bg-primary/90;
