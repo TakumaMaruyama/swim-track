@@ -9,7 +9,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Enable CORS for development
+// Enable CORS for development with caching improvements
 app.use((req, res, next) => {
   const isDevelopment = process.env.NODE_ENV !== 'production';
   const origin = req.headers.origin;
@@ -34,15 +34,33 @@ app.use((req, res, next) => {
     }
   }
 
+  // キャッシュ制御の最適化
+  if (req.method === 'GET') {
+    res.header('Cache-Control', 'public, max-age=300'); // 5分のキャッシュ
+    res.header('Vary', 'Origin, Accept-Encoding');
+  } else {
+    res.header('Cache-Control', 'no-store');
+  }
+
   // 共通のCORS設定
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Max-Age', '86400'); // CORS プリフライトの結果を24時間キャッシュ
 
   // プリフライトリクエストの処理
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
+
+  // リクエストタイミングの記録
+  req.startTime = Date.now();
+  
+  // レスポンス完了時のログ記録
+  res.on('finish', () => {
+    const duration = Date.now() - req.startTime;
+    console.log(`${req.method} ${req.url} - ${res.statusCode} - ${duration}ms`);
+  });
 
   next();
 });

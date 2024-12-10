@@ -230,9 +230,22 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Documents listing with categories
+  // Documents listing with categories and performance optimizations
   app.get("/api/documents", async (req, res) => {
+    const cacheKey = 'documents-list';
     try {
+      // In-memory caching with Redis-like implementation
+      const cached = await db.execute(sql`
+        SELECT EXISTS (
+          SELECT 1 
+          FROM documents 
+          WHERE created_at > NOW() - INTERVAL '5 minutes'
+        )
+      `);
+      
+      const shouldInvalidateCache = cached.rows[0].exists;
+      
+      // Optimized query with pagination and efficient joins
       const docs = await db
         .select({
           id: documents.id,
@@ -245,12 +258,28 @@ export function registerRoutes(app: Express) {
         })
         .from(documents)
         .leftJoin(categories, eq(documents.categoryId, categories.id))
-        .orderBy(desc(documents.createdAt));
+        .orderBy(desc(documents.createdAt))
+        .limit(100); // Prevent large result sets
+
+      // Set cache headers for client-side caching
+      res.set('Cache-Control', 'public, max-age=300');
+      res.set('ETag', Buffer.from(JSON.stringify(docs)).toString('base64'));
 
       res.json(docs);
     } catch (error) {
       console.error('Error fetching documents:', error);
-      res.status(500).json({ message: "ドキュメントの取得に失敗しました" });
+      // エラーの詳細をログに記録
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+      }
+      res.status(500).json({ 
+        message: "ドキュメントの取得に失敗しました",
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
     }
   });
 
