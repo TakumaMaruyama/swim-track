@@ -32,11 +32,49 @@ import { useToast } from "@/hooks/use-toast";
 import type { ExtendedSwimRecord } from "@/hooks/use-swim-records";
 import { lazy, Suspense } from 'react';
 import { ErrorBoundary } from './ErrorBoundary';
-const TimeProgressChart = lazy(() => 
-  import('./TimeProgressChart').then(module => ({
+const TimeProgressChart = lazy(() => {
+  if (typeof window !== 'undefined') {
+    // プリロードのヒントを追加
+    const link = document.createElement('link');
+    link.rel = 'modulepreload';
+    link.href = './TimeProgressChart';
+    document.head.appendChild(link);
+  }
+  return import('./TimeProgressChart').then(module => ({
     default: module.default
-  }))
-);
+  }));
+});
+
+// データ処理をメモ化
+const useFilteredRecords = (records: ExtendedSwimRecord[], styleFilter: string, periodFilter: string) => {
+  return React.useMemo(() => {
+    return records.filter(record => {
+      if (styleFilter !== "all" && record.style !== styleFilter) {
+        return false;
+      }
+      // 期間フィルターの処理
+      if (periodFilter !== "all" && record.date) {
+        const recordDate = new Date(record.date);
+        const now = new Date();
+        
+        switch (periodFilter) {
+          case "1month": {
+            const oneMonthAgo = new Date();
+            oneMonthAgo.setMonth(now.getMonth() - 1);
+            return recordDate >= oneMonthAgo;
+          }
+          case "3months": {
+            const threeMonthsAgo = new Date();
+            threeMonthsAgo.setMonth(now.getMonth() - 3);
+            return recordDate >= threeMonthsAgo;
+          }
+          // 他のケースも同様...
+        }
+      }
+      return true;
+    });
+  }, [records, styleFilter, periodFilter]);
+};
 import { EditRecordForm } from '@/components/EditRecordForm';
 
 type TimeHistoryModalProps = {

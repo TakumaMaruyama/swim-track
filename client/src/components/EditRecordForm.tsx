@@ -1,6 +1,7 @@
 import React from 'react';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import {
   Form,
   FormControl,
@@ -20,18 +21,9 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { SwimRecord } from "db/schema";
-import * as z from "zod";
-import useSWR from "swr";
 
 // Time format validation regex: MM:SS.ms
 const timeRegex = /^([0-5]?[0-9]):([0-5][0-9])\.([0-9]{1,3})$/;
@@ -64,8 +56,6 @@ const editRecordSchema = z.object({
   competitionLocation: z.string().optional(),
 });
 
-
-
 type EditRecordFormProps = {
   record?: SwimRecord;
   studentId?: number;
@@ -74,13 +64,21 @@ type EditRecordFormProps = {
   onSubmit: (values: z.infer<typeof editRecordSchema>) => Promise<void>;
 };
 
-export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }: EditRecordFormProps) {
+export const EditRecordForm = React.memo(function EditRecordForm({ 
+  record, 
+  studentId, 
+  isOpen, 
+  onClose, 
+  onSubmit 
+}: EditRecordFormProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   
-
+  // Zodスキーマをメモ化
+  const validationSchema = React.useMemo(() => editRecordSchema, []);
+  
   const form = useForm({
-    resolver: zodResolver(editRecordSchema),
+    resolver: zodResolver(validationSchema),
     defaultValues: {
       style: record?.style ?? "",
       distance: record?.distance ?? 50,
@@ -88,11 +86,10 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
       date: record ? new Date(record.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       poolLength: record?.poolLength ?? 25,
       isCompetition: record?.isCompetition ?? false,
-      competitionId: record?.competitionId ?? undefined,
+      competitionName: record?.competitionName ?? "",
+      competitionLocation: record?.competitionLocation ?? "",
     },
   });
-
-  const watchIsCompetition = form.watch('isCompetition');
 
   const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
     try {
@@ -114,13 +111,13 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
     }
   };
 
-  const swimStyles = [
+  const swimStyles = React.useMemo(() => [
     "自由形",
     "背泳ぎ",
     "平泳ぎ",
     "バタフライ",
     "個人メドレー"
-  ];
+  ], []);
 
   const watchedPoolLength = form.watch('poolLength');
 
@@ -330,4 +327,6 @@ export function EditRecordForm({ record, studentId, isOpen, onClose, onSubmit }:
       </DialogContent>
     </Dialog>
   );
-}
+});
+
+EditRecordForm.displayName = "EditRecordForm";

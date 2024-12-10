@@ -38,9 +38,42 @@ const swimStyles = [
   "個人メドレー"
 ];
 
+const Record = React.memo(({ record, onEdit, onDelete }: { 
+  record: GroupedRecord;
+  onEdit?: (id: number) => void;
+  onDelete?: (id: number) => void;
+}) => (
+  <div className="p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group">
+    <div className="space-y-4">
+      <p className="text-xl text-primary font-bold">{record.style}</p>
+      <div className="flex items-center gap-3">
+        <p className="text-xl">{record.athleteName}</p>
+        <p className="text-xl">{formatTime(record.time)}</p>
+      </div>
+      <time className="text-sm text-muted-foreground block">
+        {new Date(record.date).toLocaleDateString('ja-JP', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        })}
+      </time>
+      {record.isCompetition && (
+        <Badge variant="secondary" className="inline-flex items-center gap-1">
+          <Trophy className="h-3 w-3" />
+          大会記録
+        </Badge>
+      )}
+    </div>
+  </div>
+));
+
 export default function AllTimeRecords() {
   const { toast } = useToast();
-  const { records, isLoading, error, mutate } = useSwimRecords();
+  const { records, isLoading, error, mutate } = useSwimRecords({
+    revalidateOnFocus: false,
+    revalidateOnReconnect: true,
+    refreshInterval: 30000
+  });
   const [editingRecord, setEditingRecord] = React.useState<number | null>(null);
   const [poolLengthFilter, setPoolLengthFilter] = React.useState<string>("25");
 
