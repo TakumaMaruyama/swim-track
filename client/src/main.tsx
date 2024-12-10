@@ -1,10 +1,14 @@
-import React, { StrictMode, Suspense, lazy } from "react";
+import React, { StrictMode, Suspense, lazy, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { Switch, Route } from "wouter";
 import { SWRConfig } from "swr";
 import { fetcher } from "./lib/fetcher";
 import { Toaster } from "./components/ui/toaster";
+import { setupErrorHandlers } from "./lib/error-handler";
 import "./index.css";
+
+// Initialize error handlers
+setupErrorHandlers();
 
 // Lazy load pages
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
@@ -17,7 +21,16 @@ const AdminLogin = lazy(() => import("@/pages/AdminLogin"));
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <SWRConfig value={{ fetcher }}>
-      <Suspense fallback={<div className="flex items-center justify-center min-h-screen">読み込み中...</div>}>
+      <Suspense fallback={
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="animate-pulse text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+                <span>読み込み中...</span>
+              </div>
+            </div>
+          </div>
+        }>
         <Switch>
           <Route path="/" component={Dashboard} />
           <Route path="/documents" component={Documents} />
