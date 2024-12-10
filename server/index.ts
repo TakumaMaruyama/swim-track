@@ -11,27 +11,54 @@ app.use(express.urlencoded({ extended: false }));
 
 // Enable CORS for development
 app.use((req, res, next) => {
-  const replSlug = process.env.REPL_SLUG;
-  const allowedOrigins = [
-    'http://localhost:5173',
-    replSlug ? `https://${replSlug}.repl.co` : null,
-    replSlug ? `https://${replSlug}.repl.co:443` : null,
-    replSlug ? `https://webview.${replSlug}.repl.co` : null,
-    replSlug ? `https://${replSlug}.id.repl.co` : null
-  ].filter(Boolean);
-  
+  const isDevelopment = process.env.NODE_ENV !== 'production';
   const origin = req.headers.origin;
-  if (origin && allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  
+  // Development環境では、すべてのオリジンを許可
+  if (isDevelopment) {
+    if (origin) {
+      res.header('Access-Control-Allow-Origin', origin);
+    }
+  } else {
+    // Production環境では、特定のオリジンのみを許可
+    const replSlug = process.env.REPL_SLUG;
+    const allowedOrigins = [
+      replSlug ? `https://${replSlug}.repl.co` : null,
+      replSlug ? `https://${replSlug}.repl.co:443` : null,
+      replSlug ? `https://webview.${replSlug}.repl.co` : null,
+      replSlug ? `https://${replSlug}.id.repl.co` : null
+    ].filter(Boolean);
+    
+    if (origin && allowedOrigins.includes(origin)) {
+      res.header('Access-Control-Allow-Origin', origin);
+    }
   }
 
+  // 共通のCORS設定
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+
+  // プリフライトリクエストの処理
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
+
   next();
+});
+
+// エラーハンドリングの強化
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  console.error('Server error:', err);
+  const status = err.status || err.statusCode || 500;
+  const message = err.message || "Internal Server Error";
+  
+  // 開発環境では詳細なエラー情報を返す
+  const error = process.env.NODE_ENV === 'development' 
+    ? { message, stack: err.stack }
+    : { message };
+  
+  res.status(status).json(error);
 });
 
 // Configure authentication
