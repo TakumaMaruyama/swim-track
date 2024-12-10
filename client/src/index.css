@@ -134,30 +134,31 @@
   }
 
   .card-container {
-    @apply grid gap-4 p-4 md:p-6 lg:p-8 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
+    @apply grid gap-6 p-4 md:p-6 lg:p-8 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
   }
+  
   .card {
-    @apply p-6 bg-card text-card-foreground rounded-lg border border-border shadow-sm;
+    @apply p-6 bg-card text-card-foreground rounded-lg border border-border/40 shadow-sm hover:shadow-md transition-shadow duration-200;
   }
 
   .card-header {
-    @apply flex flex-col space-y-1.5 pb-4;
+    @apply flex flex-col space-y-2 pb-6;
   }
 
   .card-title {
-    @apply text-2xl font-semibold leading-none tracking-tight;
+    @apply text-2xl font-semibold leading-none tracking-tight text-foreground;
   }
 
   .card-description {
-    @apply text-sm text-muted-foreground;
+    @apply text-sm text-muted-foreground leading-normal;
   }
 
   .card-content {
-    @apply p-0 pt-0;
+    @apply space-y-4;
   }
 
   .card-footer {
-    @apply flex items-center pt-4;
+    @apply flex items-center justify-between pt-6 mt-6 border-t border-border/20;
   }
 }
 
@@ -200,26 +201,26 @@
   }
 
   .form-group {
-    @apply space-y-2;
+    @apply space-y-3;
   }
 
   .form-label {
-    @apply text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70;
+    @apply block text-sm font-medium leading-none text-foreground peer-disabled:cursor-not-allowed peer-disabled:opacity-70;
   }
 
   .form-description {
-    @apply text-sm text-muted-foreground;
+    @apply text-[0.8rem] text-muted-foreground mt-1;
   }
 
   .form-message {
-    @apply text-sm font-medium text-destructive;
+    @apply text-[0.8rem] font-medium text-destructive mt-1;
   }
 
   .form-control {
-    @apply flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply flex w-full min-h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .form-select {
-    @apply flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1;
   }
 }
