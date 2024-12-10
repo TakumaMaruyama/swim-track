@@ -11,23 +11,23 @@ app.use(express.urlencoded({ extended: false }));
 
 // Enable CORS for development
 app.use((req, res, next) => {
-  // Replitの環境変数からREPL_SLUGを取得
   const replSlug = process.env.REPL_SLUG;
   const allowedOrigins = [
     'http://localhost:5173',
     replSlug ? `https://${replSlug}.repl.co` : null,
-    replSlug ? `https://webview.${replSlug}.repl.co` : null
+    replSlug ? `https://${replSlug}.repl.co:443` : null,
+    replSlug ? `https://webview.${replSlug}.repl.co` : null,
+    replSlug ? `https://${replSlug}.id.repl.co` : null
   ].filter(Boolean);
   
   const origin = req.headers.origin;
   if (origin && allowedOrigins.includes(origin)) {
     res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   }
-  
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  
+
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
