@@ -28,14 +28,9 @@ export default function Dashboard() {
         <header className="bg-white border-b">
           <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center">
-              <div className="flex items-center space-x-3">
-                <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-600">
-                  SwimTrack
-                </h1>
-                <span className="hidden sm:inline-block px-3 py-1 text-sm font-medium text-blue-600 bg-blue-50 rounded-full">
-                  システム
-                </span>
-              </div>
+              <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-600">
+                SwimTrack
+              </h1>
             </div>
           </div>
         </header>
