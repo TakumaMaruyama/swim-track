@@ -82,56 +82,44 @@ const root = createRoot(document.getElementById("root")!);
 
 root.render(
   <StrictMode>
-    <SWRConfig
-      value={{
-        fetcher,
-        revalidateOnFocus: false,
-        revalidateOnReconnect: true,
-        dedupingInterval: 5000,
-        errorRetryCount: 3,
-        errorRetryInterval: 3000,
-        keepPreviousData: true,
-        suspense: true,
-      }}
-    >
-      <ErrorBoundary>
+    <ErrorBoundary>
+      <SWRConfig
+        value={{
+          fetcher,
+          revalidateOnFocus: false,
+          revalidateOnReconnect: true,
+          dedupingInterval: 5000,
+          errorRetryCount: 3,
+          errorRetryInterval: 3000,
+          keepPreviousData: true,
+          suspense: true,
+        }}
+      >
         <Suspense fallback={<LoadingSpinner />}>
           <Switch>
             <Route path="/">
-              <Suspense fallback={<LoadingSpinner />}>
-                <Dashboard />
-              </Suspense>
+              <Dashboard />
             </Route>
             <Route path="/documents">
-              <Suspense fallback={<LoadingSpinner />}>
-                <Documents />
-              </Suspense>
+              <Documents />
             </Route>
             <Route path="/athletes">
-              <Suspense fallback={<LoadingSpinner />}>
-                <Athletes />
-              </Suspense>
+              <Athletes />
             </Route>
             <Route path="/all-time-records">
-              <Suspense fallback={<LoadingSpinner />}>
-                <AllTimeRecords />
-              </Suspense>
+              <AllTimeRecords />
             </Route>
             <Route path="/competitions">
-              <Suspense fallback={<LoadingSpinner />}>
-                <Competitions />
-              </Suspense>
+              <Competitions />
             </Route>
             <Route path="/admin/login">
-              <Suspense fallback={<LoadingSpinner />}>
-                <AdminLogin />
-              </Suspense>
+              <AdminLogin />
             </Route>
             <Route>404 ページが見つかりません</Route>
           </Switch>
-          <Toaster />
         </Suspense>
-      </ErrorBoundary>
-    </SWRConfig>
+        <Toaster />
+      </SWRConfig>
+    </ErrorBoundary>
   </StrictMode>
 );

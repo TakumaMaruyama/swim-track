@@ -1,14 +1,11 @@
 import React from 'react';
-import { useSwimRecords } from '../hooks/use-swim-records';
+import { useSwimRecords } from '@/hooks/use-swim-records';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Edit2, Trash2, Trophy } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { EditRecordForm } from '../components/EditRecordForm';
-import { useToast } from '@/hooks/use-toast';
-import { PageHeader } from '../components/PageHeader';
+import { AlertCircle, Trophy } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PageHeader } from '@/components/PageHeader';
 
 type GroupedRecord = {
   id: number;
@@ -38,7 +35,7 @@ const swimStyles = [
   "個人メドレー"
 ];
 
-const Record = React.memo(({ record }: { record: GroupedRecord }) => {
+const Record: React.FC<{ record: GroupedRecord }> = React.memo(({ record }) => {
   const formatTime = React.useCallback((time: string) => {
     const [minutes, seconds] = time.split(':');
     if (!seconds) return time;
@@ -73,16 +70,14 @@ const Record = React.memo(({ record }: { record: GroupedRecord }) => {
 
 Record.displayName = "Record";
 
-function AllTimeRecords() {
-  const { toast } = useToast();
-  const { records, isLoading, error, mutate } = useSwimRecords({
+function AllTimeRecords(): JSX.Element {
+  const { records, isLoading, error } = useSwimRecords({
     revalidateOnFocus: false,
     revalidateOnReconnect: true,
     refreshInterval: 30000,
     dedupingInterval: 5000,
   });
   
-  const [editingRecord, setEditingRecord] = React.useState<number | null>(null);
   const [poolLengthFilter, setPoolLengthFilter] = React.useState<string>("25");
 
   const groupedRecords: GroupedRecords = React.useMemo(() => {
@@ -124,37 +119,6 @@ function AllTimeRecords() {
       });
     return sorted;
   }, [groupedRecords]);
-
-  const handleEdit = React.useCallback(async (recordId: number, data: any) => {
-    try {
-      const response = await fetch(`/api/records/${recordId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update record');
-      }
-
-      await mutate();
-      toast({
-        title: "更新成功",
-        description: "記録が更新されました",
-      });
-    } catch (error) {
-      console.error('Error updating record:', error);
-      toast({
-        variant: "destructive",
-        title: "エラー",
-        description: "記録の更新に失敗しました",
-      });
-      throw error;
-    }
-  }, [mutate, toast]);
 
   if (isLoading) {
     return (
@@ -226,18 +190,6 @@ function AllTimeRecords() {
             </TabsContent>
           ))}
         </Tabs>
-
-        <EditRecordForm
-          record={editingRecord === -1 ? undefined : records?.find(r => r.id === editingRecord)}
-          isOpen={!!editingRecord}
-          onClose={() => setEditingRecord(null)}
-          onSubmit={async (data) => {
-            if (editingRecord !== -1) {
-              await handleEdit(editingRecord, data);
-            }
-            setEditingRecord(null);
-          }}
-        />
       </div>
     </>
   );
