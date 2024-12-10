@@ -38,50 +38,52 @@ const swimStyles = [
   "個人メドレー"
 ];
 
-const Record = React.memo(({ record, onEdit, onDelete }: { 
-  record: GroupedRecord;
-  onEdit?: (id: number) => void;
-  onDelete?: (id: number) => void;
-}) => (
-  <div className="p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group">
-    <div className="space-y-4">
-      <p className="text-xl text-primary font-bold">{record.style}</p>
-      <div className="flex items-center gap-3">
-        <p className="text-xl">{record.athleteName}</p>
-        <p className="text-xl">{formatTime(record.time)}</p>
+const Record = React.memo(({ record }: { record: GroupedRecord }) => {
+  const formatTime = React.useCallback((time: string) => {
+    const [minutes, seconds] = time.split(':');
+    if (!seconds) return time;
+    return `${minutes}'${seconds}"`;
+  }, []);
+
+  return (
+    <div className="p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+      <div className="space-y-4">
+        <p className="text-xl text-primary font-bold">{record.style}</p>
+        <div className="flex items-center gap-3">
+          <p className="text-xl">{record.athleteName}</p>
+          <p className="text-xl">{formatTime(record.time)}</p>
+        </div>
+        <time className="text-sm text-muted-foreground block">
+          {new Date(record.date).toLocaleDateString('ja-JP', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          })}
+        </time>
+        {record.isCompetition && (
+          <Badge variant="secondary" className="inline-flex items-center gap-1">
+            <Trophy className="h-3 w-3" />
+            大会記録
+          </Badge>
+        )}
       </div>
-      <time className="text-sm text-muted-foreground block">
-        {new Date(record.date).toLocaleDateString('ja-JP', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        })}
-      </time>
-      {record.isCompetition && (
-        <Badge variant="secondary" className="inline-flex items-center gap-1">
-          <Trophy className="h-3 w-3" />
-          大会記録
-        </Badge>
-      )}
     </div>
-  </div>
-));
+  );
+});
+
+Record.displayName = "Record";
 
 export default function AllTimeRecords() {
   const { toast } = useToast();
   const { records, isLoading, error, mutate } = useSwimRecords({
     revalidateOnFocus: false,
     revalidateOnReconnect: true,
-    refreshInterval: 30000
+    refreshInterval: 30000,
+    dedupingInterval: 5000,
   });
+  
   const [editingRecord, setEditingRecord] = React.useState<number | null>(null);
   const [poolLengthFilter, setPoolLengthFilter] = React.useState<string>("25");
-
-  const formatTime = (time: string) => {
-    const [minutes, seconds] = time.split(':');
-    if (!seconds) return time;
-    return `${minutes}'${seconds}"`;
-  };
 
   const groupedRecords: GroupedRecords = React.useMemo(() => {
     if (!records) return {};
@@ -90,7 +92,7 @@ export default function AllTimeRecords() {
       record.poolLength === parseInt(poolLengthFilter)
     );
 
-    const groupedByDistance = filteredRecords.reduce((acc, record) => {
+    return filteredRecords.reduce((acc, record) => {
       if (!acc[record.distance]) {
         acc[record.distance] = {};
       }
@@ -110,19 +112,20 @@ export default function AllTimeRecords() {
       }
       return acc;
     }, {} as GroupedRecords);
+  }, [records, poolLengthFilter]);
 
-    const sortedGrouped: GroupedRecords = {};
-    Object.keys(groupedByDistance)
+  const sortedGroupedRecords = React.useMemo(() => {
+    const sorted: GroupedRecords = {};
+    Object.keys(groupedRecords)
       .map(Number)
       .sort((a, b) => a - b)
       .forEach(distance => {
-        sortedGrouped[distance] = groupedByDistance[distance];
+        sorted[distance] = groupedRecords[distance];
       });
+    return sorted;
+  }, [groupedRecords]);
 
-    return sortedGrouped;
-  }, [records, poolLengthFilter]);
-
-  const handleEdit = async (recordId: number, data: any) => {
+  const handleEdit = React.useCallback(async (recordId: number, data: any) => {
     try {
       const response = await fetch(`/api/records/${recordId}`, {
         method: 'PUT',
@@ -151,39 +154,7 @@ export default function AllTimeRecords() {
       });
       throw error;
     }
-  };
-
-  const handleDelete = async (recordId: number) => {
-    if (!confirm('この記録を削除してもよろしいですか？')) {
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/records/${recordId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete record');
-      }
-
-      await mutate();
-      toast({
-        title: "削除成功",
-        description: "記録が削除されました",
-      });
-    } catch (error) {
-      console.error('Error deleting record:', error);
-      toast({
-        variant: "destructive",
-        title: "エラー",
-        description: "記録の削除に失敗しました",
-      });
-    }
-  };
-
-  const record = records?.find(r => r.id === editingRecord);
+  }, [mutate, toast]);
 
   if (isLoading) {
     return (
@@ -228,7 +199,7 @@ export default function AllTimeRecords() {
 
           {['15', '25', '50'].map((poolLength) => (
             <TabsContent key={poolLength} value={poolLength} className="space-y-8">
-              {Object.entries(groupedRecords).map(([distance, styles]) => (
+              {Object.entries(sortedGroupedRecords).map(([distance, styles]) => (
                 <Card key={distance} className="overflow-hidden">
                   <CardHeader className="bg-muted/50">
                     <CardTitle className="text-xl">
@@ -246,34 +217,7 @@ export default function AllTimeRecords() {
                           return indexA - indexB;
                         })
                         .map(([style, record]) => (
-                          <div
-                            key={`${distance}-${style}`}
-                            className="p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group"
-                          >
-                            <div className="space-y-4">
-                              <p className="text-xl text-primary font-bold">{style}</p>
-                              
-                              <div className="flex items-center gap-3">
-                                <p className="text-xl">{record.athleteName}</p>
-                                <p className="text-xl">{formatTime(record.time)}</p>
-                              </div>
-
-                              <time className="text-sm text-muted-foreground block">
-                                {new Date(record.date).toLocaleDateString('ja-JP', {
-                                  year: 'numeric',
-                                  month: 'long',
-                                  day: 'numeric'
-                                })}
-                              </time>
-
-                              {record.isCompetition && (
-                                <Badge variant="secondary" className="inline-flex items-center gap-1">
-                                  <Trophy className="h-3 w-3" />
-                                  大会記録
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
+                          <Record key={`${distance}-${style}`} record={record} />
                         ))}
                     </div>
                   </CardContent>
@@ -284,13 +228,14 @@ export default function AllTimeRecords() {
         </Tabs>
 
         <EditRecordForm
-          record={editingRecord === -1 ? undefined : record}
+          record={editingRecord === -1 ? undefined : records?.find(r => r.id === editingRecord)}
           isOpen={!!editingRecord}
           onClose={() => setEditingRecord(null)}
           onSubmit={async (data) => {
-            if (record) {
-              await handleEdit(record.id, data);
+            if (editingRecord !== -1) {
+              await handleEdit(editingRecord, data);
             }
+            setEditingRecord(null);
           }}
         />
       </div>

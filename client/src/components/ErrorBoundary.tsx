@@ -21,11 +21,14 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   private cleanupTimeout?: number;
+  private mounted: boolean = false;
+
+  public componentDidMount() {
+    this.mounted = true;
+  }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.error('Uncaught error:', error, errorInfo);
-    }
+    console.error('Uncaught error:', error, errorInfo);
     
     // エラー状態を自動リセット (デバウンス付き)
     if (this.cleanupTimeout) {
@@ -39,12 +42,20 @@ export class ErrorBoundary extends Component<Props, State> {
     }, 5000) as unknown as number;
 
     // エラーの種類に応じて適切な処理を実行
-    if (error instanceof TypeError) {
-      // 型エラーの場合は即座にリセット
-      this.setState({ hasError: false });
-    } else if (error.name === 'ChunkLoadError') {
+    if (error instanceof TypeError && error.message.includes('hooks')) {
+      // Hooksエラーの場合はコンポーネントをリマウント
+      this.setState({ hasError: true }, () => {
+        setTimeout(() => {
+          if (this.mounted) {
+            this.setState({ hasError: false });
+          }
+        }, 100);
+      });
+    } else if (error.name === 'ChunkLoadError' || error.message.includes('loading chunk')) {
       // チャンクロードエラーの場合はページをリロード
       window.location.reload();
+    } else {
+      this.setState({ hasError: true });
     }
   }
 

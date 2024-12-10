@@ -12,34 +12,63 @@ setupErrorHandlers();
 
 // Lazy load pages with preload hints
 const Dashboard = lazy(() => {
-  const promise = import("@/pages/Dashboard");
-  promise.then(() => { /* トレースのための空の処理 */ });
-  return promise;
+  if (typeof window !== 'undefined') {
+    const link = document.createElement('link');
+    link.rel = 'modulepreload';
+    link.href = '/src/pages/Dashboard.tsx';
+    document.head.appendChild(link);
+  }
+  return import("@/pages/Dashboard");
 });
+
 const Documents = lazy(() => {
-  const promise = import("@/pages/Documents");
-  promise.then(() => { /* トレースのための空の処理 */ });
-  return promise;
+  if (typeof window !== 'undefined') {
+    const link = document.createElement('link');
+    link.rel = 'modulepreload';
+    link.href = '/src/pages/Documents.tsx';
+    document.head.appendChild(link);
+  }
+  return import("@/pages/Documents");
 });
+
 const Athletes = lazy(() => {
-  const promise = import("@/pages/Athletes");
-  promise.then(() => { /* トレースのための空の処理 */ });
-  return promise;
+  if (typeof window !== 'undefined') {
+    const link = document.createElement('link');
+    link.rel = 'modulepreload';
+    link.href = '/src/pages/Athletes.tsx';
+    document.head.appendChild(link);
+  }
+  return import("@/pages/Athletes");
 });
+
 const AllTimeRecords = lazy(() => {
-  const promise = import("@/pages/AllTimeRecords");
-  promise.then(() => { /* トレースのための空の処理 */ });
-  return promise;
+  if (typeof window !== 'undefined') {
+    const link = document.createElement('link');
+    link.rel = 'modulepreload';
+    link.href = '/src/pages/AllTimeRecords.tsx';
+    document.head.appendChild(link);
+  }
+  return import("@/pages/AllTimeRecords");
 });
+
 const Competitions = lazy(() => {
-  const promise = import("@/pages/Competitions");
-  promise.then(() => { /* トレースのための空の処理 */ });
-  return promise;
+  if (typeof window !== 'undefined') {
+    const link = document.createElement('link');
+    link.rel = 'modulepreload';
+    link.href = '/src/pages/Competitions.tsx';
+    document.head.appendChild(link);
+  }
+  return import("@/pages/Competitions");
 });
+
 const AdminLogin = lazy(() => {
-  const promise = import("@/pages/AdminLogin");
-  promise.then(() => { /* トレースのための空の処理 */ });
-  return promise;
+  if (typeof window !== 'undefined') {
+    const link = document.createElement('link');
+    link.rel = 'modulepreload';
+    link.href = '/src/pages/AdminLogin.tsx';
+    document.head.appendChild(link);
+  }
+  return import("@/pages/AdminLogin");
 });
 
 // プリロードのためのユーティリティ関数
@@ -78,6 +107,8 @@ root.render(
         dedupingInterval: 5000,
         errorRetryCount: 3,
         errorRetryInterval: 3000,
+        keepPreviousData: true,
+        suspense: true,
         provider: () => {
           const cache = new Map();
 

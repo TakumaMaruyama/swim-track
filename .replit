@@ -82,6 +82,7 @@ task = "packager.installForAll"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd client && NODE_ENV=development vite --host 0.0.0.0 --port 5173"
+waitForPort = 5173
 
 [[workflows.workflow]]
 name = "Production Server"
