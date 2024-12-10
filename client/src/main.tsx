@@ -1,10 +1,11 @@
-import React, { StrictMode, Suspense, lazy, useEffect } from "react";
+import React, { StrictMode, Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { Switch, Route } from "wouter";
 import { SWRConfig } from "swr";
 import { fetcher } from "./lib/fetcher";
 import { Toaster } from "./components/ui/toaster";
 import { setupErrorHandlers } from "./lib/error-handler";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import "./index.css";
 
 // Initialize error handlers
@@ -15,7 +16,7 @@ const Dashboard = lazy(() => {
   if (typeof window !== 'undefined') {
     const link = document.createElement('link');
     link.rel = 'modulepreload';
-    link.href = '/src/pages/Dashboard.tsx';
+    link.href = '/src/pages/Dashboard';
     document.head.appendChild(link);
   }
   return import("@/pages/Dashboard");
@@ -25,7 +26,7 @@ const Documents = lazy(() => {
   if (typeof window !== 'undefined') {
     const link = document.createElement('link');
     link.rel = 'modulepreload';
-    link.href = '/src/pages/Documents.tsx';
+    link.href = '/src/pages/Documents';
     document.head.appendChild(link);
   }
   return import("@/pages/Documents");
@@ -35,7 +36,7 @@ const Athletes = lazy(() => {
   if (typeof window !== 'undefined') {
     const link = document.createElement('link');
     link.rel = 'modulepreload';
-    link.href = '/src/pages/Athletes.tsx';
+    link.href = '/src/pages/Athletes';
     document.head.appendChild(link);
   }
   return import("@/pages/Athletes");
@@ -45,7 +46,7 @@ const AllTimeRecords = lazy(() => {
   if (typeof window !== 'undefined') {
     const link = document.createElement('link');
     link.rel = 'modulepreload';
-    link.href = '/src/pages/AllTimeRecords.tsx';
+    link.href = '/src/pages/AllTimeRecords';
     document.head.appendChild(link);
   }
   return import("@/pages/AllTimeRecords");
@@ -55,7 +56,7 @@ const Competitions = lazy(() => {
   if (typeof window !== 'undefined') {
     const link = document.createElement('link');
     link.rel = 'modulepreload';
-    link.href = '/src/pages/Competitions.tsx';
+    link.href = '/src/pages/Competitions';
     document.head.appendChild(link);
   }
   return import("@/pages/Competitions");
@@ -65,35 +66,17 @@ const AdminLogin = lazy(() => {
   if (typeof window !== 'undefined') {
     const link = document.createElement('link');
     link.rel = 'modulepreload';
-    link.href = '/src/pages/AdminLogin.tsx';
+    link.href = '/src/pages/AdminLogin';
     document.head.appendChild(link);
   }
   return import("@/pages/AdminLogin");
 });
 
-// プリロードのためのユーティリティ関数
-const preloadRoute = (route: string) => {
-  switch (route) {
-    case '/':
-      Dashboard.preload?.();
-      break;
-    case '/documents':
-      Documents.preload?.();
-      break;
-    case '/athletes':
-      Athletes.preload?.();
-      break;
-    case '/all-time-records':
-      AllTimeRecords.preload?.();
-      break;
-    case '/competitions':
-      Competitions.preload?.();
-      break;
-    case '/admin/login':
-      AdminLogin.preload?.();
-      break;
-  }
-};
+const LoadingSpinner = () => (
+  <div className="flex items-center justify-center min-h-screen">
+    <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+  </div>
+);
 
 const root = createRoot(document.getElementById("root")!);
 
@@ -109,77 +92,46 @@ root.render(
         errorRetryInterval: 3000,
         keepPreviousData: true,
         suspense: true,
-        provider: () => {
-          const cache = new Map();
-
-          // 初期状態の復元
-          if (typeof window !== 'undefined') {
-            const stored = sessionStorage.getItem('app-cache');
-            if (stored) {
-              try {
-                const parsedCache = JSON.parse(stored);
-                Object.entries(parsedCache).forEach(([key, value]) => {
-                  if (value && typeof value === 'object') {
-                    cache.set(key, value);
-                  }
-                });
-              } catch (error) {
-                console.error('キャッシュの復元に失敗しました:', error);
-                sessionStorage.removeItem('app-cache');
-              }
-            }
-          }
-
-          // キャッシュの自動クリーンアップ
-          const cleanup = setInterval(() => {
-            const keys = Array.from(cache.keys());
-            const now = Date.now();
-            keys.forEach(key => {
-              const value = cache.get(key);
-              if (value && value.timestamp && now - value.timestamp > 1800000) {
-                cache.delete(key);
-              }
-            });
-          }, 300000);
-
-          // アンマウント時にクリーンアップ
-          if (typeof window !== 'undefined') {
-            window.addEventListener('beforeunload', () => {
-              clearInterval(cleanup);
-              const cacheData = Object.fromEntries(cache.entries());
-              sessionStorage.setItem('app-cache', JSON.stringify(cacheData));
-            });
-          }
-
-          return cache;
-        }
       }}
     >
-      <Suspense
-        fallback={
-          <div className="flex items-center justify-center min-h-screen">
-            <div className="animate-pulse text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                <span>読み込み中...</span>
-              </div>
-            </div>
-          </div>
-        }
-      >
-        <>
+      <ErrorBoundary>
+        <Suspense fallback={<LoadingSpinner />}>
           <Switch>
-            <Route path="/" component={Dashboard} />
-            <Route path="/documents" component={Documents} />
-            <Route path="/athletes" component={Athletes} />
-            <Route path="/all-time-records" component={AllTimeRecords} />
-            <Route path="/competitions" component={Competitions} />
-            <Route path="/admin/login" component={AdminLogin} />
+            <Route path="/">
+              <Suspense fallback={<LoadingSpinner />}>
+                <Dashboard />
+              </Suspense>
+            </Route>
+            <Route path="/documents">
+              <Suspense fallback={<LoadingSpinner />}>
+                <Documents />
+              </Suspense>
+            </Route>
+            <Route path="/athletes">
+              <Suspense fallback={<LoadingSpinner />}>
+                <Athletes />
+              </Suspense>
+            </Route>
+            <Route path="/all-time-records">
+              <Suspense fallback={<LoadingSpinner />}>
+                <AllTimeRecords />
+              </Suspense>
+            </Route>
+            <Route path="/competitions">
+              <Suspense fallback={<LoadingSpinner />}>
+                <Competitions />
+              </Suspense>
+            </Route>
+            <Route path="/admin/login">
+              <Suspense fallback={<LoadingSpinner />}>
+                <AdminLogin />
+              </Suspense>
+            </Route>
             <Route>404 ページが見つかりません</Route>
           </Switch>
           <Toaster />
-        </>
-      </Suspense>
+        </Suspense>
+      </ErrorBoundary>
     </SWRConfig>
   </StrictMode>
 );

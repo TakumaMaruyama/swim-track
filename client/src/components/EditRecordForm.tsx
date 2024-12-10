@@ -64,13 +64,8 @@ type EditRecordFormProps = {
   onSubmit: (values: z.infer<typeof editRecordSchema>) => Promise<void>;
 };
 
-export const EditRecordForm = React.memo(function EditRecordForm({ 
-  record, 
-  studentId, 
-  isOpen, 
-  onClose, 
-  onSubmit 
-}: EditRecordFormProps) {
+export const EditRecordForm = React.memo(function EditRecordForm(props: EditRecordFormProps) {
+  const { record, studentId, isOpen, onClose, onSubmit } = props;
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   

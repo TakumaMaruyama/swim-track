@@ -73,7 +73,7 @@ const Record = React.memo(({ record }: { record: GroupedRecord }) => {
 
 Record.displayName = "Record";
 
-export default function AllTimeRecords() {
+function AllTimeRecords() {
   const { toast } = useToast();
   const { records, isLoading, error, mutate } = useSwimRecords({
     revalidateOnFocus: false,
@@ -242,3 +242,5 @@ export default function AllTimeRecords() {
     </>
   );
 }
+
+export default AllTimeRecords;
