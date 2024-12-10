@@ -11,9 +11,15 @@ app.use(express.urlencoded({ extended: false }));
 
 // Enable CORS for development
 app.use((req, res, next) => {
-  const allowedOrigins = ['http://localhost:5173', 'https://webview.YOUR-REPL-NAME.repl.co'];
-  const origin = req.headers.origin;
+  // Replitの環境変数からREPL_SLUGを取得
+  const replSlug = process.env.REPL_SLUG;
+  const allowedOrigins = [
+    'http://localhost:5173',
+    replSlug ? `https://${replSlug}.repl.co` : null,
+    replSlug ? `https://webview.${replSlug}.repl.co` : null
+  ].filter(Boolean);
   
+  const origin = req.headers.origin;
   if (origin && allowedOrigins.includes(origin)) {
     res.header('Access-Control-Allow-Origin', origin);
   }
