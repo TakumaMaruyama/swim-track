@@ -27,10 +27,25 @@ export class ErrorBoundary extends Component<Props, State> {
       console.error('Uncaught error:', error, errorInfo);
     }
     
-    // エラー状態を自動リセット
+    // エラー状態を自動リセット (デバウンス付き)
+    if (this.cleanupTimeout) {
+      window.clearTimeout(this.cleanupTimeout);
+    }
+    
     this.cleanupTimeout = window.setTimeout(() => {
-      this.setState({ hasError: false });
+      if (this.mounted) {
+        this.setState({ hasError: false });
+      }
     }, 5000) as unknown as number;
+
+    // エラーの種類に応じて適切な処理を実行
+    if (error instanceof TypeError) {
+      // 型エラーの場合は即座にリセット
+      this.setState({ hasError: false });
+    } else if (error.name === 'ChunkLoadError') {
+      // チャンクロードエラーの場合はページをリロード
+      window.location.reload();
+    }
   }
 
   public componentWillUnmount() {
