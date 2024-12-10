@@ -20,7 +20,28 @@ const AdminLogin = lazy(() => import("@/pages/AdminLogin"));
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <SWRConfig value={{ fetcher }}>
+    <SWRConfig value={{ 
+      fetcher,
+      // キャッシュ戦略の最適化
+      revalidateOnFocus: false,
+      revalidateOnReconnect: true,
+      dedupingInterval: 5000,
+      // エラーリトライの設定
+      errorRetryCount: 3,
+      errorRetryInterval: 3000,
+      // キャッシュの永続化（オプション）
+      provider: (cache) => {
+        // 初期状態の復元
+        if (typeof window !== 'undefined') {
+          const stored = sessionStorage.getItem('app-cache')
+          if (stored) {
+            cache.set('app-cache', JSON.parse(stored))
+          }
+        }
+        
+        return cache
+      }
+    }}>
       <Suspense fallback={
           <div className="flex items-center justify-center min-h-screen">
             <div className="animate-pulse text-muted-foreground">

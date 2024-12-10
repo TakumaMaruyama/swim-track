@@ -20,9 +20,22 @@ export class ErrorBoundary extends Component<Props, State> {
     return { hasError: true };
   }
 
+  private cleanupTimeout?: number;
+
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     if (process.env.NODE_ENV !== 'production') {
       console.error('Uncaught error:', error, errorInfo);
+    }
+    
+    // エラー状態を自動リセット
+    this.cleanupTimeout = window.setTimeout(() => {
+      this.setState({ hasError: false });
+    }, 5000) as unknown as number;
+  }
+
+  public componentWillUnmount() {
+    if (this.cleanupTimeout) {
+      window.clearTimeout(this.cleanupTimeout);
     }
   }
 
