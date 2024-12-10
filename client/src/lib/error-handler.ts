@@ -23,6 +23,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 // エラーの種類を判定する関数
 function getErrorType(error: unknown): ErrorType {
   if (error instanceof Error) {
+    // APIエラーの処理
     if ('status' in error) {
       const status = (error as any).status;
       switch (status) {
@@ -33,22 +34,72 @@ function getErrorType(error: unknown): ErrorType {
         case 500: return { message: ERROR_MESSAGES.SERVER_ERROR, status };
       }
     }
-    if (error.name === 'NetworkError') {
+    
+    // Promiseエラーの処理
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      return { message: ERROR_MESSAGES.NETWORK_ERROR, name: 'NetworkError' };
+    }
+    
+    // 認証エラーの処理
+    if (error.message.includes('authentication') || error.message.includes('unauthorized')) {
+      return { message: ERROR_MESSAGES.UNAUTHORIZED, name: error.name };
+    }
+
+    // その他のネットワークエラー
+    if (error.name === 'NetworkError' || error.message.includes('network')) {
       return { message: ERROR_MESSAGES.NETWORK_ERROR, name: error.name };
     }
+
+    // カスタムエラーメッセージの処理
+    const customMessage = error.message.match(/^Custom\[(.*)\]$/);
+    if (customMessage) {
+      return { message: customMessage[1], name: error.name };
+    }
+
     return { message: error.message, name: error.name };
   }
+
+  // Promise rejectionの処理
+  if (typeof error === 'object' && error !== null && 'reason' in error) {
+    return getErrorType((error as { reason: unknown }).reason);
+  }
+
   return { message: ERROR_MESSAGES.DEFAULT };
 }
 
-// レート制限付きトースト表示
-let lastToastTime = 0;
+// エラーメッセージのキャッシュと重複防止
+const errorCache = new Map<string, { timestamp: number; count: number }>();
 const TOAST_THROTTLE = 2000; // 2秒
+const ERROR_CACHE_LIFETIME = 60000; // 1分
+const MAX_DUPLICATE_ERRORS = 3; // 同じエラーの最大表示回数
 
 function showThrottledToast(error: ErrorType) {
+  const errorKey = `${error.name}-${error.message}`;
   const now = Date.now();
-  if (now - lastToastTime > TOAST_THROTTLE) {
-    lastToastTime = now;
+  const cached = errorCache.get(errorKey);
+
+  // キャッシュのクリーンアップ
+  for (const [key, value] of errorCache.entries()) {
+    if (now - value.timestamp > ERROR_CACHE_LIFETIME) {
+      errorCache.delete(key);
+    }
+  }
+
+  // 新規エラーまたはキャッシュ期限切れの場合
+  if (!cached || now - cached.timestamp > ERROR_CACHE_LIFETIME) {
+    errorCache.set(errorKey, { timestamp: now, count: 1 });
+    toast({
+      variant: "destructive",
+      title: "エラー",
+      description: error.message,
+    });
+    return;
+  }
+
+  // エラーの重複チェックとレート制限
+  if (cached.count < MAX_DUPLICATE_ERRORS && now - cached.timestamp > TOAST_THROTTLE) {
+    cached.count++;
+    cached.timestamp = now;
     toast({
       variant: "destructive",
       title: "エラー",
