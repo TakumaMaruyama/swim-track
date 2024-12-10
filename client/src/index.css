@@ -157,8 +157,40 @@
     @apply text-foreground hover:text-primary transition-colors;
   }
   
+  .nav-item {
+    @apply flex items-center gap-2 px-4 py-2 rounded-md hover:bg-accent text-foreground hover:text-accent-foreground transition-colors;
+  }
+  
+  .nav-item.active {
+    @apply bg-primary text-primary-foreground hover:bg-primary/90;
+  }
+  
   .sidebar-nav {
     @apply flex flex-col gap-2 p-4;
+  }
+  
+  .mobile-nav {
+    @apply md:hidden fixed bottom-0 left-0 right-0 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-2 z-50 shadow-lg;
+  }
+  
+  .mobile-nav-items {
+    @apply grid grid-cols-4 gap-2 items-center justify-center;
+  }
+  
+  .mobile-nav-item {
+    @apply flex flex-col items-center justify-center gap-1 p-2 rounded-lg text-muted-foreground hover:text-foreground transition-colors;
+  }
+  
+  .mobile-nav-item.active {
+    @apply text-primary;
+  }
+  
+  .mobile-nav-icon {
+    @apply h-5 w-5;
+  }
+  
+  .mobile-nav-label {
+    @apply text-xs font-medium;
   }
   
   .card-container {
