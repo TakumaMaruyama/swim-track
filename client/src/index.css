@@ -98,45 +98,45 @@
   }
 
   .nav-item {
-    @apply flex items-center gap-2 px-4 py-2 rounded-md hover:bg-accent text-foreground hover:text-accent-foreground transition-colors;
+    @apply flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-accent text-foreground hover:text-accent-foreground transition-colors;
   }
 
   .nav-item.active {
-    @apply bg-primary text-primary-foreground hover:bg-primary/90;
+    @apply bg-primary text-primary-foreground hover:bg-primary/90 font-medium;
   }
 
   .sidebar-nav {
-    @apply flex flex-col gap-2 p-4;
+    @apply flex flex-col gap-2 p-4 my-2;
   }
 
   .mobile-nav {
-    @apply md:hidden fixed bottom-0 left-0 right-0 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-2 z-50 shadow-lg;
+    @apply md:hidden fixed bottom-0 left-0 right-0 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 py-3 z-50 shadow-lg;
   }
 
   .mobile-nav-items {
-    @apply grid grid-cols-4 gap-2 items-center justify-center;
+    @apply grid grid-cols-4 gap-4 items-center justify-center;
   }
 
   .mobile-nav-item {
-    @apply flex flex-col items-center justify-center gap-1 p-2 rounded-lg text-muted-foreground hover:text-foreground transition-colors;
+    @apply flex flex-col items-center justify-center gap-2 p-2 rounded-lg text-muted-foreground hover:text-foreground transition-colors;
   }
 
   .mobile-nav-item.active {
-    @apply text-primary;
+    @apply text-primary font-medium;
   }
 
   .mobile-nav-icon {
-    @apply h-5 w-5;
+    @apply h-6 w-6;
   }
 
   .mobile-nav-label {
-    @apply text-xs font-medium;
+    @apply text-xs font-medium tracking-wide;
   }
 
   .card-container {
     @apply grid gap-6 p-4 md:p-6 lg:p-8 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
   }
-  
+
   .card {
     @apply p-6 bg-card text-card-foreground rounded-lg border border-border/40 shadow-sm hover:shadow-md transition-shadow duration-200;
   }
