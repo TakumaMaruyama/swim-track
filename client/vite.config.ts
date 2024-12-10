@@ -16,20 +16,21 @@ export default defineConfig({
     }
   },
   server: {
-    host: true,
+    host: '0.0.0.0',
     port: 5173,
     strictPort: true,
     proxy: {
       '/api': {
-        target: process.env.REPL_SLUG ? 'https://' + process.env.REPL_SLUG + '.id.repl.co' : 'http://localhost:5000',
+        target: 'http://localhost:5000',
         changeOrigin: true,
         secure: false,
-        ws: true
+        ws: true,
+        rewrite: (path) => path.replace(/^\/api/, '')
       }
     },
     hmr: {
-      clientPort: 443,
-      host: process.env.REPL_SLUG ? `${process.env.REPL_SLUG}.id.repl.co` : undefined,
+      clientPort: process.env.REPL_SLUG ? 443 : undefined,
+      host: process.env.REPL_SLUG ? `${process.env.REPL_SLUG}.repl.co` : undefined,
       protocol: process.env.REPL_SLUG ? 'wss' : 'ws'
     },
     watch: {
