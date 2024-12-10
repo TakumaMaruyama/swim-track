@@ -16,8 +16,9 @@ export default defineConfig({
     }
   },
   server: {
-    host: "0.0.0.0",
+    host: true,
     port: 5173,
+    strictPort: true,
     proxy: {
       '/api': {
         target: 'http://0.0.0.0:5000',
@@ -27,9 +28,8 @@ export default defineConfig({
       }
     },
     hmr: {
-      overlay: true,
-      clientPort: 5173,
-      host: '0.0.0.0'
+      clientPort: 443,
+      host: 'webview.YOUR-REPL-NAME.repl.co'
     },
     watch: {
       usePolling: true

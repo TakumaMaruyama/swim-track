@@ -44,7 +44,8 @@ configureAuth(app);
   }
 
   // Serve the app using configuration port
-  server.listen(configuration.port, "0.0.0.0", () => {
+  const PORT = process.env.PORT || 5000;
+  server.listen(PORT, "0.0.0.0", () => {
     const formattedTime = new Date().toLocaleTimeString("en-US", {
       hour: "2-digit",
       minute: "2-digit",
@@ -52,6 +53,11 @@ configureAuth(app);
       hour12: true,
     });
 
-    console.log(`${formattedTime} [express] serving on port ${configuration.port}`);
+    console.log(`${formattedTime} [express] Server is running on http://0.0.0.0:${PORT}`);
+    console.log('Server configuration:', {
+      port: PORT,
+      env: process.env.NODE_ENV,
+      cors: true
+    });
   });
 })();
