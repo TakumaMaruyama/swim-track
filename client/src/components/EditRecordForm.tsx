@@ -72,19 +72,21 @@ export const EditRecordForm = React.memo(function EditRecordForm(props: EditReco
   // Zodスキーマをメモ化
   const validationSchema = React.useMemo(() => editRecordSchema, []);
   
-  const form = useForm({
-    resolver: zodResolver(validationSchema),
-    defaultValues: {
-      style: record?.style ?? "",
-      distance: record?.distance ?? 50,
-      time: record?.time ?? "",
-      date: record ? new Date(record.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-      poolLength: record?.poolLength ?? 25,
-      isCompetition: record?.isCompetition ?? false,
-      competitionName: record?.competitionName ?? "",
-      competitionLocation: record?.competitionLocation ?? "",
-    },
-  });
+  const defaultValues = React.useMemo(() => ({
+  style: record?.style ?? "",
+  distance: record?.distance ?? 50,
+  time: record?.time ?? "",
+  date: record ? new Date(record.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+  poolLength: record?.poolLength ?? 25,
+  isCompetition: record?.isCompetition ?? false,
+  competitionName: record?.competitionName ?? "",
+  competitionLocation: record?.competitionLocation ?? "",
+}), [record]);
+
+const form = useForm({
+  resolver: zodResolver(validationSchema),
+  defaultValues,
+});
 
   const handleSubmit = async (values: z.infer<typeof editRecordSchema>) => {
     try {

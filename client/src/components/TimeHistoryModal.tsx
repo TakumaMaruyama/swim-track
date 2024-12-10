@@ -120,51 +120,56 @@ export function TimeHistoryModal({
   const [periodFilter, setPeriodFilter] = React.useState<string>("all");
   const [customStartDate, setCustomStartDate] = React.useState<string>("");
   const [customEndDate, setCustomEndDate] = React.useState<string>("");
-  const groupedAndFilteredRecords: GroupedRecords = React.useMemo(() => {
+  const filterRecordsByDate = React.useCallback((record: ExtendedSwimRecord, now: Date) => {
+  if (!record.date || periodFilter === "all") return true;
+  
+  const recordDate = new Date(record.date);
+  
+  switch (periodFilter) {
+    case "1month": {
+      const oneMonthAgo = new Date(now);
+      oneMonthAgo.setMonth(now.getMonth() - 1);
+      return recordDate >= oneMonthAgo;
+    }
+    case "3months": {
+      const threeMonthsAgo = new Date(now);
+      threeMonthsAgo.setMonth(now.getMonth() - 3);
+      return recordDate >= threeMonthsAgo;
+    }
+    case "6months": {
+      const sixMonthsAgo = new Date(now);
+      sixMonthsAgo.setMonth(now.getMonth() - 6);
+      return recordDate >= sixMonthsAgo;
+    }
+    case "1year": {
+      const oneYearAgo = new Date(now);
+      oneYearAgo.setFullYear(now.getFullYear() - 1);
+      return recordDate >= oneYearAgo;
+    }
+    case "custom": {
+      const startDate = customStartDate ? new Date(customStartDate) : null;
+      const endDate = customEndDate ? new Date(customEndDate) : null;
+      
+      if (startDate && endDate) {
+        return recordDate >= startDate && recordDate <= endDate;
+      } else if (startDate) {
+        return recordDate >= startDate;
+      } else if (endDate) {
+        return recordDate <= endDate;
+      }
+    }
+    default:
+      return true;
+  }
+}, [periodFilter, customStartDate, customEndDate]);
+
+const groupedAndFilteredRecords: GroupedRecords = React.useMemo(() => {
+    const now = new Date();
     const filtered = records.filter(record => {
-      // Style filter
       if (styleFilter !== "all" && record.style !== styleFilter) {
         return false;
       }
-
-      // Period filter
-      if (periodFilter !== "all" && record.date) {
-        const recordDate = new Date(record.date);
-        const now = new Date();
-        
-        switch (periodFilter) {
-          case "1month":
-            const oneMonthAgo = new Date();
-            oneMonthAgo.setMonth(now.getMonth() - 1);
-            return recordDate >= oneMonthAgo;
-          case "3months":
-            const threeMonthsAgo = new Date();
-            threeMonthsAgo.setMonth(now.getMonth() - 3);
-            return recordDate >= threeMonthsAgo;
-          case "6months":
-            const sixMonthsAgo = new Date();
-            sixMonthsAgo.setMonth(now.getMonth() - 6);
-            return recordDate >= sixMonthsAgo;
-          case "1year":
-            const oneYearAgo = new Date();
-            oneYearAgo.setFullYear(now.getFullYear() - 1);
-            return recordDate >= oneYearAgo;
-          case "custom":
-            const startDate = customStartDate ? new Date(customStartDate) : null;
-            const endDate = customEndDate ? new Date(customEndDate) : null;
-            
-            if (startDate && endDate) {
-              return recordDate >= startDate && recordDate <= endDate;
-            } else if (startDate) {
-              return recordDate >= startDate;
-            } else if (endDate) {
-              return recordDate <= endDate;
-            }
-            break;
-        }
-      }
-      
-      return true;
+      return filterRecordsByDate(record, now);
     });
 
     const sorted = [...filtered].sort((a, b) => {
