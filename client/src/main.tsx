@@ -92,32 +92,54 @@ root.render(
           errorRetryCount: 3,
           errorRetryInterval: 3000,
           keepPreviousData: true,
-          suspense: true,
+          suspense: false,
         }}
       >
-        <Suspense fallback={<LoadingSpinner />}>
-          <Switch>
-            <Route path="/">
-              <Dashboard />
-            </Route>
-            <Route path="/documents">
-              <Documents />
-            </Route>
-            <Route path="/athletes">
-              <Athletes />
-            </Route>
-            <Route path="/all-time-records">
-              <AllTimeRecords />
-            </Route>
-            <Route path="/competitions">
-              <Competitions />
-            </Route>
-            <Route path="/admin/login">
-              <AdminLogin />
-            </Route>
-            <Route>404 ページが見つかりません</Route>
-          </Switch>
-        </Suspense>
+        <Switch>
+          <Route path="/">
+            <Suspense fallback={<LoadingSpinner />}>
+              <ErrorBoundary>
+                <Dashboard />
+              </ErrorBoundary>
+            </Suspense>
+          </Route>
+          <Route path="/documents">
+            <Suspense fallback={<LoadingSpinner />}>
+              <ErrorBoundary>
+                <Documents />
+              </ErrorBoundary>
+            </Suspense>
+          </Route>
+          <Route path="/athletes">
+            <Suspense fallback={<LoadingSpinner />}>
+              <ErrorBoundary>
+                <Athletes />
+              </ErrorBoundary>
+            </Suspense>
+          </Route>
+          <Route path="/all-time-records">
+            <Suspense fallback={<LoadingSpinner />}>
+              <ErrorBoundary>
+                <AllTimeRecords />
+              </ErrorBoundary>
+            </Suspense>
+          </Route>
+          <Route path="/competitions">
+            <Suspense fallback={<LoadingSpinner />}>
+              <ErrorBoundary>
+                <Competitions />
+              </ErrorBoundary>
+            </Suspense>
+          </Route>
+          <Route path="/admin/login">
+            <Suspense fallback={<LoadingSpinner />}>
+              <ErrorBoundary>
+                <AdminLogin />
+              </ErrorBoundary>
+            </Suspense>
+          </Route>
+          <Route>404 ページが見つかりません</Route>
+        </Switch>
         <Toaster />
       </SWRConfig>
     </ErrorBoundary>
