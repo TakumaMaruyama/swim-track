@@ -138,27 +138,27 @@
   }
 
   .card {
-    @apply p-6 bg-card text-card-foreground rounded-lg border border-border/40 shadow-sm hover:shadow-md transition-shadow duration-200;
+    @apply p-6 bg-card text-card-foreground rounded-xl border border-border/40 shadow-sm hover:shadow-md transition-all duration-200 hover:border-border/60;
   }
 
   .card-header {
-    @apply flex flex-col space-y-2 pb-6;
+    @apply flex flex-col space-y-2.5 pb-6;
   }
 
   .card-title {
-    @apply text-2xl font-semibold leading-none tracking-tight text-foreground;
+    @apply text-xl md:text-2xl font-semibold leading-none tracking-tight text-foreground;
   }
 
   .card-description {
-    @apply text-sm text-muted-foreground leading-normal;
+    @apply text-sm text-muted-foreground leading-relaxed;
   }
 
   .card-content {
-    @apply space-y-4;
+    @apply space-y-4 text-sm leading-relaxed;
   }
 
   .card-footer {
-    @apply flex items-center justify-between pt-6 mt-6 border-t border-border/20;
+    @apply flex items-center justify-between pt-6 mt-6 border-t border-border/20 text-sm text-muted-foreground;
   }
 }
 
