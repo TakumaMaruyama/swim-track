@@ -20,14 +20,16 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: 'http://0.0.0.0:5000',
         changeOrigin: true,
         secure: false,
+        ws: true
       }
     },
     hmr: {
       overlay: true,
-      clientPort: 5173
+      clientPort: 5173,
+      host: '0.0.0.0'
     },
     watch: {
       usePolling: true
