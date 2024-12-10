@@ -27,9 +27,9 @@ export class ErrorBoundary extends Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       return this.props.fallback || (
-        <Alert variant="destructive" className="m-4 flex items-center gap-2">
-          <AlertCircle className="h-5 w-5" />
-          <AlertDescription className="text-sm">
+        <Alert variant="destructive" className="mx-auto max-w-md my-8 p-4 animate-slide-up flex items-center gap-3 rounded-xl shadow-lg">
+          <AlertCircle className="h-6 w-6 flex-shrink-0" />
+          <AlertDescription className="text-sm leading-relaxed">
             申し訳ありません。データの取得中にエラーが発生しました。
             <br />
             しばらく待ってから再度お試しください。
