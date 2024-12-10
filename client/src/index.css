@@ -175,4 +175,32 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  .data-table {
+    @apply w-full border-collapse;
+  }
+
+  .data-table th {
+    @apply px-4 py-2 text-left bg-muted text-muted-foreground font-medium;
+  }
+
+  .data-table td {
+    @apply px-4 py-2 border-t border-border;
+  }
+
+  .data-table tr:hover {
+    @apply bg-accent/50;
+  }
+
+  .record-cell {
+    @apply font-mono tabular-nums text-right;
+  }
+
+  .athlete-name {
+    @apply font-medium hover:text-primary transition-colors;
+  }
+
+  .record-badge {
+    @apply inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary;
+  }
 }
