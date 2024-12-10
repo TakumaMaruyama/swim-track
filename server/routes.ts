@@ -259,6 +259,7 @@ export function registerRoutes(app: Express) {
   // Athletes API
   app.get("/api/athletes", async (req, res) => {
     try {
+      console.log('Fetching athletes...');
       const athletes = await db
         .select({
           id: users.id,
@@ -270,16 +271,29 @@ export function registerRoutes(app: Express) {
         .where(eq(users.role, 'student'))
         .orderBy(users.username);
 
+      console.log('Athletes fetched successfully:', athletes.length);
       res.json(athletes);
     } catch (error) {
       console.error('Error fetching athletes:', error);
-      res.status(500).json({ message: "選手情報の取得に失敗しました" });
+      // エラーの詳細情報をログに出力
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+      }
+      res.status(500).json({ 
+        message: "選手情報の取得に失敗しました",
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
     }
   });
 
   // Records API endpoints
   app.get("/api/records", async (req, res) => {
     try {
+      console.log('Fetching swim records...');
       const allRecords = await db
         .select({
           id: swimRecords.id,
@@ -298,10 +312,22 @@ export function registerRoutes(app: Express) {
         .leftJoin(users, eq(swimRecords.studentId, users.id))
         .orderBy(desc(swimRecords.date));
 
+      console.log('Records fetched successfully:', allRecords.length);
       res.json(allRecords);
     } catch (error) {
       console.error('Error fetching records:', error);
-      res.status(500).json({ message: "記録の取得に失敗しました" });
+      // エラーの詳細情報をログに出力
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+      }
+      res.status(500).json({ 
+        message: "記録の取得に失敗しました",
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
     }
   });
 

@@ -1,4 +1,4 @@
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "@/components/ui/use-toast";
 
 // グローバルなPromiseエラーハンドラー
 export function setupErrorHandlers() {
@@ -6,7 +6,6 @@ export function setupErrorHandlers() {
     console.error('Unhandled promise rejection:', event.reason);
     
     // ユーザーフレンドリーなエラーメッセージを表示
-    const { toast } = useToast();
     toast({
       variant: "destructive",
       title: "エラーが発生しました",
@@ -26,7 +25,6 @@ export function handleApiError(error: unknown) {
     ? error.message 
     : '予期せぬエラーが発生しました';
 
-  const { toast } = useToast();
   toast({
     variant: "destructive",
     title: "エラー",
