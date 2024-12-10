@@ -173,54 +173,54 @@
   }
 
   .data-table {
-    @apply w-full border-collapse;
+    @apply w-full border-collapse bg-background rounded-lg overflow-hidden;
   }
 
   .data-table th {
-    @apply px-4 py-2 text-left bg-muted text-muted-foreground font-medium;
+    @apply px-6 py-3 text-left bg-muted text-muted-foreground font-medium text-sm tracking-wider;
   }
 
   .data-table td {
-    @apply px-4 py-2 border-t border-border;
+    @apply px-6 py-4 border-t border-border text-sm;
   }
 
   .data-table tr:hover {
-    @apply bg-accent/50;
+    @apply bg-accent/30 transition-colors duration-200;
   }
 
   .record-cell {
-    @apply font-mono tabular-nums text-right;
+    @apply font-mono tabular-nums text-right tracking-tight;
   }
 
   .athlete-name {
-    @apply font-medium hover:text-primary transition-colors;
+    @apply font-medium hover:text-primary transition-colors duration-200;
   }
 
   .record-badge {
-    @apply inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary;
+    @apply inline-flex items-center px-2.5 py-1.5 rounded-full text-xs font-semibold bg-primary/10 text-primary;
   }
 
   .form-group {
-    @apply space-y-3;
+    @apply space-y-4;
   }
 
   .form-label {
-    @apply block text-sm font-medium leading-none text-foreground peer-disabled:cursor-not-allowed peer-disabled:opacity-70;
+    @apply block text-sm font-medium leading-none text-foreground mb-1.5 peer-disabled:cursor-not-allowed peer-disabled:opacity-70;
   }
 
   .form-description {
-    @apply text-[0.8rem] text-muted-foreground mt-1;
+    @apply text-[0.8rem] text-muted-foreground mt-1.5 leading-relaxed;
   }
 
   .form-message {
-    @apply text-[0.8rem] font-medium text-destructive mt-1;
+    @apply text-[0.8rem] font-medium text-destructive mt-1.5;
   }
 
   .form-control {
-    @apply flex w-full min-h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply flex w-full min-h-[2.75rem] rounded-lg border border-input bg-background px-4 py-2 text-sm text-foreground ring-offset-background transition-colors duration-200 file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 hover:border-border;
   }
 
   .form-select {
-    @apply flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1;
+    @apply flex h-11 w-full items-center justify-between rounded-lg border border-input bg-background px-4 py-2 text-sm ring-offset-background transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1 hover:border-border;
   }
 }
