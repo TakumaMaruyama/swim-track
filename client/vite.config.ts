@@ -21,16 +21,16 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: process.env.REPL_SLUG ? 'https://' + process.env.REPL_SLUG + '.id.repl.co' : 'http://localhost:5000',
         changeOrigin: true,
         secure: false,
-        ws: true,
-        rewrite: (path) => path
+        ws: true
       }
     },
     hmr: {
       clientPort: 443,
-      host: 'webview.YOUR-REPL-NAME.repl.co'
+      host: process.env.REPL_SLUG ? `${process.env.REPL_SLUG}.id.repl.co` : undefined,
+      protocol: process.env.REPL_SLUG ? 'wss' : 'ws'
     },
     watch: {
       usePolling: true
