@@ -184,7 +184,7 @@ export function TimeHistoryModal({
   }, [groupedAndFilteredRecords]);
 
   const handleDelete = async (recordId: number) => {
-    if (isDeleting) return; // 既に削除処理中の場合は何もしない
+    if (isDeleting) return;
     
     try {
       setIsDeleting(true);
@@ -201,39 +201,40 @@ export function TimeHistoryModal({
       const data = await response.json();
       console.log('Delete response:', data);
 
-      // レスポンスのステータスコードに基づいてエラーハンドリング
       if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error("記録が見つかりません");
-        }
-        throw new Error(data.message || "記録の削除に失敗しました");
+        const errorMessage = data.message || "記録の削除に失敗しました";
+        console.error('Delete failed:', errorMessage);
+        throw new Error(errorMessage);
       }
 
-      // 削除成功
-      toast({
-        title: "削除成功",
-        description: "記録が削除されました",
-      });
-
-      // データの更新処理
       if (onRecordDeleted) {
         console.log('Refreshing data after deletion...');
         await onRecordDeleted();
         console.log('Data refresh completed');
       }
-      
-      // モーダルを閉じる
+
+      toast({
+        title: "削除成功",
+        description: "記録が削除されました",
+      });
+
       setDeletingRecord(null);
       onClose();
     } catch (error) {
-      console.error('Error deleting record:', error);
+      console.error('Error during delete operation:', error);
       
-      // エラーメッセージの表示
       toast({
         variant: "destructive",
         title: "エラー",
         description: error instanceof Error ? error.message : "記録の削除に失敗しました",
       });
+
+      if (error instanceof Error && error.message === "記録が見つかりません") {
+        // 記録が見つからない場合は、データを再取得して表示を更新
+        if (onRecordDeleted) {
+          await onRecordDeleted();
+        }
+      }
     } finally {
       setIsDeleting(false);
       setDeletingRecord(null);
