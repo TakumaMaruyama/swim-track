@@ -1,10 +1,11 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+
+import React, { Component, ErrorInfo } from 'react';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 
 interface Props {
-  children: ReactNode;
-  fallback?: ReactNode;
+  children: React.ReactNode;
+  fallback?: React.ReactNode;
 }
 
 interface State {
@@ -30,7 +31,6 @@ export class ErrorBoundary extends Component<Props, State> {
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Uncaught error:', error, errorInfo);
     
-    // エラー状態を自動リセット (デバウンス付き)
     if (this.cleanupTimeout) {
       window.clearTimeout(this.cleanupTimeout);
     }
@@ -41,25 +41,11 @@ export class ErrorBoundary extends Component<Props, State> {
       }
     }, 5000) as unknown as number;
 
-    // エラーの種類に応じて適切な処理を実行
-    if (error instanceof TypeError && error.message.includes('hooks')) {
-      // Hooksエラーの場合はコンポーネントをリマウント
-      this.setState({ hasError: true }, () => {
-        setTimeout(() => {
-          if (this.mounted) {
-            this.setState({ hasError: false });
-          }
-        }, 100);
-      });
-    } else if (error.name === 'ChunkLoadError' || error.message.includes('loading chunk')) {
-      // チャンクロードエラーの場合はページをリロード
-      window.location.reload();
-    } else {
-      this.setState({ hasError: true });
-    }
+    this.setState({ hasError: true });
   }
 
   public componentWillUnmount() {
+    this.mounted = false;
     if (this.cleanupTimeout) {
       window.clearTimeout(this.cleanupTimeout);
     }
