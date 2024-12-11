@@ -74,26 +74,31 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
 
   const data = {
     labels: filteredRecords.map(r => formatDate(r.date)),
-    datasets: poolLengths.map(poolLength => ({
-      label: poolLength === 15 ? "15ｍプール" :
-             poolLength === 25 ? "25ｍプール（短水路）" :
-             "50ｍプール（長水路）",
-      data: filteredRecords
-        .filter(r => r.poolLength === poolLength)
-        .map(r => ({
-          x: formatDate(r.date),
-          y: timeToSeconds(r.time)
-        })),
-      borderColor: poolColors[poolLength as keyof typeof poolColors].border,
-      backgroundColor: poolColors[poolLength as keyof typeof poolColors].background,
-      tension: 0.3,
-      pointStyle: filteredRecords
-        .filter(r => r.poolLength === poolLength)
-        .map(r => r.isCompetition ? 'star' : 'circle'),
-      pointRadius: filteredRecords
-        .filter(r => r.poolLength === poolLength)
-        .map(r => r.isCompetition ? 8 : 4),
-    })),
+    datasets: poolLengths.map(poolLength => {
+      const color = poolLength === 15 ? poolColors[15] :
+                   poolLength === 25 ? poolColors[25] :
+                   poolColors[50];
+      return {
+        label: poolLength === 15 ? "15ｍプール" :
+               poolLength === 25 ? "25ｍプール（短水路）" :
+               "50ｍプール（長水路）",
+        data: filteredRecords
+          .filter(r => r.poolLength === poolLength)
+          .map(r => ({
+            x: formatDate(r.date),
+            y: timeToSeconds(r.time)
+          })),
+        borderColor: color.border,
+        backgroundColor: color.background,
+        tension: 0.3,
+        pointStyle: filteredRecords
+          .filter(r => r.poolLength === poolLength)
+          .map(r => r.isCompetition ? 'star' : 'circle'),
+        pointRadius: filteredRecords
+          .filter(r => r.poolLength === poolLength)
+          .map(r => r.isCompetition ? 8 : 4),
+      };
+    }),
   };
 
   const options: ChartOptions<'line'> = {
