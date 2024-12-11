@@ -27,17 +27,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 // 最大リトライ回数
 const MAX_RETRY_COUNT = 3;
 // リトライ間隔（ミリ秒）
-const RETRY_INTERVAL = 2000; // リトライ間隔を2秒に延長
-
-// ネットワークステータスの確認
-async function checkNetworkStatus() {
-  try {
-    const response = await fetch('/health');
-    return response.ok;
-  } catch {
-    return false;
-  }
-}
+const RETRY_INTERVAL = 1000;
 
 // エラーの種類を判定する関数
 function getErrorType(error: unknown): ErrorType {
