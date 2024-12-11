@@ -230,7 +230,13 @@ const groupedAndFilteredRecords: GroupedRecords = React.useMemo(() => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete record');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to delete record');
+      }
+
+      // 削除が成功した後、モーダルを閉じる前にデータを更新
+      if (onRecordDeleted) {
+        await onRecordDeleted();
       }
 
       toast({
@@ -238,17 +244,16 @@ const groupedAndFilteredRecords: GroupedRecords = React.useMemo(() => {
         description: "記録が削除されました",
       });
       
-      if (onRecordDeleted) {
-        onRecordDeleted();
-      }
+      // 削除完了後にモーダルを閉じる
+      setDeletingRecord(null);
     } catch (error) {
       console.error('Error deleting record:', error);
       toast({
         variant: "destructive",
         title: "エラー",
-        description: "記録の削除に失敗しました",
+        description: error instanceof Error ? error.message : "記録の削除に失敗しました",
       });
-    } finally {
+      // エラー時もモーダルを閉じる
       setDeletingRecord(null);
     }
   };

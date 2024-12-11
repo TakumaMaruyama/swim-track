@@ -435,6 +435,11 @@ export function registerRoutes(app: Express) {
     try {
       const { id } = req.params;
       
+      // IDの検証を追加
+      if (!id || isNaN(parseInt(id))) {
+        return res.status(400).json({ message: "無効なIDが指定されました" });
+      }
+      
       const [record] = await db
         .select()
         .from(swimRecords)
@@ -445,14 +450,32 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ message: "記録が見つかりません" });
       }
 
-      await db
+      // 削除を実行し、削除された記録を返す
+      const [deletedRecord] = await db
         .delete(swimRecords)
-        .where(eq(swimRecords.id, parseInt(id)));
+        .where(eq(swimRecords.id, parseInt(id)))
+        .returning();
 
-      res.json({ message: "記録が削除されました" });
+      if (!deletedRecord) {
+        return res.status(500).json({ message: "記録の削除に失敗しました" });
+      }
+
+      console.log(`Record ${id} deleted successfully`);
+      res.json({ message: "記録が削除されました", id: deletedRecord.id });
     } catch (error) {
       console.error('Error deleting record:', error);
-      res.status(500).json({ message: "記録の削除に失敗しました" });
+      // エラーの詳細情報をログに出力
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+      }
+      res.status(500).json({ 
+        message: "記録の削除に失敗しました",
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
     }
   });
 
