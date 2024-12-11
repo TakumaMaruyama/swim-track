@@ -62,7 +62,7 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
 
   // プール長ごとの色を定義
   const poolColors = {
-    15: { border: 'rgb(75, 192, 192)', background: 'rgba(75, 192, 192, 0.5)' },   // 緑（15mプール）
+    15: { border: 'rgb(255, 159, 64)', background: 'rgba(255, 159, 64, 0.5)' },   // オレンジ（15mプール）
     25: { border: 'rgb(255, 99, 132)', background: 'rgba(255, 99, 132, 0.5)' },   // 赤（25mプール）
     50: { border: 'rgb(53, 162, 235)', background: 'rgba(53, 162, 235, 0.5)' },   // 青（50mプール）
   } as const;
