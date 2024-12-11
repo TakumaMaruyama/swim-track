@@ -67,17 +67,20 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
     50: { border: 'rgb(53, 162, 235)', background: 'rgba(53, 162, 235, 0.5)' },   // 青（50mプール）
   } as const;
 
-  // プール長の順序を明示的に指定
+  // プール長の順序を明示的に指定し、存在するプール長のみをフィルタリング
   const poolLengths = [15, 25, 50].filter(length => 
     filteredRecords.some(record => record.poolLength === length)
-  );
+  ).sort((a, b) => a - b);
 
   const data = {
     labels: filteredRecords.map(r => formatDate(r.date)),
     datasets: poolLengths.map(poolLength => {
-      const color = poolLength === 15 ? poolColors[15] :
-                   poolLength === 25 ? poolColors[25] :
-                   poolColors[50];
+      // プール長に応じて色を割り当て（15m: 緑, 25m: 赤, 50m: 青）
+      const color = {
+        15: poolColors[15],
+        25: poolColors[25],
+        50: poolColors[50]
+      }[poolLength] || poolColors[25]; // デフォルトは25mプールの色
       return {
         label: poolLength === 15 ? "15ｍプール" :
                poolLength === 25 ? "25ｍプール（短水路）" :
