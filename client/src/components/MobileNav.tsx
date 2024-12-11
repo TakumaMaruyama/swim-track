@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from "../components/ui/button";
 import { 
   Sheet, 
@@ -6,7 +6,7 @@ import {
   SheetTrigger,
   SheetTitle,
   SheetDescription 
-} from "../components/ui/sheet";
+} from "@/components/ui/sheet";
 import { Menu } from 'lucide-react';
 import { useLocation } from 'wouter';
 
@@ -21,16 +21,14 @@ interface MobileNavProps {
 }
 
 export function MobileNav({ items }: MobileNavProps) {
-  const [open, setOpen] = useState(false);
   const [, navigate] = useLocation();
 
-  const onNavigate = (href: string) => {
-    setOpen(false);
+  const handleNavigate = (href: string) => {
     navigate(href);
   };
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
+    <Sheet>
       <SheetTrigger asChild>
         <Button variant="ghost" size="icon" className="md:hidden">
           <Menu className="h-5 w-5" />
@@ -46,7 +44,7 @@ export function MobileNav({ items }: MobileNavProps) {
               key={index}
               variant="ghost"
               className="w-full justify-start"
-              onClick={() => onNavigate(item.href)}
+              onClick={() => handleNavigate(item.href)}
             >
               {item.icon}
               <span className="ml-2">{item.label}</span>
