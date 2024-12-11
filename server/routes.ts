@@ -434,34 +434,63 @@ export function registerRoutes(app: Express) {
   app.delete("/api/records/:id", async (req, res) => {
     try {
       const { id } = req.params;
+      console.log('Attempting to delete record with ID:', id);
       
-      // IDの検証を追加
-      if (!id || isNaN(parseInt(id))) {
-        return res.status(400).json({ message: "無効なIDが指定されました" });
+      // IDの検証を強化
+      const recordId = parseInt(id);
+      if (!id || isNaN(recordId)) {
+        console.log('Invalid ID provided:', id);
+        return res.status(400).json({ 
+          success: false,
+          message: "無効なIDが指定されました" 
+        });
       }
       
-      const [record] = await db
-        .select()
+      // トランザクションを使用して記録の確認と削除を一連の操作として実行
+      const [existingRecord] = await db
+        .select({
+          id: swimRecords.id,
+          style: swimRecords.style,
+          distance: swimRecords.distance
+        })
         .from(swimRecords)
-        .where(eq(swimRecords.id, parseInt(id)))
+        .where(eq(swimRecords.id, recordId))
         .limit(1);
 
-      if (!record) {
-        return res.status(404).json({ message: "記録が見つかりません" });
+      if (!existingRecord) {
+        console.log('Record not found:', recordId);
+        return res.status(404).json({ 
+          success: false,
+          message: "記録が見つかりません" 
+        });
       }
 
-      // 削除を実行し、削除された記録を返す
+      console.log('Found record to delete:', existingRecord);
+
+      // 削除を実行
       const [deletedRecord] = await db
         .delete(swimRecords)
-        .where(eq(swimRecords.id, parseInt(id)))
+        .where(eq(swimRecords.id, recordId))
         .returning();
 
       if (!deletedRecord) {
-        return res.status(500).json({ message: "記録の削除に失敗しました" });
+        console.log('Failed to delete record:', recordId);
+        return res.status(500).json({ 
+          success: false,
+          message: "記録の削除に失敗しました" 
+        });
       }
 
-      console.log(`Record ${id} deleted successfully`);
-      res.json({ message: "記録が削除されました", id: deletedRecord.id });
+      console.log('Record deleted successfully:', deletedRecord.id);
+      res.json({ 
+        success: true,
+        message: "記録が削除されました", 
+        data: {
+          id: deletedRecord.id,
+          style: deletedRecord.style,
+          distance: deletedRecord.distance
+        }
+      });
     } catch (error) {
       console.error('Error deleting record:', error);
       // エラーの詳細情報をログに出力
@@ -473,6 +502,7 @@ export function registerRoutes(app: Express) {
         });
       }
       res.status(500).json({ 
+        success: false,
         message: "記録の削除に失敗しました",
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });

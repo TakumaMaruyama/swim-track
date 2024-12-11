@@ -16,12 +16,35 @@ export interface ExtendedSwimRecord {
 }
 
 export function useSwimRecords() {
-  const { data: records, error, mutate } = useSWR<ExtendedSwimRecord[]>('/api/records');
+  const { data: records, error, mutate } = useSWR<ExtendedSwimRecord[]>('/api/records', {
+    revalidateOnFocus: false,
+    dedupingInterval: 2000,
+    onError: (err) => {
+      console.error('Error fetching swim records:', err);
+    }
+  });
+
+  const refreshRecords = React.useCallback(async () => {
+    try {
+      console.log('Refreshing swim records...');
+      // 強制的に再検証を行い、キャッシュを無効化
+      await mutate(undefined, {
+        revalidate: true,
+        rollbackOnError: true,
+        populateCache: true,
+        revalidateIfStale: true
+      });
+      console.log('Swim records refreshed successfully');
+    } catch (error) {
+      console.error('Error refreshing records:', error);
+      throw error; // エラーを上位に伝播させる
+    }
+  }, [mutate]);
 
   return {
     records,
     isLoading: !error && !records,
     error,
-    mutate
+    mutate: refreshRecords
   };
 }

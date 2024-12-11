@@ -223,29 +223,46 @@ const groupedAndFilteredRecords: GroupedRecords = React.useMemo(() => {
   }, [groupedAndFilteredRecords]);
 
   const handleDelete = async (recordId: number) => {
+    console.log('Attempting to delete record:', recordId);
     try {
       const response = await fetch(`/api/records/${recordId}`, {
         method: 'DELETE',
         credentials: 'include',
       });
 
+      const data = await response.json();
+      console.log('Delete response:', data);
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to delete record');
+        throw new Error(data.message || 'Failed to delete record');
       }
 
-      // 削除が成功した後、モーダルを閉じる前にデータを更新
-      if (onRecordDeleted) {
-        await onRecordDeleted();
-      }
+      if (data.success) {
+        // 削除成功後の処理
+        toast({
+          title: "削除成功",
+          description: "記録が削除されました",
+        });
 
-      toast({
-        title: "削除成功",
-        description: "記録が削除されました",
-      });
-      
-      // 削除完了後にモーダルを閉じる
-      setDeletingRecord(null);
+        // データを更新（非同期処理を待つ）
+        if (onRecordDeleted) {
+          try {
+            console.log('Refreshing data after deletion...');
+            await onRecordDeleted();
+            console.log('Data refresh completed');
+          } catch (refreshError) {
+            console.error('Error refreshing data:', refreshError);
+            toast({
+              variant: "destructive",
+              title: "警告",
+              description: "記録は削除されましたが、表示の更新に失敗しました。",
+            });
+          }
+        }
+      } else {
+        // サーバーからエラーメッセージを受け取った場合
+        throw new Error(data.message);
+      }
     } catch (error) {
       console.error('Error deleting record:', error);
       toast({
@@ -253,7 +270,8 @@ const groupedAndFilteredRecords: GroupedRecords = React.useMemo(() => {
         title: "エラー",
         description: error instanceof Error ? error.message : "記録の削除に失敗しました",
       });
-      // エラー時もモーダルを閉じる
+    } finally {
+      // 処理完了後にモーダルを閉じる
       setDeletingRecord(null);
     }
   };

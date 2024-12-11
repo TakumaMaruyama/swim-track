@@ -69,12 +69,7 @@ RecordCard.displayName = "RecordCard";
 
 export default function BestTimes() {
   const { toast } = useToast();
-  const { records, isLoading, error, mutate } = useSwimRecords({
-    revalidateOnFocus: false,
-    revalidateOnReconnect: true,
-    refreshInterval: 30000,
-    dedupingInterval: 5000,
-  });
+  const { records, isLoading, error, mutate } = useSwimRecords();
   
   const [editingRecord, setEditingRecord] = React.useState<number | null>(null);
 

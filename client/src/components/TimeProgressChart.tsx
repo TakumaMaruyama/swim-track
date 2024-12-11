@@ -37,16 +37,18 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
   style, 
   distance
 }) => {
-  const filteredRecords = records
-    .filter(r => {
-      return r.style === style &&
-             r.distance === distance;
-    })
-    .sort((a, b) => {
-      const dateA = new Date(a.date || '');
-      const dateB = new Date(b.date || '');
-      return dateA.getTime() - dateB.getTime();
-    });
+  const filteredRecords = React.useMemo(() => {
+    return records
+      .filter(r => {
+        return r.style === style &&
+               r.distance === distance;
+      })
+      .sort((a, b) => {
+        const dateA = new Date(a.date || '');
+        const dateB = new Date(b.date || '');
+        return dateA.getTime() - dateB.getTime();
+      });
+  }, [records, style, distance]);
 
   const timeToSeconds = (time: string) => {
     const [minutes, seconds] = time.split(':').map(Number);
