@@ -32,57 +32,16 @@ import { useToast } from "@/hooks/use-toast";
 import type { ExtendedSwimRecord } from "@/hooks/use-swim-records";
 import { lazy, Suspense } from 'react';
 import { ErrorBoundary } from './ErrorBoundary';
-const TimeProgressChart = lazy(() => {
-  if (typeof window !== 'undefined') {
-    // プリロードのヒントを追加
-    const link = document.createElement('link');
-    link.rel = 'modulepreload';
-    link.href = './TimeProgressChart';
-    document.head.appendChild(link);
-  }
-  return import('./TimeProgressChart').then(module => ({
-    default: module.default
-  }));
-});
-
-// データ処理をメモ化
-const useFilteredRecords = (records: ExtendedSwimRecord[], styleFilter: string, periodFilter: string) => {
-  return React.useMemo(() => {
-    return records.filter(record => {
-      if (styleFilter !== "all" && record.style !== styleFilter) {
-        return false;
-      }
-      // 期間フィルターの処理
-      if (periodFilter !== "all" && record.date) {
-        const recordDate = new Date(record.date);
-        const now = new Date();
-        
-        switch (periodFilter) {
-          case "1month": {
-            const oneMonthAgo = new Date();
-            oneMonthAgo.setMonth(now.getMonth() - 1);
-            return recordDate >= oneMonthAgo;
-          }
-          case "3months": {
-            const threeMonthsAgo = new Date();
-            threeMonthsAgo.setMonth(now.getMonth() - 3);
-            return recordDate >= threeMonthsAgo;
-          }
-          // 他のケースも同様...
-        }
-      }
-      return true;
-    });
-  }, [records, styleFilter, periodFilter]);
-};
 import { EditRecordForm } from '@/components/EditRecordForm';
+
+const TimeProgressChart = lazy(() => import('./TimeProgressChart'));
 
 type TimeHistoryModalProps = {
   isOpen: boolean;
   onClose: () => void;
   records: ExtendedSwimRecord[];
   athleteName: string;
-  onRecordDeleted?: () => void;
+  onRecordDeleted?: () => Promise<void>;
   isAdmin: boolean;
 };
 
@@ -120,50 +79,52 @@ export function TimeHistoryModal({
   const [periodFilter, setPeriodFilter] = React.useState<string>("all");
   const [customStartDate, setCustomStartDate] = React.useState<string>("");
   const [customEndDate, setCustomEndDate] = React.useState<string>("");
-  const filterRecordsByDate = React.useCallback((record: ExtendedSwimRecord, now: Date) => {
-  if (!record.date || periodFilter === "all") return true;
-  
-  const recordDate = new Date(record.date);
-  
-  switch (periodFilter) {
-    case "1month": {
-      const oneMonthAgo = new Date(now);
-      oneMonthAgo.setMonth(now.getMonth() - 1);
-      return recordDate >= oneMonthAgo;
-    }
-    case "3months": {
-      const threeMonthsAgo = new Date(now);
-      threeMonthsAgo.setMonth(now.getMonth() - 3);
-      return recordDate >= threeMonthsAgo;
-    }
-    case "6months": {
-      const sixMonthsAgo = new Date(now);
-      sixMonthsAgo.setMonth(now.getMonth() - 6);
-      return recordDate >= sixMonthsAgo;
-    }
-    case "1year": {
-      const oneYearAgo = new Date(now);
-      oneYearAgo.setFullYear(now.getFullYear() - 1);
-      return recordDate >= oneYearAgo;
-    }
-    case "custom": {
-      const startDate = customStartDate ? new Date(customStartDate) : null;
-      const endDate = customEndDate ? new Date(customEndDate) : null;
-      
-      if (startDate && endDate) {
-        return recordDate >= startDate && recordDate <= endDate;
-      } else if (startDate) {
-        return recordDate >= startDate;
-      } else if (endDate) {
-        return recordDate <= endDate;
-      }
-    }
-    default:
-      return true;
-  }
-}, [periodFilter, customStartDate, customEndDate]);
+  const [isDeleting, setIsDeleting] = React.useState(false);
 
-const groupedAndFilteredRecords: GroupedRecords = React.useMemo(() => {
+  const filterRecordsByDate = React.useCallback((record: ExtendedSwimRecord, now: Date) => {
+    if (!record.date || periodFilter === "all") return true;
+    
+    const recordDate = new Date(record.date);
+    
+    switch (periodFilter) {
+      case "1month": {
+        const oneMonthAgo = new Date(now);
+        oneMonthAgo.setMonth(now.getMonth() - 1);
+        return recordDate >= oneMonthAgo;
+      }
+      case "3months": {
+        const threeMonthsAgo = new Date(now);
+        threeMonthsAgo.setMonth(now.getMonth() - 3);
+        return recordDate >= threeMonthsAgo;
+      }
+      case "6months": {
+        const sixMonthsAgo = new Date(now);
+        sixMonthsAgo.setMonth(now.getMonth() - 6);
+        return recordDate >= sixMonthsAgo;
+      }
+      case "1year": {
+        const oneYearAgo = new Date(now);
+        oneYearAgo.setFullYear(now.getFullYear() - 1);
+        return recordDate >= oneYearAgo;
+      }
+      case "custom": {
+        const startDate = customStartDate ? new Date(customStartDate) : null;
+        const endDate = customEndDate ? new Date(customEndDate) : null;
+        
+        if (startDate && endDate) {
+          return recordDate >= startDate && recordDate <= endDate;
+        } else if (startDate) {
+          return recordDate >= startDate;
+        } else if (endDate) {
+          return recordDate <= endDate;
+        }
+      }
+      default:
+        return true;
+    }
+  }, [periodFilter, customStartDate, customEndDate]);
+
+  const groupedAndFilteredRecords: GroupedRecords = React.useMemo(() => {
     const now = new Date();
     const filtered = records.filter(record => {
       if (styleFilter !== "all" && record.style !== styleFilter) {
@@ -197,7 +158,7 @@ const groupedAndFilteredRecords: GroupedRecords = React.useMemo(() => {
       acc[key].push(record);
       return acc;
     }, {} as GroupedRecords);
-  }, [records, styleFilter, sortBy]);
+  }, [records, styleFilter, sortBy, filterRecordsByDate]);
 
   const personalBests = React.useMemo(() => {
     const bests: { [key: string]: string } = {};
@@ -223,8 +184,12 @@ const groupedAndFilteredRecords: GroupedRecords = React.useMemo(() => {
   }, [groupedAndFilteredRecords]);
 
   const handleDelete = async (recordId: number) => {
-    console.log('Attempting to delete record:', recordId);
+    if (isDeleting) return; // 既に削除処理中の場合は何もしない
+    
     try {
+      setIsDeleting(true);
+      console.log('Attempting to delete record:', recordId);
+      
       const response = await fetch(`/api/records/${recordId}`, {
         method: 'DELETE',
         credentials: 'include',
@@ -238,13 +203,11 @@ const groupedAndFilteredRecords: GroupedRecords = React.useMemo(() => {
       }
 
       if (data.success) {
-        // 削除成功後の処理
         toast({
           title: "削除成功",
           description: "記録が削除されました",
         });
 
-        // データを更新（非同期処理を待つ）
         if (onRecordDeleted) {
           try {
             console.log('Refreshing data after deletion...');
@@ -260,8 +223,7 @@ const groupedAndFilteredRecords: GroupedRecords = React.useMemo(() => {
           }
         }
       } else {
-        // サーバーからエラーメッセージを受け取った場合
-        throw new Error(data.message);
+        throw new Error(data.message || 'Failed to delete record');
       }
     } catch (error) {
       console.error('Error deleting record:', error);
@@ -271,12 +233,10 @@ const groupedAndFilteredRecords: GroupedRecords = React.useMemo(() => {
         description: error instanceof Error ? error.message : "記録の削除に失敗しました",
       });
     } finally {
-      // 処理完了後にモーダルを閉じる
+      setIsDeleting(false);
       setDeletingRecord(null);
     }
   };
-
-  
 
   return (
     <>
@@ -356,7 +316,6 @@ const groupedAndFilteredRecords: GroupedRecords = React.useMemo(() => {
           <div className="space-y-6">
             {Object.entries(groupedAndFilteredRecords).map(([key, records]) => {
               const [style, distance] = key.split('-');
-              const poolLength = records[0]?.poolLength || 25;
               
               return (
                 <Card key={key}>
@@ -394,6 +353,9 @@ const groupedAndFilteredRecords: GroupedRecords = React.useMemo(() => {
 
                     <div className="space-y-3 mt-4">
                       {records.map((record) => {
+                        const poolLengthKey = `${record.style}-${record.distance}-${record.poolLength}`;
+                        const isBestTime = record.time === personalBests[poolLengthKey];
+                        
                         return (
                           <div
                             key={record.id}
@@ -402,13 +364,12 @@ const groupedAndFilteredRecords: GroupedRecords = React.useMemo(() => {
                             <div className="flex flex-col gap-2">
                               <span className="text-xl font-bold">{record.time}</span>
                               <div className="flex flex-wrap gap-2">
-                                {record.time === personalBests[`${record.style}-${record.distance}-${record.poolLength}`] && (
+                                {isBestTime && (
                                   <Badge variant="secondary" className="flex items-center gap-1">
                                     <Trophy className="h-3 w-3" />
                                     自己ベスト ({record.poolLength}メートル)
                                   </Badge>
                                 )}
-                                
                               </div>
                             </div>
                             <div className="flex flex-col items-start md:items-end gap-1">
@@ -426,6 +387,7 @@ const groupedAndFilteredRecords: GroupedRecords = React.useMemo(() => {
                                     variant="ghost"
                                     size="icon"
                                     onClick={() => setEditingRecord(record)}
+                                    disabled={isDeleting}
                                   >
                                     <Edit2 className="h-4 w-4" />
                                   </Button>
@@ -433,6 +395,7 @@ const groupedAndFilteredRecords: GroupedRecords = React.useMemo(() => {
                                     variant="ghost"
                                     size="icon"
                                     onClick={() => setDeletingRecord(record.id)}
+                                    disabled={isDeleting}
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
@@ -463,16 +426,17 @@ const groupedAndFilteredRecords: GroupedRecords = React.useMemo(() => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>キャンセル</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting}>キャンセル</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (deletingRecord) {
                   handleDelete(deletingRecord);
                 }
               }}
+              disabled={isDeleting}
               className="bg-red-500 hover:bg-red-600"
             >
-              削除
+              {isDeleting ? "削除中..." : "削除"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

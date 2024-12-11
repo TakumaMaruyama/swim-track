@@ -1,3 +1,4 @@
+import React from 'react';
 import useSWR from "swr";
 import type { SwimRecord } from "db/schema";
 
@@ -21,13 +22,16 @@ export function useSwimRecords() {
     dedupingInterval: 2000,
     onError: (err) => {
       console.error('Error fetching swim records:', err);
-    }
+    },
+    shouldRetryOnError: true,
+    errorRetryCount: 3,
+    errorRetryInterval: 2000,
   });
 
   const refreshRecords = React.useCallback(async () => {
     try {
       console.log('Refreshing swim records...');
-      // 強制的に再検証を行い、キャッシュを無効化
+      // キャッシュを完全にクリアして再取得
       await mutate(undefined, {
         revalidate: true,
         rollbackOnError: true,
@@ -37,7 +41,15 @@ export function useSwimRecords() {
       console.log('Swim records refreshed successfully');
     } catch (error) {
       console.error('Error refreshing records:', error);
-      throw error; // エラーを上位に伝播させる
+      // より詳細なエラー情報をログに出力
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+      }
+      throw error;
     }
   }, [mutate]);
 
@@ -45,6 +57,8 @@ export function useSwimRecords() {
     records,
     isLoading: !error && !records,
     error,
-    mutate: refreshRecords
+    mutate: refreshRecords,
+    // エラー状態をより詳細に提供
+    errorDetails: error instanceof Error ? error.message : String(error)
   };
 }

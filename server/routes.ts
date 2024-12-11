@@ -498,13 +498,19 @@ export function registerRoutes(app: Express) {
         console.error('Error details:', {
           message: error.message,
           stack: error.stack,
-          name: error.name
+          name: error.name,
+          cause: error.cause
         });
       }
+      // エラーレスポンスをより詳細に
       res.status(500).json({ 
         success: false,
         message: "記録の削除に失敗しました",
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        error: process.env.NODE_ENV === 'development' ? {
+          message: error instanceof Error ? error.message : String(error),
+          name: error instanceof Error ? error.name : 'UnknownError',
+          cause: error instanceof Error ? error.cause : undefined
+        } : undefined
       });
     }
   });

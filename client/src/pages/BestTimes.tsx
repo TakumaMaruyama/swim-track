@@ -143,6 +143,7 @@ export default function BestTimes() {
   }
 
   if (error) {
+    console.error('Error fetching records:', error);
     return (
       <>
         <PageHeader title="ベストタイム" />
@@ -151,8 +152,20 @@ export default function BestTimes() {
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               記録の取得中にエラーが発生しました。再度お試しください。
+              {process.env.NODE_ENV === 'development' && (
+                <p className="mt-2 text-sm opacity-75">
+                  エラー詳細: {error.message}
+                </p>
+              )}
             </AlertDescription>
           </Alert>
+          <Button
+            onClick={() => mutate()}
+            className="mt-4"
+            variant="outline"
+          >
+            再読み込み
+          </Button>
         </div>
       </>
     );
