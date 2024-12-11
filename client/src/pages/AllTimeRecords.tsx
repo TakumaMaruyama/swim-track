@@ -163,26 +163,24 @@ function AllTimeRecords(): JSX.Element {
 
           {['15', '25', '50'].map((poolLength) => (
             <TabsContent key={poolLength} value={poolLength} className="space-y-8">
-              {Object.entries(sortedGroupedRecords).map(([distance, styles]) => (
-                <Card key={distance} className="overflow-hidden">
+              {swimStyles.map((style) => (
+                <Card key={style} className="overflow-hidden">
                   <CardHeader className="bg-muted/50">
                     <CardTitle className="text-xl">
-                      {distance}m種目
+                      {style}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="pt-6">
                     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                      {Object.entries(styles)
-                        .sort(([styleA], [styleB]) => {
-                          const indexA = swimStyles.indexOf(styleA);
-                          const indexB = swimStyles.indexOf(styleB);
-                          if (indexA === -1) return 1;
-                          if (indexB === -1) return -1;
-                          return indexA - indexB;
+                      {Object.entries(sortedGroupedRecords)
+                        .sort(([distA], [distB]) => parseInt(distA) - parseInt(distB))
+                        .map(([distance, styles]) => {
+                          if (!styles[style]) return null;
+                          return (
+                            <Record key={`${style}-${distance}`} record={styles[style]} />
+                          );
                         })
-                        .map(([style, record]) => (
-                          <Record key={`${distance}-${style}`} record={record} />
-                        ))}
+                        .filter(Boolean)}
                     </div>
                   </CardContent>
                 </Card>
