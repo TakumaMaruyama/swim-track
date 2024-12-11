@@ -247,7 +247,7 @@ export function TimeHistoryModal({
         setEditingRecord(null);
         onClose();
       }}>
-        <DialogContent className="max-w-4xl h-[90vh] sm:h-[80vh] overflow-y-auto p-4 sm:p-6">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] sm:max-h-[80vh] overflow-y-auto p-2 sm:p-6">
           <DialogHeader className="mb-4">
             <DialogTitle className="text-xl sm:text-2xl">{athleteName}の記録履歴</DialogTitle>
             <DialogDescription>
@@ -362,7 +362,7 @@ export function TimeHistoryModal({
                         return (
                           <div
                             key={record.id}
-                            className="p-3 rounded-lg flex flex-col gap-2 md:flex-row md:justify-between md:items-center"
+                            className="p-2 sm:p-3 rounded-lg flex flex-col gap-2 md:flex-row md:justify-between md:items-center"
                           >
                             <div className="flex flex-col gap-2">
                               <span className="text-xl font-bold">{record.time}</span>
