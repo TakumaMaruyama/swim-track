@@ -60,17 +60,21 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
     return new Date(date).toLocaleDateString('ja-JP');
   };
 
-  // Group records by pool length
-  const poolLengths = [...new Set(filteredRecords.map(r => r.poolLength))].sort();
-  const colors = [
-    { border: 'rgb(75, 192, 192)', background: 'rgba(75, 192, 192, 0.5)' },
-    { border: 'rgb(255, 99, 132)', background: 'rgba(255, 99, 132, 0.5)' },
-    { border: 'rgb(53, 162, 235)', background: 'rgba(53, 162, 235, 0.5)' },
-  ];
+  // プール長ごとの色を定義
+  const poolColors = {
+    15: { border: 'rgb(75, 192, 192)', background: 'rgba(75, 192, 192, 0.5)' },   // 緑（15mプール）
+    25: { border: 'rgb(255, 99, 132)', background: 'rgba(255, 99, 132, 0.5)' },   // 赤（25mプール）
+    50: { border: 'rgb(53, 162, 235)', background: 'rgba(53, 162, 235, 0.5)' },   // 青（50mプール）
+  } as const;
+
+  // プール長の順序を明示的に指定
+  const poolLengths = [15, 25, 50].filter(length => 
+    filteredRecords.some(record => record.poolLength === length)
+  );
 
   const data = {
     labels: filteredRecords.map(r => formatDate(r.date)),
-    datasets: poolLengths.map((poolLength, index) => ({
+    datasets: poolLengths.map(poolLength => ({
       label: poolLength === 15 ? "15ｍプール" :
              poolLength === 25 ? "25ｍプール（短水路）" :
              "50ｍプール（長水路）",
@@ -80,8 +84,8 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
           x: formatDate(r.date),
           y: timeToSeconds(r.time)
         })),
-      borderColor: colors[index % colors.length].border,
-      backgroundColor: colors[index % colors.length].background,
+      borderColor: poolColors[poolLength as keyof typeof poolColors].border,
+      backgroundColor: poolColors[poolLength as keyof typeof poolColors].background,
       tension: 0.3,
       pointStyle: filteredRecords
         .filter(r => r.poolLength === poolLength)
