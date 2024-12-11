@@ -17,53 +17,70 @@ export interface ExtendedSwimRecord {
 }
 
 export function useSwimRecords() {
-  const { data: records, error, mutate } = useSWR<ExtendedSwimRecord[]>('/api/records', {
-    revalidateOnFocus: false,
-    dedupingInterval: 5000,  // キャッシュの有効期間を延長
-    onError: (err) => {
-      console.error('Error fetching swim records:', err);
-      if (err instanceof Error) {
-        console.error('Error details:', {
-          message: err.message,
-          stack: err.stack,
-          name: err.name,
-          cause: err.cause
-        });
-      }
-    },
-    shouldRetryOnError: true,
-    errorRetryCount: 5,      // リトライ回数を増やす
-    errorRetryInterval: 3000, // リトライ間隔を延長
-    suspense: false,
-    keepPreviousData: true,
-    revalidateOnReconnect: true,
-    refreshWhenOffline: false,
-    refreshWhenHidden: false,
-    refreshInterval: 0
-  });
+  const fetcher = async (url: string) => {
+    const response = await fetch(url, {
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      const error = new Error('データの取得に失敗しました');
+      error.cause = await response.json();
+      throw error;
+    }
+    
+    return response.json();
+  };
+
+  const { data: records, error, mutate } = useSWR<ExtendedSwimRecord[]>(
+    '/api/records',
+    fetcher,
+    {
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+      dedupingInterval: 2000,
+      onError: (err) => {
+        console.error('Error fetching swim records:', err);
+        if (err instanceof Error) {
+          console.error('Error details:', {
+            message: err.message,
+            cause: err.cause,
+            name: err.name
+          });
+        }
+      },
+      shouldRetryOnError: true,
+      errorRetryCount: 3,
+      errorRetryInterval: 2000,
+      suspense: false,
+      keepPreviousData: true,
+      refreshWhenHidden: false,
+      refreshInterval: 0
+    }
+  );
 
   const refreshRecords = React.useCallback(async () => {
     try {
       console.log('Refreshing swim records...');
-      // キャッシュを完全にクリアして再取得
+      // Clear cache and revalidate
       await mutate(undefined, {
         revalidate: true,
-        rollbackOnError: true,
         populateCache: true,
-        revalidateIfStale: true
+        rollbackOnError: false
       });
       console.log('Swim records refreshed successfully');
     } catch (error) {
       console.error('Error refreshing records:', error);
-      // より詳細なエラー情報をログに出力
       if (error instanceof Error) {
         console.error('Error details:', {
           message: error.message,
-          stack: error.stack,
-          name: error.name
+          name: error.name,
+          cause: error.cause
         });
       }
-      throw error;
+      throw new Error('記録の更新に失敗しました');
     }
   }, [mutate]);
 
@@ -72,7 +89,8 @@ export function useSwimRecords() {
     isLoading: !error && !records,
     error,
     mutate: refreshRecords,
-    // エラー状態をより詳細に提供
-    errorDetails: error instanceof Error ? error.message : String(error)
+    errorDetails: error instanceof Error 
+      ? error.message 
+      : 'データの取得中にエラーが発生しました'
   };
 }

@@ -193,40 +193,42 @@ export function TimeHistoryModal({
       const response = await fetch(`/api/records/${recordId}`, {
         method: 'DELETE',
         credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
 
       const data = await response.json();
       console.log('Delete response:', data);
 
+      // レスポンスのステータスコードに基づいてエラーハンドリング
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to delete record');
-      }
-
-      if (data.success) {
-        toast({
-          title: "削除成功",
-          description: "記録が削除されました",
-        });
-
-        if (onRecordDeleted) {
-          try {
-            console.log('Refreshing data after deletion...');
-            await onRecordDeleted();
-            console.log('Data refresh completed');
-          } catch (refreshError) {
-            console.error('Error refreshing data:', refreshError);
-            toast({
-              variant: "destructive",
-              title: "警告",
-              description: "記録は削除されましたが、表示の更新に失敗しました。",
-            });
-          }
+        if (response.status === 404) {
+          throw new Error("記録が見つかりません");
         }
-      } else {
-        throw new Error(data.message || 'Failed to delete record');
+        throw new Error(data.message || "記録の削除に失敗しました");
       }
+
+      // 削除成功
+      toast({
+        title: "削除成功",
+        description: "記録が削除されました",
+      });
+
+      // データの更新処理
+      if (onRecordDeleted) {
+        console.log('Refreshing data after deletion...');
+        await onRecordDeleted();
+        console.log('Data refresh completed');
+      }
+      
+      // モーダルを閉じる
+      setDeletingRecord(null);
+      onClose();
     } catch (error) {
       console.error('Error deleting record:', error);
+      
+      // エラーメッセージの表示
       toast({
         variant: "destructive",
         title: "エラー",
