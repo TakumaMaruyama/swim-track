@@ -345,17 +345,23 @@ export function registerRoutes(app: Express) {
       res.json(allRecords);
     } catch (error) {
       console.error('Error fetching records:', error);
-      // エラーの詳細情報をログに出力
+      // より詳細なエラー情報をログに出力
       if (error instanceof Error) {
         console.error('Error details:', {
           message: error.message,
           stack: error.stack,
-          name: error.name
+          name: error.name,
+          cause: error.cause
         });
       }
       res.status(500).json({ 
+        success: false,
         message: "記録の取得に失敗しました",
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        error: process.env.NODE_ENV === 'development' ? {
+          message: error instanceof Error ? error.message : String(error),
+          name: error instanceof Error ? error.name : 'UnknownError',
+          cause: error instanceof Error ? error.cause : undefined
+        } : undefined
       });
     }
   });

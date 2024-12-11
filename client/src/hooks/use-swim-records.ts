@@ -19,13 +19,27 @@ export interface ExtendedSwimRecord {
 export function useSwimRecords() {
   const { data: records, error, mutate } = useSWR<ExtendedSwimRecord[]>('/api/records', {
     revalidateOnFocus: false,
-    dedupingInterval: 2000,
+    dedupingInterval: 5000,  // キャッシュの有効期間を延長
     onError: (err) => {
       console.error('Error fetching swim records:', err);
+      if (err instanceof Error) {
+        console.error('Error details:', {
+          message: err.message,
+          stack: err.stack,
+          name: err.name,
+          cause: err.cause
+        });
+      }
     },
     shouldRetryOnError: true,
-    errorRetryCount: 3,
-    errorRetryInterval: 2000,
+    errorRetryCount: 5,      // リトライ回数を増やす
+    errorRetryInterval: 3000, // リトライ間隔を延長
+    suspense: false,
+    keepPreviousData: true,
+    revalidateOnReconnect: true,
+    refreshWhenOffline: false,
+    refreshWhenHidden: false,
+    refreshInterval: 0
   });
 
   const refreshRecords = React.useCallback(async () => {
