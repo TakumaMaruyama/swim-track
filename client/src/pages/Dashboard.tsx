@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useLocation } from 'wouter';
 import { Trophy, Users, ClipboardList } from 'lucide-react';
@@ -62,19 +63,6 @@ export default function Dashboard() {
         <main className="flex-grow">
           <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              <Card className="col-span-full">
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2 text-2xl">
-                    <span>ダッシュボード</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-lg text-muted-foreground">
-                    SwimTrackへようこそ。メニューから機能を選択してください。
-                  </p>
-                </CardContent>
-              </Card>
-
               {NAV_ITEMS.map((item, index) => (
                 <Card 
                   key={index}

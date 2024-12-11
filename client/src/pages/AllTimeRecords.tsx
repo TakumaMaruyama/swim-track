@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useSwimRecords } from '@/hooks/use-swim-records';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -181,8 +180,24 @@ function AllTimeRecords(): JSX.Element {
                           .sort(([distA], [distB]) => parseInt(distA) - parseInt(distB))
                           .map(([distance, styles]) => {
                             if (!styles[style]) return null;
+                            const record = styles[style];
                             return (
-                              <Record key={`${style}-${distance}`} record={styles[style]} />
+                              <div key={`${style}-${distance}`} className="p-4 rounded-lg bg-muted/30">
+                                <div className="space-y-4">
+                                  <p className="text-xl text-primary font-bold">{distance}m</p>
+                                  <div className="flex items-center gap-3">
+                                    <p className="text-xl">{record.athleteName}</p>
+                                    <p className="text-xl">{record.time}</p>
+                                  </div>
+                                  <time className="text-sm text-muted-foreground block">
+                                    {new Date(record.date).toLocaleDateString('ja-JP', {
+                                      year: 'numeric',
+                                      month: 'long',
+                                      day: 'numeric'
+                                    })}
+                                  </time>
+                                </div>
+                              </div>
                             );
                           })
                           .filter(Boolean)}
