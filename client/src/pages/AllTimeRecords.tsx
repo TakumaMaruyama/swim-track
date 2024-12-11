@@ -45,7 +45,7 @@ const Record: React.FC<{ record: GroupedRecord }> = React.memo(({ record }) => {
   return (
     <div className="p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
       <div className="space-y-4">
-        <p className="text-xl text-primary font-bold">{record.distance}m</p>
+        <p className="text-xl text-primary font-bold">{record.style}</p>
         <div className="flex items-center gap-3">
           <p className="text-xl">{record.athleteName}</p>
           <p className="text-xl">{formatTime(record.time)}</p>
@@ -156,56 +156,37 @@ function AllTimeRecords(): JSX.Element {
       <div className="container px-4 md:px-8">
         <Tabs defaultValue="25" value={poolLengthFilter} onValueChange={setPoolLengthFilter}>
           <TabsList className="mb-8">
-            <TabsTrigger value="15">15mプール</TabsTrigger>
-            <TabsTrigger value="25">25mプール（短水路）</TabsTrigger>
-            <TabsTrigger value="50">50mプール（長水路）</TabsTrigger>
+            <TabsTrigger value="15">15ｍプール</TabsTrigger>
+            <TabsTrigger value="25">25ｍプール（短水路）</TabsTrigger>
+            <TabsTrigger value="50">50ｍプール（長水路）</TabsTrigger>
           </TabsList>
 
           {['15', '25', '50'].map((poolLength) => (
             <TabsContent key={poolLength} value={poolLength} className="space-y-8">
-              {swimStyles.map((style) => {
-                const hasRecords = Object.values(sortedGroupedRecords).some(distances => distances[style]);
-                if (!hasRecords) return null;
-                
-                return (
-                  <Card key={style} className="overflow-hidden">
-                    <CardHeader className="bg-muted/50">
-                      <CardTitle className="text-xl">
-                        {style}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-6">
-                      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                        {Object.entries(sortedGroupedRecords)
-                          .sort(([distA], [distB]) => parseInt(distA) - parseInt(distB))
-                          .map(([distance, styles]) => {
-                            if (!styles[style]) return null;
-                            const record = styles[style];
-                            return (
-                              <div key={`${style}-${distance}`} className="p-4 rounded-lg bg-muted/30">
-                                <div className="space-y-4">
-                                  <p className="text-xl text-primary font-bold">{distance}m</p>
-                                  <div className="flex items-center gap-3">
-                                    <p className="text-xl">{record.athleteName}</p>
-                                    <p className="text-xl">{record.time}</p>
-                                  </div>
-                                  <time className="text-sm text-muted-foreground block">
-                                    {new Date(record.date).toLocaleDateString('ja-JP', {
-                                      year: 'numeric',
-                                      month: 'long',
-                                      day: 'numeric'
-                                    })}
-                                  </time>
-                                </div>
-                              </div>
-                            );
-                          })
-                          .filter(Boolean)}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+              {Object.entries(sortedGroupedRecords).map(([distance, styles]) => (
+                <Card key={distance} className="overflow-hidden">
+                  <CardHeader className="bg-muted/50">
+                    <CardTitle className="text-xl">
+                      {distance}m種目
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-6">
+                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                      {Object.entries(styles)
+                        .sort(([styleA], [styleB]) => {
+                          const indexA = swimStyles.indexOf(styleA);
+                          const indexB = swimStyles.indexOf(styleB);
+                          if (indexA === -1) return 1;
+                          if (indexB === -1) return -1;
+                          return indexA - indexB;
+                        })
+                        .map(([style, record]) => (
+                          <Record key={`${distance}-${style}`} record={record} />
+                        ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </TabsContent>
           ))}
         </Tabs>
