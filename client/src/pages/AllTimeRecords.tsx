@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useSwimRecords } from '@/hooks/use-swim-records';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,12 +20,12 @@ type GroupedRecord = {
   athleteName: string;
 };
 
-type GroupedRecordsByStyle = {
-  [style: string]: GroupedRecord;
+type GroupedRecordsByDistance = {
+  [distance: number]: GroupedRecord;
 };
 
 type GroupedRecords = {
-  [distance: number]: GroupedRecordsByStyle;
+  [style: string]: GroupedRecordsByDistance;
 };
 
 const swimStyles = [
@@ -45,7 +46,7 @@ const Record: React.FC<{ record: GroupedRecord }> = React.memo(({ record }) => {
   return (
     <div className="p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
       <div className="space-y-4">
-        <p className="text-xl text-primary font-bold">{record.style}</p>
+        <p className="text-xl text-primary font-bold">{record.distance}m</p>
         <div className="flex items-center gap-3">
           <p className="text-xl">{record.athleteName}</p>
           <p className="text-xl">{formatTime(record.time)}</p>
@@ -88,12 +89,12 @@ function AllTimeRecords(): JSX.Element {
     );
 
     return filteredRecords.reduce((acc, record) => {
-      if (!acc[record.distance]) {
-        acc[record.distance] = {};
+      if (!acc[record.style]) {
+        acc[record.style] = {};
       }
       
-      if (!acc[record.distance][record.style] || record.time < acc[record.distance][record.style].time) {
-        acc[record.distance][record.style] = {
+      if (!acc[record.style][record.distance] || record.time < acc[record.style][record.distance].time) {
+        acc[record.style][record.distance] = {
           id: record.id,
           style: record.style,
           distance: record.distance,
@@ -111,12 +112,17 @@ function AllTimeRecords(): JSX.Element {
 
   const sortedGroupedRecords = React.useMemo(() => {
     const sorted: GroupedRecords = {};
-    Object.keys(groupedRecords)
-      .map(Number)
-      .sort((a, b) => a - b)
-      .forEach(distance => {
-        sorted[distance] = groupedRecords[distance];
-      });
+    swimStyles.forEach(style => {
+      if (groupedRecords[style]) {
+        sorted[style] = {};
+        Object.keys(groupedRecords[style])
+          .map(Number)
+          .sort((a, b) => a - b)
+          .forEach(distance => {
+            sorted[style][distance] = groupedRecords[style][distance];
+          });
+      }
+    });
     return sorted;
   }, [groupedRecords]);
 
@@ -163,26 +169,18 @@ function AllTimeRecords(): JSX.Element {
 
           {['15', '25', '50'].map((poolLength) => (
             <TabsContent key={poolLength} value={poolLength} className="space-y-8">
-              {Object.entries(sortedGroupedRecords).map(([distance, styles]) => (
-                <Card key={distance} className="overflow-hidden">
+              {Object.entries(sortedGroupedRecords).map(([style, distances]) => (
+                <Card key={style} className="overflow-hidden">
                   <CardHeader className="bg-muted/50">
                     <CardTitle className="text-xl">
-                      {distance}m種目
+                      {style}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="pt-6">
                     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                      {Object.entries(styles)
-                        .sort(([styleA], [styleB]) => {
-                          const indexA = swimStyles.indexOf(styleA);
-                          const indexB = swimStyles.indexOf(styleB);
-                          if (indexA === -1) return 1;
-                          if (indexB === -1) return -1;
-                          return indexA - indexB;
-                        })
-                        .map(([style, record]) => (
-                          <Record key={`${distance}-${style}`} record={record} />
-                        ))}
+                      {Object.values(distances).map((record) => (
+                        <Record key={`${record.style}-${record.distance}`} record={record} />
+                      ))}
                     </div>
                   </CardContent>
                 </Card>
