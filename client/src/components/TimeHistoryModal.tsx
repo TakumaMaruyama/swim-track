@@ -367,6 +367,12 @@ export function TimeHistoryModal({
                             <div className="flex flex-col gap-2">
                               <span className="text-xl font-bold">{record.time}</span>
                               <div className="flex flex-wrap gap-2">
+                                {record.isCompetition && record.competitionInfo && (
+                                  <Badge className="flex items-center gap-1">
+                                    <Trophy className="h-3 w-3" />
+                                    {record.competitionInfo.name} @ {record.competitionInfo.venue}
+                                  </Badge>
+                                )}
                                 {isBestTime && (
                                   <Badge variant="secondary" className="flex items-center gap-1">
                                     <Trophy className="h-3 w-3" />
