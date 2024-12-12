@@ -3,6 +3,7 @@ import { useSwimRecords } from '@/hooks/use-swim-records';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from '@/components/PageHeader';
 
@@ -63,12 +64,7 @@ const Record: React.FC<{ record: GroupedRecord }> = React.memo(({ record }) => {
 Record.displayName = "Record";
 
 function AllTimeRecords(): JSX.Element {
-  const { records, isLoading, error } = useSwimRecords({
-    revalidateOnFocus: false,
-    revalidateOnReconnect: true,
-    refreshInterval: 30000,
-    dedupingInterval: 5000,
-  });
+  const { records, isLoading, error } = useSwimRecords();
   
   const [poolLengthFilter, setPoolLengthFilter] = React.useState<string>("25");
 
@@ -125,6 +121,7 @@ function AllTimeRecords(): JSX.Element {
   }
 
   if (error) {
+    console.error('Error loading records:', error);
     return (
       <>
         <PageHeader title="歴代記録" />
@@ -132,9 +129,21 @@ function AllTimeRecords(): JSX.Element {
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              記録の取得中にエラーが発生しました。再度お試しください。
+              記録の取得中にエラーが発生しました。
+              {process.env.NODE_ENV === 'development' && error instanceof Error && (
+                <p className="mt-2 text-sm opacity-75">
+                  エラー詳細: {error.message}
+                </p>
+              )}
             </AlertDescription>
           </Alert>
+          <Button
+            onClick={() => window.location.reload()}
+            className="mt-4"
+            variant="outline"
+          >
+            再読み込み
+          </Button>
         </div>
       </>
     );
