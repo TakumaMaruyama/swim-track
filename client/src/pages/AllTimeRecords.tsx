@@ -2,8 +2,7 @@ import React from 'react';
 import { useSwimRecords } from '@/hooks/use-swim-records';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Trophy } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { AlertCircle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from '@/components/PageHeader';
 
@@ -14,7 +13,6 @@ type GroupedRecord = {
   time: string;
   date: Date;
   studentId: number;
-  isCompetition: boolean;
   poolLength: number;
   athleteName: string;
 };
@@ -57,12 +55,6 @@ const Record: React.FC<{ record: GroupedRecord }> = React.memo(({ record }) => {
             day: 'numeric'
           })}
         </time>
-        {record.isCompetition && (
-          <Badge variant="secondary" className="inline-flex items-center gap-1">
-            <Trophy className="h-3 w-3" />
-            大会記録
-          </Badge>
-        )}
       </div>
     </div>
   );
@@ -100,7 +92,6 @@ function AllTimeRecords(): JSX.Element {
           time: record.time,
           date: new Date(record.date || Date.now()),
           studentId: record.studentId,
-          isCompetition: record.isCompetition ?? false,
           poolLength: record.poolLength,
           athleteName: record.athleteName || ''
         };
