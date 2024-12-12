@@ -89,8 +89,7 @@ function AllTimeRecords(): JSX.Element {
           date: new Date(record.date || Date.now()),
           studentId: record.studentId,
           poolLength: record.poolLength,
-          athleteName: record.athleteName || '',
-          isCompetition: false // 大会記録フラグを強制的にfalseに設定
+          athleteName: record.athleteName || ''
         };
       }
       return acc;
