@@ -43,13 +43,13 @@ const Record: React.FC<{ record: GroupedRecord }> = React.memo(({ record }) => {
 
   return (
     <div className="p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-      <div className="space-y-4">
-        <p className="text-xl text-primary font-bold">{record.style}</p>
-        <div className="flex items-center gap-3">
-          <p className="text-xl">{record.athleteName}</p>
-          <p className="text-xl">{formatTime(record.time)}</p>
+      <div className="space-y-3">
+        <p className="text-lg sm:text-xl text-primary font-bold">{record.style}</p>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+          <p className="text-base sm:text-xl">{record.athleteName}</p>
+          <p className="text-base sm:text-xl font-semibold">{formatTime(record.time)}</p>
         </div>
-        <time className="text-sm text-muted-foreground block">
+        <time className="text-xs sm:text-sm text-muted-foreground block">
           {new Date(record.date).toLocaleDateString('ja-JP', {
             year: 'numeric',
             month: 'long',
@@ -89,7 +89,8 @@ function AllTimeRecords(): JSX.Element {
           date: new Date(record.date || Date.now()),
           studentId: record.studentId,
           poolLength: record.poolLength,
-          athleteName: record.athleteName || ''
+          athleteName: record.athleteName || '',
+          isCompetition: false // 大会記録フラグを強制的にfalseに設定
         };
       }
       return acc;
