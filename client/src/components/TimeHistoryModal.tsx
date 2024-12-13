@@ -457,7 +457,7 @@ export function TimeHistoryModal({
           onClose={() => setEditingRecord(null)}
           onSubmit={async (values) => {
             try {
-              console.log('Updating record:', editingRecord.id, values);
+              console.log('Starting record update:', editingRecord.id, values);
               
               const response = await fetch(`/api/records/${editingRecord.id}`, {
                 method: 'PUT',
@@ -468,39 +468,46 @@ export function TimeHistoryModal({
                 credentials: 'include',
               });
 
+              const responseData = await response.json();
               if (!response.ok) {
-                const error = await response.json();
-                console.error('Server returned error:', error);
-                throw new Error(error.message || '記録の更新に失敗しました');
+                console.error('Server returned error:', responseData);
+                throw new Error(responseData.message || '記録の更新に失敗しました');
               }
 
-              const updatedRecord = await response.json();
-              console.log('Record updated successfully:', updatedRecord);
+              console.log('Record updated successfully:', responseData);
 
-              // UIの状態を更新
+              // データを再取得する前にUIの状態をリセット
               setEditingRecord(null);
               
-              // 成功通知
-              toast({
-                title: "更新成功",
-                description: "記録が更新されました",
-              });
-
-              // データを確実に更新してから閉じる
+              // データを再取得
               if (onRecordDeleted) {
                 try {
                   console.log('Starting data refresh...');
                   await onRecordDeleted();
                   console.log('Data refresh completed');
                   
-                  // 更新が完了してからモーダルを閉じる
-                  await new Promise(resolve => setTimeout(resolve, 500));
+                  // データ更新が完了したら成功通知
+                  toast({
+                    title: "更新成功",
+                    description: "記録が更新されました",
+                  });
+
+                  // すべての処理が完了してからモーダルを閉じる
                   onClose();
                 } catch (updateError) {
                   console.error('Failed to refresh records:', updateError);
+                  toast({
+                    variant: "destructive",
+                    title: "エラー",
+                    description: "データの更新に失敗しました",
+                  });
                   throw updateError;
                 }
               } else {
+                toast({
+                  title: "更新成功",
+                  description: "記録が更新されました",
+                });
                 onClose();
               }
             } catch (error) {

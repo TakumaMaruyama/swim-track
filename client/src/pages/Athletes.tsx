@@ -489,26 +489,38 @@ export default function Athletes() {
                 onRecordDeleted={async () => {
                   console.log('Starting records refresh...');
                   try {
-                    // まず既存のキャッシュを完全にクリア
+                    // キャッシュをクリアして再取得を強制
+                    console.log('Clearing records cache...');
                     await mutateRecords(undefined, { revalidate: false });
+                    console.log('Records cache cleared');
                     
-                    // 新しいデータを強制的に取得
-                    await mutateRecords(undefined, {
+                    // 新しいデータを取得
+                    console.log('Fetching new records data...');
+                    const recordsResult = await mutateRecords(undefined, {
                       revalidate: true,
                       populateCache: true,
-                      rollbackOnError: false
+                      rollbackOnError: false,
                     });
-                    console.log('Records refreshed successfully');
-                    
-                    // athletesデータも同様に更新
+                    console.log('New records data fetched:', recordsResult ? 'success' : 'no data');
+
+                    // athletesデータも更新
+                    console.log('Updating athletes data...');
                     await mutateAthletes(undefined, { revalidate: false });
-                    await mutateAthletes(undefined, {
+                    const athletesResult = await mutateAthletes(undefined, {
                       revalidate: true,
                       populateCache: true,
-                      rollbackOnError: false
+                      rollbackOnError: false,
                     });
-                    console.log('Athletes data also refreshed');
+                    console.log('Athletes data updated:', athletesResult ? 'success' : 'no data');
+
+                    // 短い遅延を入れてUIの更新を確実にする
+                    await new Promise(resolve => setTimeout(resolve, 100));
                     
+                    if (!recordsResult || !athletesResult) {
+                      throw new Error('データの更新に失敗しました');
+                    }
+
+                    console.log('All data refresh completed successfully');
                     return Promise.resolve();
                   } catch (error) {
                     console.error('Failed to refresh data:', error);
