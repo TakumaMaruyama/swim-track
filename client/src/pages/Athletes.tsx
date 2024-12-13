@@ -487,9 +487,16 @@ export default function Athletes() {
                 records={getAthleteRecords(viewingHistory.athleteId)}
                 athleteName={viewingHistory.athleteName}
                 onRecordDeleted={async () => {
-                await mutateRecords();
-                return Promise.resolve();
-              }}
+                  try {
+                    // 確実にキャッシュを無効化して再取得
+                    await mutateRecords(undefined, { revalidate: true });
+                    console.log('Records cache revalidated successfully');
+                    return Promise.resolve();
+                  } catch (error) {
+                    console.error('Error revalidating records:', error);
+                    throw error;
+                  }
+                }}
                 isAdmin={isAdmin}
               />
             </Suspense>
