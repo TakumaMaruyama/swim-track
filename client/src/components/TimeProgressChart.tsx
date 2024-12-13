@@ -101,8 +101,8 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
           .map(r => ({
             x: formatDate(r.date),
             y: timeToSeconds(r.time),
-            competition: r.competition,
-            isCompetition: r.isCompetition
+            competition: r.competition || '',
+            isCompetition: !!r.isCompetition
           })),
         borderColor: color.border,
         backgroundColor: color.background,
@@ -130,12 +130,12 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
       tooltip: {
         callbacks: {
           label: (context: TooltipItem<'line'>) => {
-            const data = context.raw as { y: number, competition?: string, isCompetition?: boolean };
+            if (!context.raw || typeof context.raw !== 'object') return '';
+            const data = context.raw as { y: number, competition: string, isCompetition: boolean };
             const timeStr = formatSeconds(Number(data.y));
-            if (data.isCompetition && data.competition) {
-              return `${timeStr} (${data.competition})`;
-            }
-            return timeStr;
+            return data.isCompetition && data.competition 
+              ? `${timeStr} (${data.competition})`
+              : timeStr;
           },
         },
       },
