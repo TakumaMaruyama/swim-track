@@ -389,13 +389,13 @@ export default function Athletes() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex items-center gap-2 hover:bg-primary hover:text-primary-foreground transition-colors"
+                        className="flex items-center gap-2 hover:bg-primary hover:text-primary-foreground transition-all duration-200 ease-in-out transform hover:scale-105 active:scale-95 hover:shadow-md focus:ring-2 focus:ring-primary focus:ring-offset-2"
                         onClick={() => setViewingHistory({
                           athleteId: athlete.id,
                           athleteName: athlete.username
                         })}
                       >
-                        <History className="h-4 w-4" />
+                        <History className="h-4 w-4 transition-transform duration-200 group-hover:rotate-12" />
                         記録履歴
                       </Button>
                     </div>
