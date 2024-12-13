@@ -489,7 +489,10 @@ export default function Athletes() {
                 onRecordDeleted={async () => {
                   console.log('Starting records refresh...');
                   try {
-                    // キャッシュを完全に無効化
+                    // まず既存のキャッシュを完全にクリア
+                    await mutateRecords(undefined, { revalidate: false });
+                    
+                    // 新しいデータを強制的に取得
                     await mutateRecords(undefined, {
                       revalidate: true,
                       populateCache: true,
@@ -497,10 +500,12 @@ export default function Athletes() {
                     });
                     console.log('Records refreshed successfully');
                     
-                    // athletesデータも更新
+                    // athletesデータも同様に更新
+                    await mutateAthletes(undefined, { revalidate: false });
                     await mutateAthletes(undefined, {
                       revalidate: true,
-                      populateCache: true
+                      populateCache: true,
+                      rollbackOnError: false
                     });
                     console.log('Athletes data also refreshed');
                     
