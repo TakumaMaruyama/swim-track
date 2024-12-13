@@ -128,8 +128,17 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
       tooltip: {
         callbacks: {
           label: (context: TooltipItem<'line'>) => {
+            const datasetIndex = context.datasetIndex;
+            const index = context.dataIndex;
+            const poolLength = poolLengths[datasetIndex];
+            const record = filteredRecords
+              .filter(r => r.poolLength === poolLength)[index];
             const seconds = Number(context.raw.y);
-            return formatSeconds(seconds);
+            const timeStr = formatSeconds(seconds);
+            if (record.isCompetition && record.competition) {
+              return `${timeStr} (${record.competition})`;
+            }
+            return timeStr;
           },
         },
       },
