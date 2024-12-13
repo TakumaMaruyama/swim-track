@@ -99,12 +99,13 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
         data: filteredRecords
           .filter(r => r.poolLength === poolLength)
           .map(r => {
-            console.log('Record data:', r);
             return {
               x: formatDate(r.date),
               y: timeToSeconds(r.time),
-              competition: r.competitionName || '',
-              isCompetition: !!r.isCompetition,
+              isCompetition: r.isCompetition,
+              competitionName: r.competitionName,
+              competitionLocation: r.competitionLocation,
+              time: r.time,
               poolLength: r.poolLength
             };
           }),
@@ -136,19 +137,19 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
           label: (context: TooltipItem<'line'>) => {
             if (!context.raw || typeof context.raw !== 'object') return '';
             console.log('Tooltip data:', context.raw);
-            const data = context.raw as { y: number, competition: string, isCompetition: boolean };
-            const timeStr = formatSeconds(Number(data.y));
-            const poolLength = poolLengths[context.datasetIndex || 0];
-            const recordIndex = filteredRecords
-              .filter(r => r.poolLength === poolLength)
-              .findIndex(r => timeToSeconds(r.time) === data.y);
+            const data = context.raw as { 
+              y: number, 
+              isCompetition: boolean,
+              competitionName: string | null,
+              competitionLocation: string | null,
+              time: string,
+              poolLength: number
+            };
             
-            if (recordIndex !== -1) {
-              const record = filteredRecords
-                .filter(r => r.poolLength === poolLength)[recordIndex];
-              if (record.isCompetition && record.competitionName) {
-                return `${timeStr} (${record.competitionName})`;
-              }
+            const timeStr = formatSeconds(Number(data.y));
+            if (data.isCompetition && data.competitionName) {
+              const location = data.competitionLocation ? ` @ ${data.competitionLocation}` : '';
+              return `${timeStr} (${data.competitionName}${location})`;
             }
             return timeStr;
           },

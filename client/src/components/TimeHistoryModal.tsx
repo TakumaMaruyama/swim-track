@@ -373,6 +373,11 @@ export function TimeHistoryModal({
                                     自己ベスト ({record.poolLength}メートル)
                                   </Badge>
                                 )}
+                                {record.isCompetition && record.competitionName && (
+                                  <Badge variant="outline" className="flex items-center gap-1">
+                                    {record.competitionName}
+                                  </Badge>
+                                )}
                               </div>
                             </div>
                             <div className="flex flex-col items-start md:items-end gap-1">
