@@ -457,41 +457,48 @@ export function TimeHistoryModal({
           onClose={() => setEditingRecord(null)}
           onSubmit={async (values) => {
             try {
+              console.log('Updating record:', editingRecord.id, values);
+              
               const response = await fetch(`/api/records/${editingRecord.id}`, {
                 method: 'PUT',
                 headers: {
                   'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                  ...values,
-                }),
+                body: JSON.stringify(values),
                 credentials: 'include',
               });
 
               if (!response.ok) {
                 const error = await response.json();
+                console.error('Server returned error:', error);
                 throw new Error(error.message || '記録の更新に失敗しました');
               }
 
               const updatedRecord = await response.json();
-              
-              // 更新されたデータを確実に反映
+              console.log('Record updated successfully:', updatedRecord);
+
+              // 記録を更新した後、確実にデータを再取得
               if (onRecordDeleted) {
                 try {
                   await onRecordDeleted();
-                  console.log('Records updated successfully after edit');
                 } catch (updateError) {
-                  console.error('Error updating records after edit:', updateError);
+                  console.error('Failed to refresh records:', updateError);
                   throw updateError;
                 }
               }
 
+              // UIの状態を更新
+              setEditingRecord(null);
+              
+              // 成功通知
               toast({
                 title: "更新成功",
                 description: "記録が更新されました",
               });
 
-              setEditingRecord(null);
+              // モーダルを閉じる前に少し待つ
+              await new Promise(resolve => setTimeout(resolve, 100));
+              onClose();
             } catch (error) {
               console.error('Error updating record:', error);
               toast({

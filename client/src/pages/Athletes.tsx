@@ -487,13 +487,31 @@ export default function Athletes() {
                 records={getAthleteRecords(viewingHistory.athleteId)}
                 athleteName={viewingHistory.athleteName}
                 onRecordDeleted={async () => {
+                  console.log('Starting records refresh...');
                   try {
-                    // 確実にキャッシュを無効化して再取得
-                    await mutateRecords(undefined, { revalidate: true });
-                    console.log('Records cache revalidated successfully');
+                    // キャッシュを完全に無効化
+                    await mutateRecords(undefined, {
+                      revalidate: true,
+                      populateCache: true,
+                      rollbackOnError: false
+                    });
+                    console.log('Records refreshed successfully');
+                    
+                    // athletesデータも更新
+                    await mutateAthletes(undefined, {
+                      revalidate: true,
+                      populateCache: true
+                    });
+                    console.log('Athletes data also refreshed');
+                    
                     return Promise.resolve();
                   } catch (error) {
-                    console.error('Error revalidating records:', error);
+                    console.error('Failed to refresh data:', error);
+                    toast({
+                      variant: "destructive",
+                      title: "エラー",
+                      description: "データの更新に失敗しました",
+                    });
                     throw error;
                   }
                 }}
