@@ -486,7 +486,10 @@ export default function Athletes() {
                 onClose={() => setViewingHistory({ athleteId: null, athleteName: '' })}
                 records={getAthleteRecords(viewingHistory.athleteId)}
                 athleteName={viewingHistory.athleteName}
-                onRecordDeleted={() => mutateRecords()}
+                onRecordDeleted={async () => {
+                await mutateRecords();
+                return Promise.resolve();
+              }}
                 isAdmin={isAdmin}
               />
             </Suspense>

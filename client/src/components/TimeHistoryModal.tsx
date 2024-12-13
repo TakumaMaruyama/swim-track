@@ -473,6 +473,8 @@ export function TimeHistoryModal({
                 throw new Error(error.message || '記録の更新に失敗しました');
               }
 
+              await response.json(); // レスポンスを待つ
+
               toast({
                 title: "更新成功",
                 description: "記録が更新されました",
@@ -481,7 +483,7 @@ export function TimeHistoryModal({
               setEditingRecord(null);
               
               if (onRecordDeleted) {
-                onRecordDeleted();
+                await onRecordDeleted(); // awaitを追加して確実に更新を待つ
               }
             } catch (error) {
               console.error('Error updating record:', error);
