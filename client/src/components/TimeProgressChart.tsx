@@ -50,9 +50,25 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
       });
   }, [records, style, distance]);
 
-  const timeToSeconds = (time: string) => {
-    const [minutes, seconds] = time.split(':').map(Number);
-    return minutes * 60 + seconds;
+  const timeToSeconds = (time: string | null): number => {
+    if (!time) return 0;
+    try {
+      const [minutes, seconds] = time.split(':').map(str => {
+        const num = parseFloat(str);
+        return isNaN(num) ? 0 : num;
+      });
+      return (minutes * 60) + seconds;
+    } catch (error) {
+      console.error('Error parsing time:', error);
+      return 0;
+    }
+  };
+
+  const formatSeconds = (totalSeconds: number): string => {
+    if (isNaN(totalSeconds) || totalSeconds === 0) return '0:00.00';
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = (totalSeconds % 60).toFixed(2);
+    return `${minutes}:${seconds.padStart(5, '0')}`;
   };
 
   const formatDate = (date: Date | string | null) => {
@@ -75,12 +91,7 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
   const data = {
     labels: filteredRecords.map(r => formatDate(r.date)),
     datasets: poolLengths.map(poolLength => {
-      // プール長に応じて色を割り当て（15m: 緑, 25m: 赤, 50m: 青）
-      const color = {
-        15: poolColors[15],
-        25: poolColors[25],
-        50: poolColors[50]
-      }[poolLength] || poolColors[25]; // デフォルトは25mプールの色
+      const color = poolColors[poolLength as keyof typeof poolColors];
       return {
         label: poolLength === 15 ? "15ｍプール" :
                poolLength === 25 ? "25ｍプール（短水路）" :
@@ -117,10 +128,8 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
       tooltip: {
         callbacks: {
           label: (context: TooltipItem<'line'>) => {
-            const seconds = context.raw as number;
-            const minutes = Math.floor(seconds / 60);
-            const remainingSeconds = (seconds % 60).toFixed(2);
-            return `${minutes}:${remainingSeconds.padStart(5, '0')}`;
+            const seconds = Number(context.raw.y);
+            return formatSeconds(seconds);
           },
         },
       },
@@ -133,11 +142,8 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
           text: 'タイム (秒)',
         },
         ticks: {
-          callback: function(this: Scale<CoreScaleOptions>, value: number | string): string {
-            value = Number(value);
-            const minutes = Math.floor(value / 60);
-            const seconds = (value % 60).toFixed(2);
-            return `${minutes}:${seconds.padStart(5, '0')}`;
+          callback: function(value: number | string): string {
+            return formatSeconds(Number(value));
           },
         },
       },
