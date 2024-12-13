@@ -100,7 +100,9 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
           .filter(r => r.poolLength === poolLength)
           .map(r => ({
             x: formatDate(r.date),
-            y: timeToSeconds(r.time)
+            y: timeToSeconds(r.time),
+            competition: r.competition,
+            isCompetition: r.isCompetition
           })),
         borderColor: color.border,
         backgroundColor: color.background,
@@ -128,15 +130,10 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
       tooltip: {
         callbacks: {
           label: (context: TooltipItem<'line'>) => {
-            const datasetIndex = context.datasetIndex;
-            const index = context.dataIndex;
-            const poolLength = poolLengths[datasetIndex];
-            const record = filteredRecords
-              .filter(r => r.poolLength === poolLength)[index];
-            const seconds = Number(context.raw.y);
-            const timeStr = formatSeconds(seconds);
-            if (record.isCompetition && record.competition) {
-              return `${timeStr} (${record.competition})`;
+            const data = context.raw as { y: number, competition?: string, isCompetition?: boolean };
+            const timeStr = formatSeconds(Number(data.y));
+            if (data.isCompetition && data.competition) {
+              return `${timeStr} (${data.competition})`;
             }
             return timeStr;
           },
