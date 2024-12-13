@@ -103,7 +103,7 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
             return {
               x: formatDate(r.date),
               y: timeToSeconds(r.time),
-              competition: r.competition || '',
+              competition: r.competitionName || '',
               isCompetition: !!r.isCompetition,
               poolLength: r.poolLength
             };
@@ -146,8 +146,8 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
             if (recordIndex !== -1) {
               const record = filteredRecords
                 .filter(r => r.poolLength === poolLength)[recordIndex];
-              if (record.isCompetition && record.competition) {
-                return `${timeStr} (${record.competition})`;
+              if (record.isCompetition && record.competitionName) {
+                return `${timeStr} (${record.competitionName})`;
               }
             }
             return timeStr;

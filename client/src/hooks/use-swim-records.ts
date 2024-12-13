@@ -12,6 +12,7 @@ export interface ExtendedSwimRecord {
   poolLength: number;
   athleteName: string;
   isCompetition: boolean;
+  competition: string | null;  // For backward compatibility
   competitionName: string | null;
   competitionLocation: string | null;
 }
