@@ -98,12 +98,16 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
                "50ｍプール（長水路）",
         data: filteredRecords
           .filter(r => r.poolLength === poolLength)
-          .map(r => ({
-            x: formatDate(r.date),
-            y: timeToSeconds(r.time),
-            competition: r.competition || '',
-            isCompetition: !!r.isCompetition
-          })),
+          .map(r => {
+            console.log('Record data:', r);
+            return {
+              x: formatDate(r.date),
+              y: timeToSeconds(r.time),
+              competition: r.competition || '',
+              isCompetition: !!r.isCompetition,
+              poolLength: r.poolLength
+            };
+          }),
         borderColor: color.border,
         backgroundColor: color.background,
         tension: 0.3,
@@ -131,11 +135,22 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
         callbacks: {
           label: (context: TooltipItem<'line'>) => {
             if (!context.raw || typeof context.raw !== 'object') return '';
+            console.log('Tooltip data:', context.raw);
             const data = context.raw as { y: number, competition: string, isCompetition: boolean };
             const timeStr = formatSeconds(Number(data.y));
-            return data.isCompetition && data.competition 
-              ? `${timeStr} (${data.competition})`
-              : timeStr;
+            const poolLength = poolLengths[context.datasetIndex || 0];
+            const recordIndex = filteredRecords
+              .filter(r => r.poolLength === poolLength)
+              .findIndex(r => timeToSeconds(r.time) === data.y);
+            
+            if (recordIndex !== -1) {
+              const record = filteredRecords
+                .filter(r => r.poolLength === poolLength)[recordIndex];
+              if (record.isCompetition && record.competition) {
+                return `${timeStr} (${record.competition})`;
+              }
+            }
+            return timeStr;
           },
         },
       },
