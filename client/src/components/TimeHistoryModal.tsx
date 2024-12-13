@@ -501,7 +501,6 @@ export function TimeHistoryModal({
                     title: "エラー",
                     description: "データの更新に失敗しました",
                   });
-                  throw updateError;
                 }
               } else {
                 toast({
@@ -517,7 +516,6 @@ export function TimeHistoryModal({
                 title: "エラー",
                 description: error instanceof Error ? error.message : "記録の更新に失敗しました",
               });
-              throw error;
             }
           }}
         />
