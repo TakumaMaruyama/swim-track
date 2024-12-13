@@ -479,21 +479,20 @@ export function TimeHistoryModal({
               // データを再取得する前にUIの状態をリセット
               setEditingRecord(null);
               
-              // データを再取得
+              // 更新が完了したことを通知
+              toast({
+                title: "更新成功",
+                description: "記録が更新されました",
+              });
+
+              // データを再取得してから閉じる
               if (onRecordDeleted) {
                 try {
                   console.log('Starting data refresh...');
+                  // 一定時間待ってからデータを再取得
+                  await new Promise(resolve => setTimeout(resolve, 500));
                   await onRecordDeleted();
                   console.log('Data refresh completed');
-                  
-                  // データ更新が完了したら成功通知
-                  toast({
-                    title: "更新成功",
-                    description: "記録が更新されました",
-                  });
-
-                  // すべての処理が完了してからモーダルを閉じる
-                  onClose();
                 } catch (updateError) {
                   console.error('Failed to refresh records:', updateError);
                   toast({
@@ -501,14 +500,12 @@ export function TimeHistoryModal({
                     title: "エラー",
                     description: "データの更新に失敗しました",
                   });
+                  return;
                 }
-              } else {
-                toast({
-                  title: "更新成功",
-                  description: "記録が更新されました",
-                });
-                onClose();
               }
+
+              // 更新が完了したらモーダルを閉じる
+              onClose();
             } catch (error) {
               console.error('Error updating record:', error);
               toast({
