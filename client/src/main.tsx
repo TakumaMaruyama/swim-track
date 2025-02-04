@@ -11,66 +11,13 @@ import "./index.css";
 // Initialize error handlers
 setupErrorHandlers();
 
-// Lazy load pages with preload hints
-const Dashboard = lazy(() => {
-  if (typeof window !== 'undefined') {
-    const link = document.createElement('link');
-    link.rel = 'modulepreload';
-    link.href = '/src/pages/Dashboard';
-    document.head.appendChild(link);
-  }
-  return import("@/pages/Dashboard");
-});
-
-const Documents = lazy(() => {
-  if (typeof window !== 'undefined') {
-    const link = document.createElement('link');
-    link.rel = 'modulepreload';
-    link.href = '/src/pages/Documents';
-    document.head.appendChild(link);
-  }
-  return import("@/pages/Documents");
-});
-
-const Athletes = lazy(() => {
-  if (typeof window !== 'undefined') {
-    const link = document.createElement('link');
-    link.rel = 'modulepreload';
-    link.href = '/src/pages/Athletes';
-    document.head.appendChild(link);
-  }
-  return import("@/pages/Athletes");
-});
-
-const AllTimeRecords = lazy(() => {
-  if (typeof window !== 'undefined') {
-    const link = document.createElement('link');
-    link.rel = 'modulepreload';
-    link.href = '/src/pages/AllTimeRecords';
-    document.head.appendChild(link);
-  }
-  return import("@/pages/AllTimeRecords");
-});
-
-const Competitions = lazy(() => {
-  if (typeof window !== 'undefined') {
-    const link = document.createElement('link');
-    link.rel = 'modulepreload';
-    link.href = '/src/pages/Competitions';
-    document.head.appendChild(link);
-  }
-  return import("@/pages/Competitions");
-});
-
-const AdminLogin = lazy(() => {
-  if (typeof window !== 'undefined') {
-    const link = document.createElement('link');
-    link.rel = 'modulepreload';
-    link.href = '/src/pages/AdminLogin';
-    document.head.appendChild(link);
-  }
-  return import("@/pages/AdminLogin");
-});
+// Lazy load pages
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Documents = lazy(() => import("./pages/Documents"));
+const Athletes = lazy(() => import("./pages/Athletes"));
+const AllTimeRecords = lazy(() => import("./pages/AllTimeRecords"));
+const Competitions = lazy(() => import("./pages/Competitions"));
+const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 
 const LoadingSpinner = () => (
   <div className="flex items-center justify-center min-h-screen">
