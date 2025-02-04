@@ -408,46 +408,38 @@ export default function Athletes() {
                         variant="outline"
                         size="sm"
                         onClick={() => setEditingRecord({ id: null, studentId: athlete.id })}
+                        className="w-full justify-center"
                       >
                         <Plus className="mr-2 h-4 w-4" />
                         記録追加
                       </Button>
                     )}
-                    <div className="flex justify-between items-center">
-                      <h3 className="font-medium text-sm text-muted-foreground">最近の記録:</h3>
-                    </div>
-                    {latestRecord ? (
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <p className="text-sm font-medium">種目</p>
-                          <p className="text-base">{latestRecord.style}</p>
+                    {latestRecord && (
+                      <>
+                        <div className="flex justify-between items-center">
+                          <h3 className="font-medium text-sm text-muted-foreground">最近の記録:</h3>
                         </div>
-                        <div>
-                          <p className="text-sm font-medium">距離</p>
-                          <p className="text-base">{latestRecord.distance}m</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <p className="text-sm font-medium">種目</p>
+                            <p className="text-base">{latestRecord.style}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">距離</p>
+                            <p className="text-base">{latestRecord.distance}m</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">タイム</p>
+                            <p className="text-base font-bold">{latestRecord.time}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">日付</p>
+                            <p className="text-base">
+                              {new Date(latestRecord.date).toLocaleDateString()}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-medium">タイム</p>
-                          <p className="text-base font-bold">{latestRecord.time}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">日付</p>
-                          <p className="text-base">
-                            {new Date(latestRecord.date).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                    ) : isAdmin && (
-                      <div className="flex justify-center mt-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setEditingRecord({ id: null, studentId: athlete.id })}
-                        >
-                          <Plus className="mr-2 h-4 w-4" />
-                          記録追加
-                        </Button>
-                      </div>
+                      </>
                     )}
                   </div>
                 </CardContent>
@@ -504,15 +496,15 @@ export default function Athletes() {
                     console.log('Clearing records cache...');
                     await mutateRecords(undefined, { revalidate: false });
                     console.log('Records cache cleared');
-                    
+
                     // 新しいデータを取得（強制的に再検証）
                     console.log('Fetching new records data...');
-                    const recordsResult = await mutateRecords(undefined, { 
+                    const recordsResult = await mutateRecords(undefined, {
                       revalidate: true,
                       populateCache: true,
                       throwOnError: true
                     });
-                    
+
                     if (!recordsResult) {
                       throw new Error('記録データの更新に失敗しました');
                     }
@@ -521,12 +513,12 @@ export default function Athletes() {
                     // athletesデータも同様に更新
                     console.log('Updating athletes data...');
                     await mutateAthletes(undefined, { revalidate: false });
-                    const athletesResult = await mutateAthletes(undefined, { 
+                    const athletesResult = await mutateAthletes(undefined, {
                       revalidate: true,
                       populateCache: true,
                       throwOnError: true
                     });
-                    
+
                     if (!athletesResult) {
                       throw new Error('選手データの更新に失敗しました');
                     }
