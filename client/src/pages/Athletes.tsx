@@ -402,12 +402,11 @@ export default function Athletes() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {latestRecord ? (
-                    <div className="space-y-3">
-                      {isAdmin && (
-                        <Button
-                          variant="outline"
-                          size="sm"
+                  <div className="space-y-3">
+                    {isAdmin && (
+                      <Button
+                        variant="outline"
+                        size="sm"
                           onClick={() => setEditingRecord({ id: null, studentId: athlete.id })}
                         >
                           <Plus className="mr-2 h-4 w-4" />
@@ -438,9 +437,25 @@ export default function Athletes() {
                         </div>
                       </div>
                     </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">記録なし</p>
-                  )}
+                  {latestRecord ? (
+                      <div className="mt-3">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-sm font-medium">タイム</p>
+                            <p className="text-base font-bold">{latestRecord.time}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">日付</p>
+                            <p className="text-base">
+                              {new Date(latestRecord.date).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground mt-3">記録なし</p>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             );
