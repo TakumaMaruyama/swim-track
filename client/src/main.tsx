@@ -6,18 +6,36 @@ import { fetcher } from "./lib/fetcher";
 import { Toaster } from "./components/ui/toaster";
 import { setupErrorHandlers } from "./lib/error-handler";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { preloadComponents } from "./lib/preload";
 import "./index.css";
 
-// Initialize error handlers
+// Initialize error handlers and preload components
 setupErrorHandlers();
+preloadComponents();
+
+// Lazy load pages with retry configuration
+const retryImport = async (importFn: () => Promise<any>, retries = 3) => {
+  try {
+    return await importFn();
+  } catch (err) {
+    if (retries > 0) {
+      return new Promise(resolve => {
+        setTimeout(() => {
+          resolve(retryImport(importFn, retries - 1));
+        }, 1000);
+      });
+    }
+    throw err;
+  }
+};
 
 // Lazy load pages
-const Dashboard = lazy(() => import("./pages/Dashboard"));
-const Documents = lazy(() => import("./pages/Documents"));
-const Athletes = lazy(() => import("./pages/Athletes"));
-const AllTimeRecords = lazy(() => import("./pages/AllTimeRecords"));
-const Competitions = lazy(() => import("./pages/Competitions"));
-const AdminLogin = lazy(() => import("./pages/AdminLogin"));
+const Dashboard = lazy(() => retryImport(() => import("./pages/Dashboard")));
+const Documents = lazy(() => retryImport(() => import("./pages/Documents")));
+const Athletes = lazy(() => retryImport(() => import("./pages/Athletes")));
+const AllTimeRecords = lazy(() => retryImport(() => import("./pages/AllTimeRecords")));
+const Competitions = lazy(() => retryImport(() => import("./pages/Competitions")));
+const AdminLogin = lazy(() => retryImport(() => import("./pages/AdminLogin")));
 
 const LoadingSpinner = () => (
   <div className="flex items-center justify-center min-h-screen">
@@ -40,6 +58,17 @@ root.render(
           errorRetryInterval: 3000,
           keepPreviousData: true,
           suspense: false,
+          provider: () => new Map(),
+          onErrorRetry: (error, key, config, revalidate, { retryCount }) => {
+            // Never retry on 404
+            if (error.status === 404) return;
+
+            // Only retry up to 3 times
+            if (retryCount >= 3) return;
+
+            // Retry after 3 seconds
+            setTimeout(() => revalidate({ retryCount }), 3000);
+          },
         }}
       >
         <Switch>

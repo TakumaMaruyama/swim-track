@@ -7,52 +7,139 @@ import path from "path";
 import fs from "fs/promises";
 import { createReadStream } from "fs";
 import { configureAuth } from "./auth";
+import cors from 'cors';
 
-// Use absolute path in persistent storage directory
-const UPLOAD_DIR = path.join(process.env.HOME || process.cwd(), "storage/uploads");
-
-// Update initialization to be more robust with proper permissions
-const initializeUploadDirectory = async () => {
-  try {
-    await fs.access(UPLOAD_DIR);
-    console.log('Storage directory exists:', UPLOAD_DIR);
-  } catch {
-    console.log('Creating storage directory:', UPLOAD_DIR);
-    try {
-      await fs.mkdir(UPLOAD_DIR, { recursive: true });
-      // Set directory permissions to ensure persistence
-      await fs.chmod(UPLOAD_DIR, 0o777);
-      console.log('Storage directory created successfully with full permissions');
-    } catch (error) {
-      console.error('Failed to create storage directory:', error);
-      throw error;
-    }
-  }
+// Add CORS configuration
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://swimtrack.repl.co'] 
+    : ['http://localhost:5173', 'http://172.31.128.56:5173'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
-// Configure storage with better error handling
-const storage = multer.diskStorage({
-  destination: async (req, file, cb) => {
-    try {
-      await initializeUploadDirectory();
-      cb(null, UPLOAD_DIR);
-    } catch (error) {
-      console.error('Storage destination error:', error);
-      cb(error as Error, UPLOAD_DIR);
-    }
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
-    const safeFilename = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-    cb(null, `${uniqueSuffix}-${safeFilename}`);
-  }
-});
-
-const upload = multer({ storage });
-
 export function registerRoutes(app: Express) {
-  // 認証設定を追加
+  // Enable CORS with credentials
+  app.use(cors(corsOptions));
+
+  // Configure authentication
   configureAuth(app);
+
+  // Public endpoints that don't require authentication
+  app.get("/api/athletes", async (req, res) => {
+    try {
+      console.log('Fetching athletes...');
+      const athletes = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          isActive: users.isActive,
+          role: users.role,
+        })
+        .from(users)
+        .where(eq(users.role, 'student'))
+        .orderBy(users.username);
+
+      console.log('Athletes fetched successfully:', athletes.length);
+      res.json(athletes);
+    } catch (error) {
+      console.error('Error fetching athletes:', error);
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+      }
+      res.status(500).json({ 
+        message: "選手情報の取得に失敗しました",
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  });
+
+  app.get("/api/records", async (req, res) => {
+    try {
+      console.log('Fetching swim records...');
+      const allRecords = await db
+        .select({
+          id: swimRecords.id,
+          style: swimRecords.style,
+          distance: swimRecords.distance,
+          time: swimRecords.time,
+          date: swimRecords.date,
+          poolLength: swimRecords.poolLength,
+          studentId: swimRecords.studentId,
+          athleteName: users.username,
+          isCompetition: swimRecords.isCompetition,
+          competitionName: swimRecords.competitionName,
+          competitionLocation: swimRecords.competitionLocation
+        })
+        .from(swimRecords)
+        .leftJoin(users, eq(swimRecords.studentId, users.id))
+        .orderBy(desc(swimRecords.date));
+
+      console.log('Records fetched successfully:', allRecords.length);
+      res.json(allRecords);
+    } catch (error) {
+      console.error('Error fetching records:', error);
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+      }
+      res.status(500).json({ 
+        message: "記録の取得に失敗しました",
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  });
+
+  // Use absolute path in persistent storage directory
+  const UPLOAD_DIR = path.join(process.env.HOME || process.cwd(), "storage/uploads");
+
+  // Update initialization to be more robust with proper permissions
+  const initializeUploadDirectory = async () => {
+    try {
+      await fs.access(UPLOAD_DIR);
+      console.log('Storage directory exists:', UPLOAD_DIR);
+    } catch {
+      console.log('Creating storage directory:', UPLOAD_DIR);
+      try {
+        await fs.mkdir(UPLOAD_DIR, { recursive: true });
+        // Set directory permissions to ensure persistence
+        await fs.chmod(UPLOAD_DIR, 0o777);
+        console.log('Storage directory created successfully with full permissions');
+      } catch (error) {
+        console.error('Failed to create storage directory:', error);
+        throw error;
+      }
+    }
+  };
+
+  // Configure storage with better error handling
+  const storage = multer.diskStorage({
+    destination: async (req, file, cb) => {
+      try {
+        await initializeUploadDirectory();
+        cb(null, UPLOAD_DIR);
+      } catch (error) {
+        console.error('Storage destination error:', error);
+        cb(error as Error, UPLOAD_DIR);
+      }
+    },
+    filename: (req, file, cb) => {
+      const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
+      const safeFilename = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+      cb(null, `${uniqueSuffix}-${safeFilename}`);
+    }
+  });
+
+  const upload = multer({ storage });
+
   // Initialize upload directory during route registration
   initializeUploadDirectory().catch(console.error);
 
@@ -283,89 +370,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  
-
-  // Athletes API
-  app.get("/api/athletes", async (req, res) => {
-    try {
-      console.log('Fetching athletes...');
-      const athletes = await db
-        .select({
-          id: users.id,
-          username: users.username,
-          isActive: users.isActive,
-          role: users.role,
-        })
-        .from(users)
-        .where(eq(users.role, 'student'))
-        .orderBy(users.username);
-
-      console.log('Athletes fetched successfully:', athletes.length);
-      res.json(athletes);
-    } catch (error) {
-      console.error('Error fetching athletes:', error);
-      // エラーの詳細情報をログに出力
-      if (error instanceof Error) {
-        console.error('Error details:', {
-          message: error.message,
-          stack: error.stack,
-          name: error.name
-        });
-      }
-      res.status(500).json({ 
-        message: "選手情報の取得に失敗しました",
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
-      });
-    }
-  });
 
   // Records API endpoints
-  app.get("/api/records", async (req, res) => {
-    try {
-      console.log('Fetching swim records...');
-      const allRecords = await db
-        .select({
-          id: swimRecords.id,
-          style: swimRecords.style,
-          distance: swimRecords.distance,
-          time: swimRecords.time,
-          date: swimRecords.date,
-          poolLength: swimRecords.poolLength,
-          studentId: swimRecords.studentId,
-          athleteName: users.username,
-          isCompetition: swimRecords.isCompetition,
-          competitionName: swimRecords.competitionName,
-          competitionLocation: swimRecords.competitionLocation
-        })
-        .from(swimRecords)
-        .leftJoin(users, eq(swimRecords.studentId, users.id))
-        .orderBy(desc(swimRecords.date));
-
-      console.log('Records fetched successfully:', allRecords.length);
-      res.json(allRecords);
-    } catch (error) {
-      console.error('Error fetching records:', error);
-      // より詳細なエラー情報をログに出力
-      if (error instanceof Error) {
-        console.error('Error details:', {
-          message: error.message,
-          stack: error.stack,
-          name: error.name,
-          cause: error.cause
-        });
-      }
-      res.status(500).json({ 
-        success: false,
-        message: "記録の取得に失敗しました",
-        error: process.env.NODE_ENV === 'development' ? {
-          message: error instanceof Error ? error.message : String(error),
-          name: error instanceof Error ? error.name : 'UnknownError',
-          cause: error instanceof Error ? error.cause : undefined
-        } : undefined
-      });
-    }
-  });
-
   app.post("/api/records", async (req, res) => {
     try {
       const { style, distance, time, date, poolLength, studentId, isCompetition, competitionName, competitionLocation } = req.body;
@@ -644,9 +650,6 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ message: "選手の更新に失敗しました" });
     }
   });
-
-  
-
 
   return app;
 }
