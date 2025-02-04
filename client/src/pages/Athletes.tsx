@@ -397,7 +397,7 @@ export default function Athletes() {
                         })}
                       >
                         <History className="h-4 w-4 mr-1" />
-                        {!isMobile && "記録履歴"}
+                        記録履歴
                       </Button>
                     </div>
                   </CardTitle>
