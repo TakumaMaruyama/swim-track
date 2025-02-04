@@ -77,6 +77,8 @@ export default function Athletes() {
     athleteId: number | null;
     athleteName: string;
   }>({ athleteId: null, athleteName: '' });
+  const isMobile = window.innerWidth < 768; // Detect mobile
+
 
   const getLatestPerformance = (studentId: number) => {
     if (!records) return null;
@@ -341,7 +343,7 @@ export default function Athletes() {
         }
       />
       <div className="container px-4 md:px-8">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           {athletes?.map((athlete) => {
             const latestRecord = getLatestPerformance(athlete.id);
             return (
@@ -350,29 +352,27 @@ export default function Athletes() {
                 className={`hover:shadow-lg transition-shadow ${!athlete.isActive ? 'opacity-60' : ''}`}
               >
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-4">
-                    <Avatar className="h-12 w-12">
+                  <CardTitle className="flex items-center gap-2">
+                    <Avatar className={`h-10 w-10 ${isMobile ? 'h-8 w-8' : ''}`}>
                       <AvatarFallback className="bg-primary text-primary-foreground">
                         {athlete.username.substring(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <div>
-                          <span className="text-lg">{athlete.username}</span>
-                        </div>
-                        <Badge variant={athlete.isActive ? "default" : "secondary"}>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-base truncate">{athlete.username}</span>
+                        <Badge variant={athlete.isActive ? "default" : "secondary"} className="shrink-0">
                           {athlete.isActive ? '有効' : '無効'}
                         </Badge>
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1">選手</p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1 shrink-0">
                       {isAdmin && (
                         <>
                           <Button
                             variant="ghost"
                             size="icon"
+                            className="h-8 w-8"
                             onClick={() => setEditingAthlete(athlete.id)}
                           >
                             <Edit2 className="h-4 w-4" />
@@ -380,6 +380,7 @@ export default function Athletes() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            className="h-8 w-8"
                             onClick={() => handleToggleStatus(athlete.id, athlete.isActive)}
                           >
                             <Power className="h-4 w-4" />
@@ -389,14 +390,14 @@ export default function Athletes() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex items-center gap-2 hover:bg-primary hover:text-primary-foreground transition-all duration-200 ease-in-out transform hover:scale-105 active:scale-95 hover:shadow-md focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                        className="shrink-0"
                         onClick={() => setViewingHistory({
                           athleteId: athlete.id,
                           athleteName: athlete.username
                         })}
                       >
-                        <History className="h-4 w-4 transition-transform duration-200 group-hover:rotate-12" />
-                        記録履歴
+                        <History className="h-4 w-4 mr-1" />
+                        {!isMobile && "記録履歴"}
                       </Button>
                     </div>
                   </CardTitle>
@@ -414,7 +415,7 @@ export default function Athletes() {
                         記録追加
                       </Button>
                     )}
-                    {latestRecord && (
+                    {!isMobile && latestRecord && (
                       <>
                         <div className="flex justify-between items-center">
                           <h3 className="font-medium text-sm text-muted-foreground">最近の記録:</h3>
