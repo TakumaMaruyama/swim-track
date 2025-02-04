@@ -407,15 +407,16 @@ export default function Athletes() {
                       <Button
                         variant="outline"
                         size="sm"
-                          onClick={() => setEditingRecord({ id: null, studentId: athlete.id })}
-                        >
-                          <Plus className="mr-2 h-4 w-4" />
-                          記録追加
-                        </Button>
-                      )}
-                      <div className="flex justify-between items-center">
-                        <h3 className="font-medium text-sm text-muted-foreground">最近の記録:</h3>
-                      </div>
+                        onClick={() => setEditingRecord({ id: null, studentId: athlete.id })}
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        記録追加
+                      </Button>
+                    )}
+                    <div className="flex justify-between items-center">
+                      <h3 className="font-medium text-sm text-muted-foreground">最近の記録:</h3>
+                    </div>
+                    {latestRecord && (
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <p className="text-sm font-medium">種目</p>
@@ -436,25 +437,8 @@ export default function Athletes() {
                           </p>
                         </div>
                       </div>
-                    </div>
-                  {latestRecord ? (
-                      <div className="mt-3">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <p className="text-sm font-medium">タイム</p>
-                            <p className="text-base font-bold">{latestRecord.time}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium">日付</p>
-                            <p className="text-base">
-                              {new Date(latestRecord.date).toLocaleDateString()}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground mt-3">記録なし</p>
                     )}
+                  </div>
                   </div>
                 </CardContent>
               </Card>
