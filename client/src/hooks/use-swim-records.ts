@@ -18,28 +18,10 @@ export interface ExtendedSwimRecord {
 }
 
 export function useSwimRecords() {
-  const fetcher = async (url: string) => {
-    const response = await fetch(url, {
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      const error = new Error('データの取得に失敗しました');
-      error.cause = await response.json();
-      throw error;
-    }
-
-    return response.json();
-  };
-
   const { data: records, error, mutate } = useSWR<ExtendedSwimRecord[]>(
     '/api/records',
-    fetcher,
     {
-      revalidateOnFocus: true,
+      revalidateOnFocus: false,
       revalidateOnReconnect: true,
       dedupingInterval: 2000,
       onError: (err) => {
@@ -57,21 +39,17 @@ export function useSwimRecords() {
       errorRetryInterval: 2000,
       suspense: false,
       keepPreviousData: true,
-      refreshWhenHidden: false,
-      refreshInterval: 0
     }
   );
 
   const refreshRecords = React.useCallback(async () => {
     try {
-      console.log('Refreshing swim records...');
-      // キャッシュをクリアして強制的に再取得
       await mutate(undefined, {
         revalidate: true,
-        populateCache: true,
-        rollbackOnError: false
+        rollbackOnError: true,
+        throwOnError: false
       });
-      console.log('Swim records refreshed successfully');
+      return true;
     } catch (error) {
       console.error('Error refreshing records:', error);
       if (error instanceof Error) {
@@ -81,7 +59,7 @@ export function useSwimRecords() {
           cause: error.cause
         });
       }
-      throw new Error('記録の更新に失敗しました');
+      return false;
     }
   }, [mutate]);
 

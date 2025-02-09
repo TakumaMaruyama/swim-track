@@ -22,21 +22,28 @@ export const fetcher = async (url: string) => {
       });
 
       if (!res.ok) {
+        const errorInfo = await res.json().catch(() => ({}));
         const error = new FetchError(
-          `APIリクエストでエラーが発生しました（ステータス: ${res.status}）`,
-          await res.json().catch(() => ({})),
+          errorInfo.message || `APIリクエストでエラーが発生しました（ステータス: ${res.status}）`,
+          errorInfo,
           res.status
         );
+
+        // 認証エラーの場合は再試行しない
+        if (res.status === 401) {
+          throw error;
+        }
+
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, retryDelay * attempt));
+          return fetchWithRetry(attempt + 1);
+        }
+
         throw error;
       }
 
       return res.json();
     } catch (error) {
-      if (attempt < maxRetries) {
-        await new Promise(resolve => setTimeout(resolve, retryDelay * attempt));
-        return fetchWithRetry(attempt + 1);
-      }
-
       if (error instanceof FetchError) {
         throw error;
       }

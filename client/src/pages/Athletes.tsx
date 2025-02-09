@@ -492,13 +492,15 @@ export default function Athletes() {
                 athleteName={viewingHistory.athleteName}
                 onRecordDeleted={async () => {
                   try {
-                    // 同時にデータを更新
-                    await Promise.all([
+                    const [recordsUpdated, athletesUpdated] = await Promise.all([
                       mutateRecords(),
                       mutateAthletes()
                     ]);
 
-                    // 更新が完了したら成功メッセージを表示
+                    if (!recordsUpdated) {
+                      throw new Error('記録の更新に失敗しました');
+                    }
+
                     toast({
                       title: "更新成功",
                       description: "記録が正常に削除されました",
