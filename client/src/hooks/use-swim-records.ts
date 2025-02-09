@@ -25,13 +25,13 @@ export function useSwimRecords() {
         'Content-Type': 'application/json',
       },
     });
-    
+
     if (!response.ok) {
       const error = new Error('データの取得に失敗しました');
       error.cause = await response.json();
       throw error;
     }
-    
+
     return response.json();
   };
 
@@ -65,7 +65,7 @@ export function useSwimRecords() {
   const refreshRecords = React.useCallback(async () => {
     try {
       console.log('Refreshing swim records...');
-      // Clear cache and revalidate
+      // キャッシュをクリアして強制的に再取得
       await mutate(undefined, {
         revalidate: true,
         populateCache: true,
