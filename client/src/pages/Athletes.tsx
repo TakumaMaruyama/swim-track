@@ -359,20 +359,21 @@ export default function Athletes() {
       <PageHeader
         title="選手一覧"
         children={
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2 items-center">
             {isAdmin ? (
               <>
                 <Button
-                  variant="outline"
+                  variant="default"
                   onClick={handleDownloadCSV}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 w-full sm:w-auto"
                 >
                   <Download className="h-4 w-4" />
-                  CSVダウンロード
+                  記録データをCSVでダウンロード
                 </Button>
                 <Button
                   variant="outline"
                   onClick={() => logout()}
+                  className="w-full sm:w-auto"
                 >
                   ログアウト
                 </Button>
@@ -381,6 +382,7 @@ export default function Athletes() {
               <Button
                 variant="outline"
                 onClick={() => navigate("/admin/login")}
+                className="w-full sm:w-auto"
               >
                 管理者ログイン
               </Button>
