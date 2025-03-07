@@ -11,9 +11,9 @@ import cors from 'cors';
 
 // Add CORS configuration
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production'
-    ? ['https://swimtrack.repl.co', '172.31.128.82:5173']
-    : ['http://localhost:5173', 'http://172.31.128.56:5173', '172.31.128.82:5173'],
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://swimtrack.repl.co'] 
+    : ['http://localhost:5173', 'http://172.31.128.56:5173'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -52,7 +52,7 @@ export function registerRoutes(app: Express) {
           name: error.name
         });
       }
-      res.status(500).json({
+      res.status(500).json({ 
         message: "選手情報の取得に失敗しました",
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
@@ -91,7 +91,7 @@ export function registerRoutes(app: Express) {
           name: error.name
         });
       }
-      res.status(500).json({
+      res.status(500).json({ 
         message: "記録の取得に失敗しました",
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
@@ -173,10 +173,10 @@ export function registerRoutes(app: Express) {
       // Set proper headers for download
       res.setHeader('Content-Type', document.mimeType);
       res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(document.filename)}"`);
-
+      
       // Stream the file with proper error handling
       const fileStream = createReadStream(filePath);
-
+      
       fileStream.on('error', (error) => {
         console.error(`File streaming error for ${filePath}:`, error);
         if (!res.headersSent) {
@@ -260,7 +260,7 @@ export function registerRoutes(app: Express) {
         .select()
         .from(categories)
         .orderBy(categories.name);
-
+      
       res.json(allCategories);
     } catch (error) {
       console.error('Error fetching categories:', error);
@@ -271,7 +271,7 @@ export function registerRoutes(app: Express) {
   app.post("/api/categories", async (req, res) => {
     try {
       const { name, description } = req.body;
-
+      
       if (!name || typeof name !== 'string' || name.trim().length === 0) {
         return res.status(400).json({ message: "カテゴリー名は必須です" });
       }
@@ -329,9 +329,9 @@ export function registerRoutes(app: Express) {
           WHERE created_at > NOW() - INTERVAL '5 minutes'
         )
       `);
-
+      
       const shouldInvalidateCache = cached.rows[0].exists;
-
+      
       // Optimized query with pagination and efficient joins
       const docs = await db
         .select({
@@ -363,7 +363,7 @@ export function registerRoutes(app: Express) {
           name: error.name
         });
       }
-      res.status(500).json({
+      res.status(500).json({ 
         message: "ドキュメントの取得に失敗しました",
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
@@ -447,17 +447,17 @@ export function registerRoutes(app: Express) {
     try {
       const { id } = req.params;
       console.log('Attempting to delete record with ID:', id);
-
+      
       // IDの検証
       const recordId = parseInt(id);
       if (!id || isNaN(recordId)) {
         console.log('Invalid ID provided:', id);
-        return res.status(400).json({
+        return res.status(400).json({ 
           success: false,
-          message: "無効なIDが指定されました"
+          message: "無効なIDが指定されました" 
         });
       }
-
+      
       // 記録の存在確認
       const [existingRecord] = await db
         .select({
@@ -471,9 +471,9 @@ export function registerRoutes(app: Express) {
 
       if (!existingRecord) {
         console.log('Record not found:', recordId);
-        return res.status(404).json({
+        return res.status(404).json({ 
           success: false,
-          message: "記録が見つかりません"
+          message: "記録が見つかりません" 
         });
       }
 
@@ -487,15 +487,15 @@ export function registerRoutes(app: Express) {
 
       if (!deletedRecord) {
         console.log('Failed to delete record:', recordId);
-        return res.status(500).json({
+        return res.status(500).json({ 
           success: false,
-          message: "記録の削除に失敗しました"
+          message: "記録の削除に失敗しました" 
         });
       }
 
       console.log('Record deleted successfully:', deletedRecord.id);
-
-      res.json({
+      
+      res.json({ 
         success: true,
         message: "記録が削除されました",
         data: deletedRecord
@@ -512,7 +512,7 @@ export function registerRoutes(app: Express) {
         });
       }
 
-      res.status(500).json({
+      res.status(500).json({ 
         success: false,
         message: "記録の削除に失敗しました"
       });
@@ -551,7 +551,7 @@ export function registerRoutes(app: Express) {
   // Delete athlete and associated records
   app.delete("/api/athletes/:id", async (req, res) => {
     const { id } = req.params;
-
+    
     try {
       // First verify the athlete exists and is a student
       const [athlete] = await db
@@ -710,7 +710,7 @@ export function registerRoutes(app: Express) {
           name: error.name
         });
       }
-      res.status(500).json({
+      res.status(500).json({ 
         message: "記録のダウンロードに失敗しました",
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });

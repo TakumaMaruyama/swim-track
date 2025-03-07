@@ -110,17 +110,27 @@ export const configureAuth = (app: any) => {
     }
   });
 
+  // ログアウトエンドポイント
+  app.post("/api/auth/logout", (req: Request, res: Response) => {
+    req.session.destroy((err) => {
+      if (err) {
+        console.error("Logout error:", err);
+        return res.status(500).json({ 
+          ok: false,
+          message: "ログアウト処理中にエラーが発生しました" 
+        });
+      }
+      res.json({ 
+        ok: true,
+        message: "ログアウトしました" 
+      });
+    });
+  });
+
   // セッション確認エンドポイント
   app.get("/api/auth/session", async (req: Request, res: Response) => {
     try {
-      console.log('Session check request received:', {
-        sessionId: req.sessionID,
-        userId: req.session.userId,
-        role: req.session.role
-      });
-
       if (!req.session.userId) {
-        console.log('No active session found');
         return res.status(401).json({ 
           ok: false,
           message: "未認証です" 
@@ -135,17 +145,11 @@ export const configureAuth = (app: any) => {
         .limit(1);
 
       if (!user) {
-        console.log('User not found for session:', req.session.userId);
         return res.status(401).json({ 
           ok: false,
           message: "ユーザーが見つかりません" 
         });
       }
-
-      console.log('Session check successful:', {
-        userId: user.id,
-        role: user.role
-      });
 
       // パスワードを除外してユーザー情報を返す
       const { password: _, ...userWithoutPassword } = user;
@@ -160,31 +164,6 @@ export const configureAuth = (app: any) => {
         message: "セッション確認中にエラーが発生しました" 
       });
     }
-  });
-
-  // ログアウトエンドポイント
-  app.post("/api/auth/logout", (req: Request, res: Response) => {
-    console.log('Logout request received:', {
-      sessionId: req.sessionID,
-      userId: req.session.userId,
-      role: req.session.role
-    });
-
-    req.session.destroy((err) => {
-      if (err) {
-        console.error("Logout error:", err);
-        return res.status(500).json({ 
-          ok: false,
-          message: "ログアウト処理中にエラーが発生しました" 
-        });
-      }
-      console.log('Session destroyed successfully');
-      res.clearCookie('connect.sid');
-      res.json({ 
-        ok: true,
-        message: "ログアウトしました" 
-      });
-    });
   });
 
   // 管理者確認ミドルウェア
