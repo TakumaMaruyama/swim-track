@@ -651,5 +651,71 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // CSVダウンロードエンドポイントを追加
+  app.get("/api/records/download", async (req, res) => {
+    try {
+      console.log('Fetching records for CSV download...');
+      // Set a longer timeout for this request
+      res.setTimeout(30000); // 30 seconds timeout
+
+      const records = await db
+        .select({
+          swimmer_name: users.username,
+          style: swimRecords.style,
+          distance: swimRecords.distance,
+          total_time: swimRecords.time,
+          date: swimRecords.date,
+          pool_length: swimRecords.poolLength,
+          competition_name: swimRecords.competitionName,
+        })
+        .from(swimRecords)
+        .leftJoin(users, eq(swimRecords.studentId, users.id))
+        .orderBy(desc(swimRecords.date));
+
+      // CSVヘッダー
+      const csvHeader = [
+        'swimmer_name',
+        'pool_length',
+        'date',
+        'style',
+        'distance',
+        'total_time',
+        'competition_name'
+      ].join(',');
+
+      // CSVデータの生成
+      const csvRows = records.map(record => [
+        `"${record.swimmer_name}"`,
+        record.pool_length,
+        record.date ? new Date(record.date).toISOString().split('T')[0] : '',
+        `"${record.style}"`,
+        record.distance,
+        `"${record.total_time}"`,
+        record.competition_name ? `"${record.competition_name}"` : ''
+      ].join(','));
+
+      const csvContent = [csvHeader, ...csvRows].join('\n');
+
+      // レスポンスヘッダーの設定
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="swim_records_${new Date().toISOString().split('T')[0]}.csv"`);
+
+      res.send(csvContent);
+    } catch (error) {
+      console.error('Error generating CSV:', error);
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+      }
+      res.status(500).json({ 
+        message: "記録のダウンロードに失敗しました",
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  });
+
   return app;
 }

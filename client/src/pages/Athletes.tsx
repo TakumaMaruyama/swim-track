@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Edit2, Plus, Power, History, Trash2 } from "lucide-react";
+import { AlertCircle, Download, Edit2, Plus, Power, History, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -63,7 +63,7 @@ const FormLoadingFallback = () => (
 
 export default function Athletes() {
   const { toast } = useToast();
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, logout } = useAuth();
   const [, navigate] = useLocation();
   const { athletes, isLoading: athletesLoading, error: athletesError, mutate: mutateAthletes } = useAthletes();
   const { records, isLoading: recordsLoading, error: recordsError, mutate: mutateRecords } = useSwimRecords();
@@ -288,6 +288,40 @@ export default function Athletes() {
     }
   };
 
+  const handleDownloadCSV = async () => {
+    try {
+      const response = await fetch('/api/records/download', {
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('CSVのダウンロードに失敗しました');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `swim_records_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "ダウンロード成功",
+        description: "記録データをCSVでダウンロードしました",
+      });
+    } catch (error) {
+      console.error('Error downloading CSV:', error);
+      toast({
+        variant: "destructive",
+        title: "エラー",
+        description: error instanceof Error ? error.message : "CSVのダウンロードに失敗しました",
+      });
+    }
+  };
+
   if (athletesLoading || recordsLoading) {
     return (
       <>
@@ -325,21 +359,33 @@ export default function Athletes() {
       <PageHeader
         title="選手一覧"
         children={
-          isAdmin ? (
-            <Button
-              variant="outline"
-              onClick={() => logout()}
-            >
-              ログアウト
-            </Button>
-          ) : (
-            <Button
-              variant="outline"
-              onClick={() => navigate("/admin/login")}
-            >
-              管理者ログイン
-            </Button>
-          )
+          <div className="flex gap-2">
+            {isAdmin ? (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={handleDownloadCSV}
+                  className="flex items-center gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  CSVダウンロード
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => logout()}
+                >
+                  ログアウト
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="outline"
+                onClick={() => navigate("/admin/login")}
+              >
+                管理者ログイン
+              </Button>
+            )}
+          </div>
         }
       />
       <div className="container px-4 md:px-8">

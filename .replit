@@ -49,10 +49,6 @@ args = "Backend Server"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Production Server"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "Development Server"
 
 [[workflows.workflow]]
@@ -69,21 +65,6 @@ task = "packager.installForAll"
 task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
-
-[[workflows.workflow]]
-name = "Production Server"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "packager.installForAll"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "NODE_ENV=production PORT=5001 node dist/index.js"
-waitForPort = 5001
 
 [[workflows.workflow]]
 name = "Development Server"
