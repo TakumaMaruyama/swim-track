@@ -2,6 +2,7 @@
 import { db } from "../db";
 import { users } from "../db/schema";
 import bcrypt from "bcryptjs";
+import { eq } from "drizzle-orm";
 
 async function createStudent() {
   try {
@@ -15,7 +16,7 @@ async function createStudent() {
     const existingUser = await db
       .select()
       .from(users)
-      .where(eb => eb.eq(users.username, username))
+      .where(eq(users.username, username))
       .limit(1);
     
     if (existingUser.length > 0) {
