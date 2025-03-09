@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useState } from 'react';
 import { useAthletes } from '../hooks/use-athletes';
 import { useSwimRecords } from '../hooks/use-swim-records';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +23,15 @@ import { PageHeader } from '../components/PageHeader';
 import { Badge } from "@/components/ui/badge";
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { useLocation } from 'wouter';
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 // Lazy load components with proper loading states
 const EditAthleteForm = lazy(() =>
@@ -61,6 +70,56 @@ const FormLoadingFallback = () => (
   </div>
 );
 
+// Add new component inside Athletes.tsx
+const AddAthleteDialog = ({ isOpen, onClose, onSubmit }) => {
+  const [username, setUsername] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      await onSubmit(username);
+      setUsername("");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={() => onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>新規選手登録</DialogTitle>
+          <DialogDescription>
+            新しい選手を登録します。選手名を入力してください。
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Input
+                placeholder="選手名"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="submit"
+              disabled={isSubmitting || !username.trim()}
+            >
+              {isSubmitting ? "登録中..." : "登録"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 export default function Athletes() {
   const { toast } = useToast();
   const { user, isAdmin, logout } = useAuth();
@@ -69,7 +128,7 @@ export default function Athletes() {
   const { records, isLoading: recordsLoading, error: recordsError, mutate: mutateRecords } = useSwimRecords();
   const [editingAthlete, setEditingAthlete] = React.useState<number | null>(null);
   const [deletingAthlete, setDeletingAthlete] = React.useState<number | null>(null);
-  const [editingRecord, setEditingRecord] = React.useState<{ id: number | null, studentId: number | null }>({
+  const [editingRecord, setEditingRecord] = React.useState<{ id: number | null; studentId: number | null }>({
     id: null,
     studentId: null
   });
@@ -78,7 +137,7 @@ export default function Athletes() {
     athleteName: string;
   }>({ athleteId: null, athleteName: '' });
   const isMobile = window.innerWidth < 768; // Detect mobile
-
+  const [showAddAthlete, setShowAddAthlete] = useState(false);
 
   const getLatestPerformance = (studentId: number) => {
     if (!records) return null;
@@ -322,6 +381,39 @@ export default function Athletes() {
     }
   };
 
+  const handleCreateAthlete = async (username: string) => {
+    try {
+      const response = await fetch('/api/athletes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username }),
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || '選手の登録に失敗しました');
+      }
+
+      await mutateAthletes();
+      setShowAddAthlete(false);
+      toast({
+        title: "登録成功",
+        description: "新しい選手を登録しました",
+      });
+    } catch (error) {
+      console.error('Error creating athlete:', error);
+      toast({
+        variant: "destructive",
+        title: "エラー",
+        description: error instanceof Error ? error.message : "選手の登録に失敗しました",
+      });
+    }
+  };
+
+
   if (athletesLoading || recordsLoading) {
     return (
       <>
@@ -360,8 +452,16 @@ export default function Athletes() {
         title="選手一覧"
         children={
           <div className="flex gap-2">
-            {isAdmin ? (
+            {isAdmin && (
               <>
+                <Button
+                  variant="default"
+                  onClick={() => setShowAddAthlete(true)}
+                  className="flex items-center gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  選手追加
+                </Button>
                 <Button
                   variant="outline"
                   onClick={handleDownloadCSV}
@@ -377,7 +477,8 @@ export default function Athletes() {
                   ログアウト
                 </Button>
               </>
-            ) : (
+            )}
+            {!isAdmin && (
               <Button
                 variant="outline"
                 onClick={() => navigate("/admin/login")}
@@ -596,6 +697,11 @@ export default function Athletes() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        <AddAthleteDialog
+          isOpen={showAddAthlete}
+          onClose={() => setShowAddAthlete(false)}
+          onSubmit={handleCreateAthlete}
+        />
       </div>
     </>
   );

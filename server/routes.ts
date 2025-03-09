@@ -59,6 +59,45 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // 選手登録エンドポイントを追加
+  app.post("/api/athletes", async (req, res) => {
+    try {
+      const { username } = req.body;
+
+      if (!username || typeof username !== 'string' || username.trim().length === 0) {
+        return res.status(400).json({ message: "選手名は必須です" });
+      }
+
+      // Check if username already exists
+      const [existingUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.username, username.trim()))
+        .limit(1);
+
+      if (existingUser) {
+        return res.status(400).json({ message: "この選手名は既に使用されています" });
+      }
+
+      // Create new athlete
+      const [athlete] = await db
+        .insert(users)
+        .values({
+          username: username.trim(),
+          password: await hashPassword("temporary"), // 一時的なパスワード
+          role: "student",
+          isActive: true,
+        })
+        .returning();
+
+      const { password: _, ...athleteWithoutPassword } = athlete;
+      res.json(athleteWithoutPassword);
+    } catch (error) {
+      console.error('Error creating athlete:', error);
+      res.status(500).json({ message: "選手の作成に失敗しました" });
+    }
+  });
+
   app.get("/api/records", async (req, res) => {
     try {
       console.log('Fetching swim records...');
@@ -716,6 +755,11 @@ export function registerRoutes(app: Express) {
       });
     }
   });
+
+  async function hashPassword(password: string): Promise<string> {
+    // Placeholder for password hashing logic
+    return password; // Replace with actual hashing implementation
+  }
 
   return app;
 }
