@@ -113,7 +113,8 @@ export function registerRoutes(app: Express) {
           athleteName: users.username,
           isCompetition: swimRecords.isCompetition,
           competitionName: swimRecords.competitionName,
-          competitionLocation: swimRecords.competitionLocation
+          competitionLocation: swimRecords.competitionLocation,
+          gender: swimRecords.gender // Add gender field to the response
         })
         .from(swimRecords)
         .leftJoin(users, eq(swimRecords.studentId, users.id))
@@ -413,7 +414,7 @@ export function registerRoutes(app: Express) {
   // Records API endpoints
   app.post("/api/records", async (req, res) => {
     try {
-      const { style, distance, time, date, poolLength, studentId, isCompetition, competitionName, competitionLocation } = req.body;
+      const { style, distance, time, date, poolLength, studentId, isCompetition, competitionName, competitionLocation, gender } = req.body;
 
       const [record] = await db
         .insert(swimRecords)
@@ -426,7 +427,8 @@ export function registerRoutes(app: Express) {
           studentId,
           isCompetition: isCompetition ?? false,
           competitionName: competitionName || null,
-          competitionLocation: competitionLocation || null
+          competitionLocation: competitionLocation || null,
+          gender
         })
         .returning();
 
@@ -440,7 +442,7 @@ export function registerRoutes(app: Express) {
   app.put("/api/records/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { style, distance, time, date, poolLength, studentId, isCompetition, competitionName, competitionLocation } = req.body;
+      const { style, distance, time, date, poolLength, studentId, isCompetition, competitionName, competitionLocation, gender } = req.body;
 
       // Validate required fields
       if (!style || !distance || !time || !date) {
@@ -470,7 +472,8 @@ export function registerRoutes(app: Express) {
           studentId,
           isCompetition: isCompetition ?? false,
           competitionName: competitionName || null,
-          competitionLocation: competitionLocation || null
+          competitionLocation: competitionLocation || null,
+          gender
         })
         .where(eq(swimRecords.id, parseInt(id)))
         .returning();
