@@ -16,6 +16,7 @@ type GroupedRecord = {
   studentId: number;
   poolLength: number;
   athleteName: string;
+  gender: 'male' | 'female'; // 性別情報を追加
 };
 
 type GroupedRecordsByStyle = {
@@ -65,21 +66,23 @@ Record.displayName = "Record";
 
 function AllTimeRecords(): JSX.Element {
   const { records, isLoading, error } = useSwimRecords();
-  
+
   const [poolLengthFilter, setPoolLengthFilter] = React.useState<string>("25");
+  const [genderFilter, setGenderFilter] = React.useState<'male' | 'female'>('male');
 
   const groupedRecords: GroupedRecords = React.useMemo(() => {
     if (!records) return {};
-    
+
     const filteredRecords = records.filter(record => 
-      record.poolLength === parseInt(poolLengthFilter)
+      record.poolLength === parseInt(poolLengthFilter) &&
+      record.gender === genderFilter // 性別でフィルタリング
     );
 
     return filteredRecords.reduce((acc, record) => {
       if (!acc[record.distance]) {
         acc[record.distance] = {};
       }
-      
+
       if (!acc[record.distance][record.style] || record.time < acc[record.distance][record.style].time) {
         acc[record.distance][record.style] = {
           id: record.id,
@@ -89,12 +92,13 @@ function AllTimeRecords(): JSX.Element {
           date: new Date(record.date || Date.now()),
           studentId: record.studentId,
           poolLength: record.poolLength,
-          athleteName: record.athleteName || ''
+          athleteName: record.athleteName || '',
+          gender: record.gender
         };
       }
       return acc;
     }, {} as GroupedRecords);
-  }, [records, poolLengthFilter]);
+  }, [records, poolLengthFilter, genderFilter]);
 
   const sortedGroupedRecords = React.useMemo(() => {
     const sorted: GroupedRecords = {};
@@ -152,8 +156,17 @@ function AllTimeRecords(): JSX.Element {
   return (
     <>
       <PageHeader title="歴代記録" />
-      
+
       <div className="container px-4 md:px-8">
+        {/* 性別選択タブ */}
+        <Tabs defaultValue="male" value={genderFilter} onValueChange={(value: 'male' | 'female') => setGenderFilter(value)} className="mb-6">
+          <TabsList className="grid w-full grid-cols-2 mb-4">
+            <TabsTrigger value="male">男子</TabsTrigger>
+            <TabsTrigger value="female">女子</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {/* プール長選択タブ */}
         <Tabs defaultValue="25" value={poolLengthFilter} onValueChange={setPoolLengthFilter}>
           <TabsList className="mb-8">
             <TabsTrigger value="15">15ｍプール</TabsTrigger>
