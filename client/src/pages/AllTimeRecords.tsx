@@ -16,7 +16,7 @@ type GroupedRecord = {
   studentId: number;
   poolLength: number;
   athleteName: string;
-  gender: 'male' | 'female'; // 性別情報を追加
+  gender: 'male' | 'female';
 };
 
 type GroupedRecordsByStyle = {
@@ -65,7 +65,7 @@ const Record: React.FC<{ record: GroupedRecord }> = React.memo(({ record }) => {
 Record.displayName = "Record";
 
 function AllTimeRecords(): JSX.Element {
-  const { records, isLoading, error } = useSwimRecords();
+  const { records, isLoading, error, mutate } = useSwimRecords();
 
   const [poolLengthFilter, setPoolLengthFilter] = React.useState<string>("25");
   const [genderFilter, setGenderFilter] = React.useState<'male' | 'female'>('male');
@@ -73,31 +73,36 @@ function AllTimeRecords(): JSX.Element {
   const groupedRecords: GroupedRecords = React.useMemo(() => {
     if (!records) return {};
 
-    const filteredRecords = records.filter(record => 
-      record.poolLength === parseInt(poolLengthFilter) &&
-      record.gender === genderFilter // 性別でフィルタリング
-    );
+    try {
+      const filteredRecords = records.filter(record =>
+        record.poolLength === parseInt(poolLengthFilter) &&
+        record.gender === genderFilter
+      );
 
-    return filteredRecords.reduce((acc, record) => {
-      if (!acc[record.distance]) {
-        acc[record.distance] = {};
-      }
+      return filteredRecords.reduce((acc, record) => {
+        if (!acc[record.distance]) {
+          acc[record.distance] = {};
+        }
 
-      if (!acc[record.distance][record.style] || record.time < acc[record.distance][record.style].time) {
-        acc[record.distance][record.style] = {
-          id: record.id,
-          style: record.style,
-          distance: record.distance,
-          time: record.time,
-          date: new Date(record.date || Date.now()),
-          studentId: record.studentId,
-          poolLength: record.poolLength,
-          athleteName: record.athleteName || '',
-          gender: record.gender
-        };
-      }
-      return acc;
-    }, {} as GroupedRecords);
+        if (!acc[record.distance][record.style] || record.time < acc[record.distance][record.style].time) {
+          acc[record.distance][record.style] = {
+            id: record.id,
+            style: record.style,
+            distance: record.distance,
+            time: record.time,
+            date: new Date(record.date || Date.now()),
+            studentId: record.studentId,
+            poolLength: record.poolLength,
+            athleteName: record.athleteName || '',
+            gender: record.gender
+          };
+        }
+        return acc;
+      }, {} as GroupedRecords);
+    } catch (error) {
+      console.error('Error processing records:', error);
+      return {};
+    }
   }, [records, poolLengthFilter, genderFilter]);
 
   const sortedGroupedRecords = React.useMemo(() => {
@@ -133,7 +138,7 @@ function AllTimeRecords(): JSX.Element {
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              記録の取得中にエラーが発生しました。
+              記録の取得中にエラーが発生しました。しばらく待ってからもう一度試してください。
               {process.env.NODE_ENV === 'development' && error instanceof Error && (
                 <p className="mt-2 text-sm opacity-75">
                   エラー詳細: {error.message}
@@ -142,7 +147,7 @@ function AllTimeRecords(): JSX.Element {
             </AlertDescription>
           </Alert>
           <Button
-            onClick={() => window.location.reload()}
+            onClick={() => mutate()}
             className="mt-4"
             variant="outline"
           >
@@ -156,9 +161,7 @@ function AllTimeRecords(): JSX.Element {
   return (
     <>
       <PageHeader title="歴代記録" />
-
       <div className="container px-4 md:px-8">
-        {/* 性別選択タブ */}
         <Tabs defaultValue="male" value={genderFilter} onValueChange={(value: 'male' | 'female') => setGenderFilter(value)} className="mb-6">
           <TabsList className="grid w-full grid-cols-2 mb-4">
             <TabsTrigger value="male">男子</TabsTrigger>
@@ -166,7 +169,6 @@ function AllTimeRecords(): JSX.Element {
           </TabsList>
         </Tabs>
 
-        {/* プール長選択タブ */}
         <Tabs defaultValue="25" value={poolLengthFilter} onValueChange={setPoolLengthFilter}>
           <TabsList className="mb-8">
             <TabsTrigger value="15">15ｍプール</TabsTrigger>
@@ -176,30 +178,38 @@ function AllTimeRecords(): JSX.Element {
 
           {['15', '25', '50'].map((poolLength) => (
             <TabsContent key={poolLength} value={poolLength} className="space-y-8">
-              {Object.entries(sortedGroupedRecords).map(([distance, styles]) => (
-                <Card key={distance} className="overflow-hidden">
-                  <CardHeader className="bg-muted/50">
-                    <CardTitle className="text-xl">
-                      {distance}m種目
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-6">
-                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                      {Object.entries(styles)
-                        .sort(([styleA], [styleB]) => {
-                          const indexA = swimStyles.indexOf(styleA);
-                          const indexB = swimStyles.indexOf(styleB);
-                          if (indexA === -1) return 1;
-                          if (indexB === -1) return -1;
-                          return indexA - indexB;
-                        })
-                        .map(([style, record]) => (
-                          <Record key={`${distance}-${style}`} record={record} />
-                        ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+              {Object.entries(sortedGroupedRecords).length === 0 ? (
+                <Alert>
+                  <AlertDescription>
+                    該当する記録が見つかりません
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                Object.entries(sortedGroupedRecords).map(([distance, styles]) => (
+                  <Card key={distance} className="overflow-hidden">
+                    <CardHeader className="bg-muted/50">
+                      <CardTitle className="text-xl">
+                        {distance}m種目
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-6">
+                      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                        {Object.entries(styles)
+                          .sort(([styleA], [styleB]) => {
+                            const indexA = swimStyles.indexOf(styleA);
+                            const indexB = swimStyles.indexOf(styleB);
+                            if (indexA === -1) return 1;
+                            if (indexB === -1) return -1;
+                            return indexA - indexB;
+                          })
+                          .map(([style, record]) => (
+                            <Record key={`${distance}-${style}`} record={record} />
+                          ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
             </TabsContent>
           ))}
         </Tabs>
