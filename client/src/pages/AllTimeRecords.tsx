@@ -74,10 +74,10 @@ function AllTimeRecords(): JSX.Element {
     if (!records) return {};
 
     try {
-      const filteredRecords = records.filter(record =>
-        record.poolLength === parseInt(poolLengthFilter) &&
-        record.gender === genderFilter
-      );
+      const filteredRecords = records.filter(record => {
+        return record.poolLength === parseInt(poolLengthFilter) &&
+               record.gender === genderFilter;
+      });
 
       return filteredRecords.reduce((acc, record) => {
         if (!acc[record.distance]) {
