@@ -98,45 +98,71 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/records", async (req, res) => {
-    try {
-      console.log('Fetching swim records...');
-      const allRecords = await db
-        .select({
-          id: swimRecords.id,
-          style: swimRecords.style,
-          distance: swimRecords.distance,
-          time: swimRecords.time,
-          date: swimRecords.date,
-          poolLength: swimRecords.poolLength,
-          studentId: swimRecords.studentId,
-          athleteName: users.username,
-          isCompetition: swimRecords.isCompetition,
-          competitionName: swimRecords.competitionName,
-          competitionLocation: swimRecords.competitionLocation,
-          gender: swimRecords.gender // Add gender field to the response
-        })
-        .from(swimRecords)
-        .leftJoin(users, eq(swimRecords.studentId, users.id))
-        .orderBy(desc(swimRecords.date));
+app.get("/api/records", async (req, res) => {
+  try {
+    console.log('Fetching swim records...');
+    // First try to get records without join to isolate the issue
+    const allRecords = await db
+      .select({
+        id: swimRecords.id,
+        style: swimRecords.style,
+        distance: swimRecords.distance,
+        time: swimRecords.time,
+        date: swimRecords.date,
+        poolLength: swimRecords.poolLength,
+        studentId: swimRecords.studentId,
+        isCompetition: swimRecords.isCompetition,
+        competitionName: swimRecords.competitionName,
+        competitionLocation: swimRecords.competitionLocation,
+        gender: swimRecords.gender
+      })
+      .from(swimRecords)
+      .orderBy(desc(swimRecords.date));
 
-      console.log('Records fetched successfully:', allRecords.length);
-      res.json(allRecords);
-    } catch (error) {
-      console.error('Error fetching records:', error);
-      if (error instanceof Error) {
-        console.error('Error details:', {
-          message: error.message,
-          stack: error.stack,
-          name: error.name
-        });
-      }
-      res.status(500).json({ 
-        message: "記録の取得に失敗しました",
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    if (!allRecords || allRecords.length === 0) {
+      console.error('No records found');
+      return res.json([]); // Return empty array instead of throwing error
+    }
+
+    // Now get athlete names in a separate query
+    const athleteIds = [...new Set(allRecords.map(record => record.studentId))];
+    const athletes = await db
+      .select({
+        id: users.id,
+        username: users.username,
+      })
+      .from(users)
+      .where(sql`${users.id} = ANY(${athleteIds})`);
+
+    // Create a lookup map for athlete names
+    const athleteMap = new Map(athletes.map(athlete => [athlete.id, athlete.username]));
+
+    // Combine the data
+    const recordsWithAthletes = allRecords.map(record => ({
+      ...record,
+      athleteName: athleteMap.get(record.studentId) || ''
+    }));
+
+    console.log('Records fetched successfully:', recordsWithAthletes.length);
+    console.log('Sample record:', recordsWithAthletes[0]);
+
+    res.json(recordsWithAthletes);
+  } catch (error) {
+    console.error('Error fetching records:', error);
+    if (error instanceof Error) {
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        cause: error.cause
       });
     }
-  });
+    res.status(500).json({ 
+      message: "記録の取得に失敗しました",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
 
   // Use absolute path in persistent storage directory
   const UPLOAD_DIR = path.join(process.env.HOME || process.cwd(), "storage/uploads");
