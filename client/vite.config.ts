@@ -19,12 +19,15 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     strictPort: true,
+    cors: true,
     proxy: {
       '/api': {
-        target: 'http://0.0.0.0:5000',
+        target: 'http://localhost:5000',
         changeOrigin: true,
         secure: false,
         ws: true,
+        timeout: 30000, // Increase timeout to 30 seconds
+        proxyTimeout: 30000, // Explicitly set proxy timeout
         configure: (proxy, _options) => {
           proxy.on('error', (err, _req, _res) => {
             console.log('proxy error', err);
