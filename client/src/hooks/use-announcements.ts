@@ -59,10 +59,12 @@ export function useAnnouncements() {
         description: "管理者権限が必要です",
         variant: "destructive",
       });
-      return;
+      return null;
     }
 
     try {
+      console.log("Sending announcement update request with content:", content);
+      
       const response = await fetch("/api/admin/announcements", {
         method: "POST",
         headers: {
@@ -72,9 +74,12 @@ export function useAnnouncements() {
         credentials: "include",
       });
 
+      console.log("Announcement update response status:", response.status);
+      
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "お知らせの更新に失敗しました");
+        const errorData = await response.json();
+        console.error("Server returned error:", errorData);
+        throw new Error(errorData.message || "お知らせの更新に失敗しました");
       }
 
       const updatedAnnouncement = await response.json();

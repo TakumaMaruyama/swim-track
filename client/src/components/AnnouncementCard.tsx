@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -27,8 +27,16 @@ export function AnnouncementCard() {
     
     setIsSaving(true);
     try {
-      await updateAnnouncement(content);
-      setIsEditing(false);
+      // Add delay to ensure state is properly updated before API call
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const result = await updateAnnouncement(content);
+      
+      // Only exit editing mode if the update was successful
+      if (result) {
+        setIsEditing(false);
+      }
+    } catch (error) {
+      console.error("Error saving announcement:", error);
     } finally {
       setIsSaving(false);
     }

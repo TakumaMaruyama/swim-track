@@ -294,13 +294,18 @@ app.get("/api/records", async (req, res) => {
   // Admin only: Create or update announcement
   app.post("/api/admin/announcements", async (req, res) => {
     try {
+      console.log("Announcement update request from:", req.session);
+      
       if (req.session.role !== "admin") {
+        console.log("Unauthorized attempt to update announcement. Session:", req.session);
         return res.status(403).json({ message: "管理者権限が必要です" });
       }
       
       const { content } = req.body;
+      console.log("Received announcement content:", content);
       
       if (!content || typeof content !== 'string' || content.trim().length === 0) {
+        console.log("Invalid announcement content received");
         return res.status(400).json({ message: "お知らせ内容は必須です" });
       }
       
@@ -311,10 +316,13 @@ app.get("/api/records", async (req, res) => {
         .orderBy(desc(announcements.updatedAt))
         .limit(1);
       
+      console.log("Latest announcement:", latestAnnouncement);
+      
       let announcement;
       
       if (latestAnnouncement) {
         // Update existing announcement
+        console.log("Updating existing announcement ID:", latestAnnouncement.id);
         [announcement] = await db
           .update(announcements)
           .set({ 
@@ -326,6 +334,7 @@ app.get("/api/records", async (req, res) => {
           .returning();
       } else {
         // Create new announcement
+        console.log("Creating new announcement");
         [announcement] = await db
           .insert(announcements)
           .values({
@@ -335,10 +344,23 @@ app.get("/api/records", async (req, res) => {
           .returning();
       }
       
+      console.log("Announcement update successful:", announcement);
       res.json(announcement);
     } catch (error) {
       console.error('Error updating announcement:', error);
-      res.status(500).json({ message: "お知らせの更新に失敗しました" });
+      
+      // Provide more detailed error information
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack
+        });
+      }
+      
+      res.status(500).json({ 
+        message: "お知らせの更新に失敗しました",
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
     }
   });
 
