@@ -218,7 +218,7 @@ export default function Athletes() {
     }
   };
 
-  const handleEdit = async (athleteId: number, data: { username: string }) => {
+  const handleEdit = async (athleteId: number, data: { username: string, gender: string }) => {
     if (!isAdmin) {
       toast({
         title: "権限エラー",

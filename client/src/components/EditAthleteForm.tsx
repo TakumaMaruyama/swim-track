@@ -92,6 +92,26 @@ export function EditAthleteForm({ athlete, isOpen, onClose, onSubmit }: EditAthl
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="gender"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>性別</FormLabel>
+                  <FormControl>
+                    <select
+                      {...field}
+                      disabled={isSubmitting}
+                      className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="male">男性</option>
+                      <option value="female">女性</option>
+                    </select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <DialogFooter>
               <Button
                 type="button"
