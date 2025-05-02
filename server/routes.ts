@@ -147,17 +147,33 @@ app.get("/api/records", async (req, res) => {
 
     console.log('Fetching athlete data for IDs:', athleteIds);
     
-    // Now get athlete names in a separate query with proper parameterization for the IN clause
-    // This approach avoids SQL injection and handles the parameter types properly
-    const placeholders = athleteIds.map((_, idx) => `$${idx + 1}`).join(',');
-    const query = sql`SELECT id, username FROM users WHERE id IN (${sql.raw(placeholders)})`;
+    // Fetch user names with a simpler approach - querying each ID individually and combining results
+    const athletes = [];
     
-    // We need to manually execute this query to properly pass the parameters
-    const result = await db.execute(query, ...athleteIds);
-    const athletes = result.rows.map(row => ({
-      id: row.id,
-      username: row.username
-    }));
+    // Process in smaller batches to avoid potential issues with too many parameters
+    for (let i = 0; i < athleteIds.length; i++) {
+      const studentId = athleteIds[i];
+      if (studentId == null) continue;
+      
+      try {
+        // Query each user one at a time to avoid complex parameterized IN clauses
+        const result = await db
+          .select({
+            id: users.id,
+            username: users.username,
+          })
+          .from(users)
+          .where(eq(users.id, studentId))
+          .limit(1);
+          
+        if (result && result.length > 0) {
+          athletes.push(result[0]);
+        }
+      } catch (idError) {
+        console.error(`Error fetching athlete with ID ${studentId}:`, idError);
+        // Continue with other IDs even if one fails
+      }
+    }
 
     console.log('Athletes fetched:', athletes?.length || 0);
 
