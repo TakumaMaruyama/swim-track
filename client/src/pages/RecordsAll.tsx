@@ -74,6 +74,10 @@ function RecordsAll(): JSX.Element {
     if (!records) return {};
 
     try {
+      console.log('Records total:', records.length);
+      console.log('Males:', records.filter(r => r.gender === 'male').length);
+      console.log('Females:', records.filter(r => r.gender === 'female').length);
+      
       const filteredRecords = records.filter(record => {
         return record.poolLength === parseInt(poolLengthFilter) &&
                record.gender === genderFilter;
