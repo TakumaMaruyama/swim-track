@@ -62,7 +62,7 @@ export function registerRoutes(app: Express) {
   // 選手登録エンドポイントを追加
   app.post("/api/athletes", async (req, res) => {
     try {
-      const { username } = req.body;
+      const { username, gender = 'male' } = req.body;
 
       if (!username || typeof username !== 'string' || username.trim().length === 0) {
         return res.status(400).json({ message: "選手名は必須です" });
@@ -87,6 +87,7 @@ export function registerRoutes(app: Express) {
           password: await hashPassword("temporary"), // 一時的なパスワード
           role: "student",
           isActive: true,
+          gender: gender, // 性別を追加
         })
         .returning();
 
@@ -730,7 +731,7 @@ app.get("/api/records", async (req, res) => {
   // Update athlete
   app.put("/api/athletes/:id", async (req, res) => {
     const { id } = req.params;
-    const { username } = req.body;
+    const { username, gender } = req.body;
 
     try {
       // Check if athlete exists and is a student
@@ -760,7 +761,10 @@ app.get("/api/records", async (req, res) => {
       // Update athlete
       const [updatedAthlete] = await db
         .update(users)
-        .set({ username })
+        .set({ 
+          username,
+          gender: gender || athlete.gender || 'male' // Use provided gender, fallback to existing or default
+        })
         .where(eq(users.id, parseInt(id)))
         .returning();
 
