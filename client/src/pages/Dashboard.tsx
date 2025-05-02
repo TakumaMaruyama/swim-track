@@ -14,7 +14,7 @@ import { useMobile } from '@/hooks/use-mobile';
 
 const NAV_ITEMS = [
   { label: '選手一覧', icon: <Users className="h-4 w-4" />, href: '/athletes' },
-  { label: '歴代記録', icon: <Trophy className="h-4 w-4" />, href: '/all-time-records' },
+  { label: '歴代記録', icon: <Trophy className="h-4 w-4" />, href: '/records' },
   { label: '資料', icon: <ClipboardList className="h-4 w-4" />, href: '/documents' },
 ];
 

@@ -100,6 +100,13 @@ root.render(
               </ErrorBoundary>
             </Suspense>
           </Route>
+          <Route path="/records">
+            <Suspense fallback={<LoadingSpinner />}>
+              <ErrorBoundary>
+                <RecordsAll />
+              </ErrorBoundary>
+            </Suspense>
+          </Route>
           <Route path="/competitions">
             <Suspense fallback={<LoadingSpinner />}>
               <ErrorBoundary>
