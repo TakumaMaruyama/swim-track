@@ -73,14 +73,16 @@ const FormLoadingFallback = () => (
 // Add new component inside Athletes.tsx
 const AddAthleteDialog = ({ isOpen, onClose, onSubmit }) => {
   const [username, setUsername] = useState("");
+  const [gender, setGender] = useState("male");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      await onSubmit(username);
+      await onSubmit(username, gender);
       setUsername("");
+      setGender("male");
     } finally {
       setIsSubmitting(false);
     }
@@ -92,21 +94,47 @@ const AddAthleteDialog = ({ isOpen, onClose, onSubmit }) => {
         <DialogHeader>
           <DialogTitle>新規選手登録</DialogTitle>
           <DialogDescription>
-            新しい選手を登録します。選手名を入力してください。
+            新しい選手を登録します。選手名と性別を入力してください。
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
+              <label htmlFor="username" className="text-sm font-medium">
+                選手名
+              </label>
               <Input
+                id="username"
                 placeholder="選手名"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
               />
             </div>
+            <div className="grid gap-2">
+              <label htmlFor="gender" className="text-sm font-medium">
+                性別
+              </label>
+              <select
+                id="gender"
+                value={gender}
+                onChange={(e) => setGender(e.target.value)}
+                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="male">男性</option>
+                <option value="female">女性</option>
+              </select>
+            </div>
           </div>
           <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onClose()}
+              disabled={isSubmitting}
+            >
+              キャンセル
+            </Button>
             <Button
               type="submit"
               disabled={isSubmitting || !username.trim()}
@@ -381,14 +409,14 @@ export default function Athletes() {
     }
   };
 
-  const handleCreateAthlete = async (username: string) => {
+  const handleCreateAthlete = async (username: string, gender: string = 'male') => {
     try {
       const response = await fetch('/api/athletes', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ username }),
+        body: JSON.stringify({ username, gender }),
         credentials: 'include',
       });
 

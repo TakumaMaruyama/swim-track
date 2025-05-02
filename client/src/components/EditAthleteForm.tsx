@@ -26,6 +26,7 @@ import * as z from "zod";
 
 const editAthleteSchema = z.object({
   username: z.string().min(2, "ユーザー名は2文字以上である必要があります"),
+  gender: z.enum(["male", "female"]),
 });
 
 type EditAthleteFormProps = {
@@ -43,6 +44,7 @@ export function EditAthleteForm({ athlete, isOpen, onClose, onSubmit }: EditAthl
     resolver: zodResolver(editAthleteSchema),
     defaultValues: {
       username: athlete.username,
+      gender: athlete.gender as "male" | "female",
     },
   });
 
