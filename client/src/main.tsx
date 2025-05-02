@@ -33,7 +33,7 @@ const retryImport = async (importFn: () => Promise<any>, retries = 3) => {
 const Dashboard = lazy(() => retryImport(() => import("./pages/Dashboard")));
 const Documents = lazy(() => retryImport(() => import("./pages/Documents")));
 const Athletes = lazy(() => retryImport(() => import("./pages/Athletes")));
-const AllTimeRecords = lazy(() => retryImport(() => import("./pages/AllTimeRecords")));
+const RecordsAll = lazy(() => retryImport(() => import("./pages/RecordsAll")));
 const Competitions = lazy(() => retryImport(() => import("./pages/Competitions")));
 const AdminLogin = lazy(() => retryImport(() => import("./pages/AdminLogin")));
 
@@ -96,7 +96,7 @@ root.render(
           <Route path="/all-time-records">
             <Suspense fallback={<LoadingSpinner />}>
               <ErrorBoundary>
-                <AllTimeRecords />
+                <RecordsAll />
               </ErrorBoundary>
             </Suspense>
           </Route>
