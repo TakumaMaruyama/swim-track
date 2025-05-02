@@ -65,18 +65,13 @@ export default function Dashboard() {
         <main className="flex-grow">
           <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {/* Dashboard welcome card */}
+              {/* Dashboard header card */}
               <Card className="col-span-full">
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2 text-2xl">
                     <span>ダッシュボード</span>
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-lg text-muted-foreground">
-                    SwimTrackへようこそ。メニューから機能を選択してください。
-                  </p>
-                </CardContent>
               </Card>
 
               {/* Announcement card */}
