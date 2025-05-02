@@ -11,6 +11,8 @@ import {
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { MobileNav } from '@/components/MobileNav';
 import { useMobile } from '@/hooks/use-mobile';
+import { AnnouncementCard } from '@/components/AnnouncementCard';
+import { useAuth } from '@/hooks/use-auth';
 
 const NAV_ITEMS = [
   { label: '選手一覧', icon: <Users className="h-4 w-4" />, href: '/athletes' },
@@ -21,6 +23,7 @@ const NAV_ITEMS = [
 export default function Dashboard() {
   const [, navigate] = useLocation();
   const isMobile = useMobile();
+  const { isAuthenticated } = useAuth();
 
   return (
     <ErrorBoundary>
@@ -62,6 +65,7 @@ export default function Dashboard() {
         <main className="flex-grow">
           <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {/* Dashboard welcome card */}
               <Card className="col-span-full">
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2 text-2xl">
@@ -75,6 +79,10 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
 
+              {/* Announcement card */}
+              <AnnouncementCard />
+
+              {/* Navigation cards */}
               {NAV_ITEMS.map((item, index) => (
                 <Card 
                   key={index}

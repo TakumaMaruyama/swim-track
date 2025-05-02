@@ -273,6 +273,74 @@ app.get("/api/records", async (req, res) => {
 
   // Initialize upload directory during route registration
   initializeUploadDirectory().catch(console.error);
+  
+  // Announcements API endpoints
+  // Get latest announcement
+  app.get("/api/announcements/latest", async (req, res) => {
+    try {
+      const [latestAnnouncement] = await db
+        .select()
+        .from(announcements)
+        .orderBy(desc(announcements.updatedAt))
+        .limit(1);
+      
+      res.json(latestAnnouncement || { content: "" });
+    } catch (error) {
+      console.error('Error fetching latest announcement:', error);
+      res.status(500).json({ message: "お知らせの取得に失敗しました" });
+    }
+  });
+  
+  // Admin only: Create or update announcement
+  app.post("/api/admin/announcements", async (req, res) => {
+    try {
+      if (req.session.role !== "admin") {
+        return res.status(403).json({ message: "管理者権限が必要です" });
+      }
+      
+      const { content } = req.body;
+      
+      if (!content || typeof content !== 'string' || content.trim().length === 0) {
+        return res.status(400).json({ message: "お知らせ内容は必須です" });
+      }
+      
+      // Get latest announcement to determine if we should update or create
+      const [latestAnnouncement] = await db
+        .select()
+        .from(announcements)
+        .orderBy(desc(announcements.updatedAt))
+        .limit(1);
+      
+      let announcement;
+      
+      if (latestAnnouncement) {
+        // Update existing announcement
+        [announcement] = await db
+          .update(announcements)
+          .set({ 
+            content: content.trim(),
+            updatedAt: new Date(),
+            createdBy: req.session.userId
+          })
+          .where(eq(announcements.id, latestAnnouncement.id))
+          .returning();
+      } else {
+        // Create new announcement
+        [announcement] = await db
+          .insert(announcements)
+          .values({
+            content: content.trim(),
+            createdBy: req.session.userId
+          })
+          .returning();
+      }
+      
+      res.json(announcement);
+    } catch (error) {
+      console.error('Error updating announcement:', error);
+      res.status(500).json({ message: "お知らせの更新に失敗しました" });
+    }
+  });
 
   // Document download endpoint with enhanced error handling
   app.get("/api/documents/:id/download", async (req, res) => {
