@@ -5,8 +5,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { PageHeader } from '@/components/PageHeader';
 import { GenderSelector } from '@/components/GenderSelector';
-import { PoolLengthSelector } from '@/components/PoolLengthSelector';
-import { PoolCourseSelector } from '@/components/PoolCourseSelector';
 
 type GroupedRecord = {
   id: number;
@@ -66,25 +64,29 @@ const Record: React.FC<{ record: GroupedRecord }> = React.memo(({ record }) => {
 Record.displayName = "Record";
 
 function AllTimeRecords(): JSX.Element {
-  const { records, isLoading, error, mutate } = useSwimRecords();
+  const { records, isLoading, error } = useSwimRecords();
 
   const [genderFilter, setGenderFilter] = React.useState<'male' | 'female'>('male');
-  const [poolCourseFilter, setPoolCourseFilter] = React.useState<'short' | 'long'>('short');
-  const [distanceFilter, setDistanceFilter] = React.useState<string | null>(null);
+  const [poolLengthFilter, setPoolLengthFilter] = React.useState<string>("25");
 
-  // Transform pool course to actual pool length (25m or 50m)
-  const poolLengthValue = React.useMemo(() => {
-    return poolCourseFilter === 'short' ? "25" : "50";
-  }, [poolCourseFilter]);
+  // デバッグ用
+  React.useEffect(() => {
+    if (records) {
+      console.log('Records total:', records.length);
+      console.log('Males:', records.filter(r => r.gender === 'male').length);
+      console.log('Females:', records.filter(r => r.gender === 'female').length);
+      console.log('25m pool:', records.filter(r => r.poolLength === 25).length);
+      console.log('50m pool:', records.filter(r => r.poolLength === 50).length);
+    }
+  }, [records]);
 
   const groupedRecords: GroupedRecords = React.useMemo(() => {
     if (!records) return {};
 
     try {
       const filteredRecords = records.filter(record => {
-        return record.poolLength === parseInt(poolLengthValue) &&
-               record.gender === genderFilter &&
-               (!distanceFilter || record.distance === parseInt(distanceFilter));
+        return record.poolLength === parseInt(poolLengthFilter) &&
+               record.gender === genderFilter;
       });
 
       return filteredRecords.reduce((acc, record) => {
@@ -111,7 +113,7 @@ function AllTimeRecords(): JSX.Element {
       console.error("Error processing records:", err);
       return {};
     }
-  }, [records, poolLengthValue, genderFilter, distanceFilter]);
+  }, [records, poolLengthFilter, genderFilter]);
 
   // Sort distances in ascending order
   const sortedDistances = React.useMemo(() => {
@@ -119,24 +121,6 @@ function AllTimeRecords(): JSX.Element {
       .map(Number)
       .sort((a, b) => a - b);
   }, [groupedRecords]);
-
-  // Get all available distances from records for the current filter settings
-  const availableDistances = React.useMemo(() => {
-    if (!records) return [];
-    
-    return [...new Set(
-      records
-        .filter(r => r.poolLength === parseInt(poolLengthValue) && r.gender === genderFilter)
-        .map(r => r.distance)
-    )].sort((a, b) => a - b);
-  }, [records, poolLengthValue, genderFilter]);
-
-  // Set the first available distance when filters change
-  React.useEffect(() => {
-    if (availableDistances.length > 0 && (!distanceFilter || !availableDistances.includes(parseInt(distanceFilter)))) {
-      setDistanceFilter(availableDistances[0].toString());
-    }
-  }, [availableDistances, distanceFilter]);
 
   if (error) {
     return (
@@ -158,7 +142,7 @@ function AllTimeRecords(): JSX.Element {
     <>
       <PageHeader title="歴代記録" />
       <div className="container">
-        <div className="space-y-6">
+        <div className="mb-6 grid gap-4 sm:grid-cols-2 md:gap-6">
           {/* 性別フィルター */}
           <div>
             <p className="text-sm font-medium mb-2">性別</p>
@@ -171,31 +155,20 @@ function AllTimeRecords(): JSX.Element {
           
           {/* 短水路/長水路フィルター */}
           <div>
-            <p className="text-sm font-medium mb-2">水路</p>
-            <PoolCourseSelector
-              value={poolCourseFilter}
-              onChange={setPoolCourseFilter}
-              className="w-full"
-            />
-          </div>
-          
-          {/* 距離フィルター */}
-          <div>
-            <p className="text-sm font-medium mb-2">距離</p>
-            <div className="flex flex-wrap gap-2">
-              {availableDistances.map(distance => (
-                <button
-                  key={distance}
-                  className={`px-4 py-2 rounded-md border ${
-                    distanceFilter === distance.toString() 
-                      ? "bg-primary text-primary-foreground" 
-                      : "bg-background hover:bg-muted/50"
-                  }`}
-                  onClick={() => setDistanceFilter(distance.toString())}
-                >
-                  {distance}m
-                </button>
-              ))}
+            <p className="text-sm font-medium mb-2">プール長</p>
+            <div className="grid grid-cols-2 rounded-md border overflow-hidden">
+              <button
+                className={`py-2 px-4 text-center ${poolLengthFilter === "25" ? 'bg-primary text-primary-foreground' : 'bg-background'}`}
+                onClick={() => setPoolLengthFilter("25")}
+              >
+                短水路 (25m)
+              </button>
+              <button
+                className={`py-2 px-4 text-center ${poolLengthFilter === "50" ? 'bg-primary text-primary-foreground' : 'bg-background'}`}
+                onClick={() => setPoolLengthFilter("50")}
+              >
+                長水路 (50m)
+              </button>
             </div>
           </div>
         </div>
