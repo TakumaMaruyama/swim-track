@@ -4,6 +4,10 @@ import path from "path";
 
 export default defineConfig({
   plugins: [react()],
+  optimizeDeps: {
+    force: true, // Force dependency optimization on startup
+    exclude: ['@radix-ui/react-tabs'], // Exclude problematic dependencies
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
