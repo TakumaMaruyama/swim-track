@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,15 +11,16 @@ export function AnnouncementCard() {
   const { announcement, isLoading, error, updateAnnouncement } = useAnnouncements();
   const { isAdmin } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
-  const [content, setContent] = useState(announcement?.content || '');
+  const [content, setContent] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   // Initialize content from announcement when it loads
-  React.useEffect(() => {
-    if (announcement?.content && !isEditing) {
+  useEffect(() => {
+    console.log("Announcement data:", announcement);
+    if (announcement?.content) {
       setContent(announcement.content);
     }
-  }, [announcement, isEditing]);
+  }, [announcement]);
 
   const handleSave = async () => {
     if (!content.trim()) return;
@@ -37,6 +38,22 @@ export function AnnouncementCard() {
     setContent(announcement?.content || '');
     setIsEditing(false);
   };
+
+  // デバッグ用
+  useEffect(() => {
+    // 2秒ごとに最新のお知らせとステータスをコンソールに出力
+    const interval = setInterval(() => {
+      console.log("Current announcement state:", {
+        announcement,
+        isLoading,
+        error,
+        isEditing,
+        content,
+      });
+    }, 2000);
+    
+    return () => clearInterval(interval);
+  }, [announcement, isLoading, error, isEditing, content]);
 
   if (isLoading) {
     return (
@@ -129,8 +146,8 @@ export function AnnouncementCard() {
           </div>
         ) : (
           <div className="prose dark:prose-invert max-w-none">
-            {announcement?.content ? (
-              <p className="text-lg whitespace-pre-wrap">{announcement.content}</p>
+            {content ? (
+              <p className="text-lg whitespace-pre-wrap">{content}</p>
             ) : (
               <p className="text-lg text-muted-foreground">お知らせはありません</p>
             )}

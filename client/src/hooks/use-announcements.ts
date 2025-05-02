@@ -1,7 +1,8 @@
 import useSWR from "swr";
-import { useCallback } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "./use-auth";
+import { fetcher } from "@/lib/fetcher";
 
 export interface Announcement {
   id: number;
@@ -12,9 +13,44 @@ export interface Announcement {
 }
 
 export function useAnnouncements() {
-  const { data, error, mutate } = useSWR<Announcement>("/api/announcements/latest");
+  const { data, error, mutate } = useSWR<Announcement>("/api/announcements/latest", fetcher);
+  const [announcement, setAnnouncement] = useState<Announcement | null>(null);
   const { toast } = useToast();
   const { isAdmin } = useAuth();
+
+  // データが変わったときにステートを更新
+  useEffect(() => {
+    if (data) {
+      console.log("Setting announcement from data:", data);
+      setAnnouncement(data);
+    }
+  }, [data]);
+
+  // 手動でデータを取得する関数
+  const fetchLatestAnnouncement = useCallback(async () => {
+    try {
+      const response = await fetch("/api/announcements/latest");
+      
+      if (!response.ok) {
+        throw new Error("お知らせの取得に失敗しました");
+      }
+      
+      const data = await response.json();
+      console.log("Manually fetched announcement:", data);
+      setAnnouncement(data);
+      mutate(data, false); // SWRキャッシュも更新
+      return data;
+    } catch (error) {
+      console.error("Error fetching announcement:", error);
+    }
+  }, [mutate]);
+
+  // コンポーネントがマウントされたときに一度だけ実行
+  useEffect(() => {
+    if (!data && !error) {
+      fetchLatestAnnouncement();
+    }
+  }, [fetchLatestAnnouncement, data, error]);
 
   const updateAnnouncement = useCallback(async (content: string) => {
     if (!isAdmin) {
@@ -42,12 +78,23 @@ export function useAnnouncements() {
       }
 
       const updatedAnnouncement = await response.json();
-      mutate(updatedAnnouncement);
+      console.log("Updated announcement:", updatedAnnouncement);
+      
+      // SWRのキャッシュを更新
+      mutate(updatedAnnouncement, false);
+      
+      // ローカルのステートも更新
+      setAnnouncement(updatedAnnouncement);
       
       toast({
         title: "成功",
         description: "お知らせが更新されました",
       });
+
+      // 更新後、最新データを改めて取得
+      setTimeout(() => {
+        fetchLatestAnnouncement();
+      }, 500);
 
       return updatedAnnouncement;
     } catch (error) {
@@ -58,12 +105,13 @@ export function useAnnouncements() {
         variant: "destructive",
       });
     }
-  }, [isAdmin, toast, mutate]);
+  }, [isAdmin, toast, mutate, fetchLatestAnnouncement]);
 
   return {
-    announcement: data,
-    isLoading: !error && !data,
+    announcement: announcement,
+    isLoading: !error && !data && !announcement,
     error,
     updateAnnouncement,
+    fetchLatestAnnouncement,
   };
 }
