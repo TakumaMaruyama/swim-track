@@ -201,8 +201,8 @@ app.get("/api/records", async (req, res) => {
       return {
         ...record,
         athleteName: athleteNameMap.get(record.studentId) || 'Unknown',
-        // Use the record's gender if it exists, otherwise use the athlete's gender
-        gender: record.gender || athleteGender || 'male'
+        // Always use the athlete's gender from users table
+        gender: athleteGender || 'male'
       };
     });
 
