@@ -119,32 +119,68 @@ app.get("/api/records", async (req, res) => {
       .from(swimRecords)
       .orderBy(desc(swimRecords.date));
 
-    if (!allRecords || allRecords.length === 0) {
-      console.error('No records found');
+    console.log('Raw records fetched:', allRecords?.length || 0);
+    
+    // Check if allRecords is valid and has entries
+    if (!allRecords || !Array.isArray(allRecords) || allRecords.length === 0) {
+      console.log('No records found or invalid records data');
       return res.json([]); // Return empty array instead of throwing error
     }
 
-    // Now get athlete names in a separate query
-    const athleteIds = [...new Set(allRecords.map(record => record.studentId))];
-    const athletes = await db
-      .select({
-        id: users.id,
-        username: users.username,
-      })
-      .from(users)
-      .where(sql`${users.id} = ANY(${athleteIds})`);
+    // Filter out records with null studentId to prevent errors
+    const validRecords = allRecords.filter(record => record.studentId != null);
+    if (validRecords.length === 0) {
+      console.log('No valid records with studentId found');
+      return res.json([]);
+    }
 
-    // Create a lookup map for athlete names
-    const athleteMap = new Map(athletes.map(athlete => [athlete.id, athlete.username]));
+    // Extract unique student IDs, ensuring they are all valid
+    const athleteIds = [...new Set(validRecords.map(record => record.studentId))].filter(id => id != null);
+    
+    if (athleteIds.length === 0) {
+      console.log('No valid athlete IDs found');
+      return res.json(validRecords.map(record => ({
+        ...record,
+        athleteName: 'Unknown'
+      })));
+    }
 
-    // Combine the data
-    const recordsWithAthletes = allRecords.map(record => ({
-      ...record,
-      athleteName: athleteMap.get(record.studentId) || ''
+    console.log('Fetching athlete data for IDs:', athleteIds);
+    
+    // Now get athlete names in a separate query with proper parameterization for the IN clause
+    // This approach avoids SQL injection and handles the parameter types properly
+    const placeholders = athleteIds.map((_, idx) => `$${idx + 1}`).join(',');
+    const query = sql`SELECT id, username FROM users WHERE id IN (${sql.raw(placeholders)})`;
+    
+    // We need to manually execute this query to properly pass the parameters
+    const result = await db.execute(query, ...athleteIds);
+    const athletes = result.rows.map(row => ({
+      id: row.id,
+      username: row.username
     }));
 
-    console.log('Records fetched successfully:', recordsWithAthletes.length);
-    console.log('Sample record:', recordsWithAthletes[0]);
+    console.log('Athletes fetched:', athletes?.length || 0);
+
+    // Create a lookup map for athlete names, with safeguards
+    const athleteMap = new Map();
+    if (Array.isArray(athletes)) {
+      athletes.forEach(athlete => {
+        if (athlete && athlete.id != null) {
+          athleteMap.set(athlete.id, athlete.username || '');
+        }
+      });
+    }
+
+    // Combine the data with fallbacks for missing info
+    const recordsWithAthletes = validRecords.map(record => ({
+      ...record,
+      athleteName: athleteMap.get(record.studentId) || 'Unknown'
+    }));
+
+    console.log('Records processed successfully:', recordsWithAthletes.length);
+    if (recordsWithAthletes.length > 0) {
+      console.log('Sample record:', JSON.stringify(recordsWithAthletes[0]));
+    }
 
     res.json(recordsWithAthletes);
   } catch (error) {

@@ -49,7 +49,8 @@ export const swimRecords = pgTable("swim_records", {
   isCompetition: boolean("is_competition").default(false),
   competitionId: integer("competition_id").references(() => competitions.id),
   competitionName: text("competition_name"),
-  competitionLocation: text("competition_location")
+  competitionLocation: text("competition_location"),
+  gender: text("gender").notNull().default("male")
 });
 
 export const insertUserSchema = createInsertSchema(users);
