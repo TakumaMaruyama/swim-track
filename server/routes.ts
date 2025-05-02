@@ -36,6 +36,7 @@ export function registerRoutes(app: Express) {
           username: users.username,
           isActive: users.isActive,
           role: users.role,
+          gender: users.gender,
         })
         .from(users)
         .where(eq(users.role, 'student'))
@@ -162,6 +163,7 @@ app.get("/api/records", async (req, res) => {
           .select({
             id: users.id,
             username: users.username,
+            gender: users.gender,
           })
           .from(users)
           .where(eq(users.id, studentId))
@@ -178,21 +180,31 @@ app.get("/api/records", async (req, res) => {
 
     console.log('Athletes fetched:', athletes?.length || 0);
 
-    // Create a lookup map for athlete names, with safeguards
-    const athleteMap = new Map();
+    // Create lookup maps for athlete names and genders, with safeguards
+    const athleteNameMap = new Map();
+    const athleteGenderMap = new Map();
+    
     if (Array.isArray(athletes)) {
       athletes.forEach(athlete => {
         if (athlete && athlete.id != null) {
-          athleteMap.set(athlete.id, athlete.username || '');
+          athleteNameMap.set(athlete.id, athlete.username || '');
+          athleteGenderMap.set(athlete.id, athlete.gender || 'male');
         }
       });
     }
 
     // Combine the data with fallbacks for missing info
-    const recordsWithAthletes = validRecords.map(record => ({
-      ...record,
-      athleteName: athleteMap.get(record.studentId) || 'Unknown'
-    }));
+    const recordsWithAthletes = validRecords.map(record => {
+      // Get athlete gender from user data if record doesn't have gender
+      const athleteGender = athleteGenderMap.get(record.studentId);
+      
+      return {
+        ...record,
+        athleteName: athleteNameMap.get(record.studentId) || 'Unknown',
+        // Use the record's gender if it exists, otherwise use the athlete's gender
+        gender: record.gender || athleteGender || 'male'
+      };
+    });
 
     console.log('Records processed successfully:', recordsWithAthletes.length);
     if (recordsWithAthletes.length > 0) {
