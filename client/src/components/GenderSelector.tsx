@@ -1,4 +1,4 @@
-import React from 'react';
+// GenderSelector.tsx
 import { cn } from '@/lib/utils';
 import { Button } from './ui/button';
 

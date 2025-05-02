@@ -1,4 +1,4 @@
-import React, { StrictMode, Suspense, lazy } from "react";
+import { StrictMode, Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { Switch, Route } from "wouter";
 import { SWRConfig } from "swr";
@@ -59,7 +59,7 @@ root.render(
           keepPreviousData: true,
           suspense: false,
           provider: () => new Map(),
-          onErrorRetry: (error, key, config, revalidate, { retryCount }) => {
+          onErrorRetry: (error: any, _key: string, _config: any, revalidate: (options?: any) => Promise<any>, { retryCount }: { retryCount: number }) => {
             // Never retry on 404
             if (error.status === 404) return;
 
