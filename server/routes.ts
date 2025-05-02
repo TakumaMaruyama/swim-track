@@ -1,7 +1,7 @@
 import { Express } from "express";
 import multer from "multer";
 import { db } from "db";
-import { documents, swimRecords, categories, users } from "db/schema";
+import { documents, swimRecords, categories, users, announcements } from "db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import path from "path";
 import fs from "fs/promises";

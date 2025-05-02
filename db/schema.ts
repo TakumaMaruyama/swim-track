@@ -12,6 +12,14 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow()
 });
 
+export const announcements = pgTable("announcements", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdBy: integer("created_by").references(() => users.id)
+});
+
 export const categories = pgTable("categories", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   name: text("name").notNull(),
@@ -78,4 +86,9 @@ export const insertCompetitionSchema = createInsertSchema(competitions);
 export const selectCompetitionSchema = createSelectSchema(competitions);
 export type InsertCompetition = z.infer<typeof insertCompetitionSchema>;
 export type Competition = z.infer<typeof selectCompetitionSchema>;
+
+export const insertAnnouncementSchema = createInsertSchema(announcements);
+export const selectAnnouncementSchema = createSelectSchema(announcements);
+export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
+export type Announcement = z.infer<typeof selectAnnouncementSchema>;
 
