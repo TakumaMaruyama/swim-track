@@ -10,8 +10,6 @@ import {
   Legend,
   ChartOptions,
   TooltipItem,
-  Scale,
-  CoreScaleOptions,
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import type { ExtendedSwimRecord } from "../hooks/use-swim-records";

@@ -389,7 +389,9 @@ export function TimeHistoryModal({
                                 {formatDate(record.date)}
                               </div>
                               <div className="text-sm text-muted-foreground">
-                                {record.poolLength}メートル
+                                {record.poolLength === 15 ? "15m" : 
+                                record.poolLength === 25 ? "25m（短水路）" : 
+                                "50m（長水路）"}
                               </div>
                             </div>
                             <div className="flex gap-2">

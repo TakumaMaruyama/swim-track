@@ -161,13 +161,13 @@ function AllTimeRecords(): JSX.Element {
                 className={`py-2 px-4 text-center ${poolLengthFilter === "25" ? 'bg-primary text-primary-foreground' : 'bg-background'}`}
                 onClick={() => setPoolLengthFilter("25")}
               >
-                短水路 (25m)
+                25m（短水路）
               </button>
               <button
                 className={`py-2 px-4 text-center ${poolLengthFilter === "50" ? 'bg-primary text-primary-foreground' : 'bg-background'}`}
                 onClick={() => setPoolLengthFilter("50")}
               >
-                長水路 (50m)
+                50m（長水路）
               </button>
             </div>
           </div>
