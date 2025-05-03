@@ -370,7 +370,11 @@ export function TimeHistoryModal({
                                 {isBestTime && (
                                   <Badge variant="secondary" className="flex items-center gap-1">
                                     <Trophy className="h-3 w-3" />
-                                    自己ベスト ({record.poolLength}メートル)
+                                    自己ベスト ({
+                                      record.poolLength === 15 ? "15m" : 
+                                      record.poolLength === 25 ? "25m（短水路）" : 
+                                      "50m（長水路）"
+                                    })
                                   </Badge>
                                 )}
                                 {record.isCompetition && record.competitionName && (

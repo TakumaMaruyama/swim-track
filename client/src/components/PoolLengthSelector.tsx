@@ -31,7 +31,7 @@ export function PoolLengthSelector({ value, onChange, className }: PoolLengthSel
         )}
         onClick={() => onChange("25")}
       >
-        25m
+        25m（短水路）
       </Button>
       <Button
         type="button"
@@ -42,7 +42,7 @@ export function PoolLengthSelector({ value, onChange, className }: PoolLengthSel
         )}
         onClick={() => onChange("50")}
       >
-        50m
+        50m（長水路）
       </Button>
     </div>
   );
