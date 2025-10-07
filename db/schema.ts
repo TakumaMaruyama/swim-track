@@ -1,9 +1,9 @@
-import { pgTable, text, integer, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, timestamp, boolean, serial } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const users = pgTable("users", {
-  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  id: serial("id").primaryKey(),
   username: text("username").unique().notNull(),
   password: text("password").notNull(),
   role: text("role").notNull().default("student"),
@@ -13,7 +13,7 @@ export const users = pgTable("users", {
 });
 
 export const announcements = pgTable("announcements", {
-  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  id: serial("id").primaryKey(),
   content: text("content").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -21,7 +21,7 @@ export const announcements = pgTable("announcements", {
 });
 
 export const competitions = pgTable("competitions", {
-  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  id: serial("id").primaryKey(),
   name: text("name").notNull(),
   date: timestamp("date").notNull(),
   location: text("location").notNull(),
@@ -29,7 +29,7 @@ export const competitions = pgTable("competitions", {
 });
 
 export const swimRecords = pgTable("swim_records", {
-  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  id: serial("id").primaryKey(),
   studentId: integer("student_id").references(() => users.id),
   style: text("style").notNull(),
   distance: integer("distance").notNull(),
