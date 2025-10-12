@@ -2,7 +2,7 @@
 
 ## Overview
 
-SwimTrack is a comprehensive swimming team management application designed to track athlete records, manage competitions, share documents, and facilitate communication between coaches and swimmers. The system provides role-based access with separate interfaces for administrators (coaches) and students (athletes), supporting Japanese language throughout the interface.
+SwimTrack is a comprehensive swimming team management application designed to track athlete records, manage competitions, and facilitate communication between coaches and swimmers. The system provides role-based access with separate interfaces for administrators (coaches) and students (athletes), supporting Japanese language throughout the interface.
 
 ## User Preferences
 
@@ -52,7 +52,6 @@ Preferred communication style: Simple, everyday language.
 
 **API Design**
 - RESTful API patterns with consistent response formats
-- File upload support using Multer middleware
 - Error handling with appropriate HTTP status codes
 - Request validation and sanitization
 
@@ -73,11 +72,10 @@ Preferred communication style: Simple, everyday language.
 - Users table with role-based access (admin/student) and gender tracking
 - Swim records with support for multiple pool lengths (15m, 25m, 50m)
 - Competition tracking with location and date information
-- Document management with category organization and access control
 - Announcements system for team-wide communications
 
 **Data Relationships**
-- Foreign key relationships between users, records, competitions, and documents
+- Foreign key relationships between users, records, and competitions
 - Cascade delete patterns for data integrity
 - Indexed fields for optimized query performance
 
@@ -86,7 +84,6 @@ Preferred communication style: Simple, everyday language.
 **Database & Storage**
 - Neon Database (PostgreSQL): Serverless PostgreSQL database with automatic scaling
 - Drizzle ORM: Type-safe ORM for database operations and migrations
-- Google Drive API: Document storage and sharing (via @google-cloud/local-auth)
 
 **Authentication & Session Management**
 - @auth/express and @auth/core: Authentication framework integration
