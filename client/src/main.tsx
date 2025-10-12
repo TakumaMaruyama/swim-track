@@ -31,11 +31,11 @@ const retryImport = async (importFn: () => Promise<any>, retries = 3) => {
 
 // Lazy load pages
 const Dashboard = lazy(() => retryImport(() => import("./pages/Dashboard")));
+const Documents = lazy(() => retryImport(() => import("./pages/Documents")));
 const Athletes = lazy(() => retryImport(() => import("./pages/Athletes")));
 const RecordsAll = lazy(() => retryImport(() => import("./pages/RecordsAll")));
 const Competitions = lazy(() => retryImport(() => import("./pages/Competitions")));
 const AdminLogin = lazy(() => retryImport(() => import("./pages/AdminLogin")));
-const IMRanking = lazy(() => retryImport(() => import("./pages/IMRanking")));
 
 const LoadingSpinner = () => (
   <div className="flex items-center justify-center min-h-screen">
@@ -79,6 +79,13 @@ root.render(
               </ErrorBoundary>
             </Suspense>
           </Route>
+          <Route path="/documents">
+            <Suspense fallback={<LoadingSpinner />}>
+              <ErrorBoundary>
+                <Documents />
+              </ErrorBoundary>
+            </Suspense>
+          </Route>
           <Route path="/athletes">
             <Suspense fallback={<LoadingSpinner />}>
               <ErrorBoundary>
@@ -104,13 +111,6 @@ root.render(
             <Suspense fallback={<LoadingSpinner />}>
               <ErrorBoundary>
                 <Competitions />
-              </ErrorBoundary>
-            </Suspense>
-          </Route>
-          <Route path="/im-ranking">
-            <Suspense fallback={<LoadingSpinner />}>
-              <ErrorBoundary>
-                <IMRanking />
               </ErrorBoundary>
             </Suspense>
           </Route>

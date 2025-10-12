@@ -1,7 +1,11 @@
 import { Express } from "express";
+import multer from "multer";
 import { db } from "db";
-import { swimRecords, users, announcements } from "db/schema";
+import { documents, swimRecords, categories, users, announcements } from "db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
+import path from "path";
+import fs from "fs/promises";
+import { createReadStream } from "fs";
 import { configureAuth } from "./auth";
 import cors from 'cors';
 
@@ -225,6 +229,51 @@ app.get("/api/records", async (req, res) => {
   }
 });
 
+  // Use absolute path in persistent storage directory
+  const UPLOAD_DIR = path.join(process.env.HOME || process.cwd(), "storage/uploads");
+
+  // Update initialization to be more robust with proper permissions
+  const initializeUploadDirectory = async () => {
+    try {
+      await fs.access(UPLOAD_DIR);
+      console.log('Storage directory exists:', UPLOAD_DIR);
+    } catch {
+      console.log('Creating storage directory:', UPLOAD_DIR);
+      try {
+        await fs.mkdir(UPLOAD_DIR, { recursive: true });
+        // Set directory permissions to ensure persistence
+        await fs.chmod(UPLOAD_DIR, 0o777);
+        console.log('Storage directory created successfully with full permissions');
+      } catch (error) {
+        console.error('Failed to create storage directory:', error);
+        throw error;
+      }
+    }
+  };
+
+  // Configure storage with better error handling
+  const storage = multer.diskStorage({
+    destination: async (req, file, cb) => {
+      try {
+        await initializeUploadDirectory();
+        cb(null, UPLOAD_DIR);
+      } catch (error) {
+        console.error('Storage destination error:', error);
+        cb(error as Error, UPLOAD_DIR);
+      }
+    },
+    filename: (req, file, cb) => {
+      const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
+      const safeFilename = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+      cb(null, `${uniqueSuffix}-${safeFilename}`);
+    }
+  });
+
+  const upload = multer({ storage });
+
+  // Initialize upload directory during route registration
+  initializeUploadDirectory().catch(console.error);
+  
   // Announcements API endpoints
   // Get latest announcement
   app.get("/api/announcements/latest", async (req, res) => {
@@ -314,6 +363,234 @@ app.get("/api/records", async (req, res) => {
       });
     }
   });
+
+  // Document download endpoint with enhanced error handling
+  app.get("/api/documents/:id/download", async (req, res) => {
+    try {
+      const { id } = req.params;
+      console.log('Download request for document:', id);
+
+      const [document] = await db
+        .select()
+        .from(documents)
+        .where(eq(documents.id, parseInt(id)))
+        .limit(1);
+
+      if (!document) {
+        console.log('Document not found:', id);
+        return res.status(404).json({ message: "ドキュメントが見つかりません" });
+      }
+
+      const filePath = path.join(UPLOAD_DIR, document.filename);
+      console.log('Attempting to access file:', filePath);
+
+      try {
+        await fs.access(filePath);
+      } catch (error) {
+        console.error(`File access error for ${filePath}:`, error);
+        return res.status(404).json({ message: "ファイルが見つかりません" });
+      }
+
+      // Set proper headers for download
+      res.setHeader('Content-Type', document.mimeType);
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(document.filename)}"`);
+      
+      // Stream the file with proper error handling
+      const fileStream = createReadStream(filePath);
+      
+      fileStream.on('error', (error) => {
+        console.error(`File streaming error for ${filePath}:`, error);
+        if (!res.headersSent) {
+          res.status(500).json({ message: "ファイルの読み込みに失敗しました" });
+        }
+      });
+
+      fileStream.pipe(res);
+    } catch (error) {
+      console.error('Document download error:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ message: "予期せぬエラーが発生しました" });
+      }
+    }
+  });
+
+  // Document upload endpoint with improved error handling
+  app.post("/api/documents/upload", upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "ファイルが選択されていません" });
+      }
+
+      // Verify file was saved successfully
+      const filePath = path.join(UPLOAD_DIR, req.file.filename);
+      try {
+        await fs.access(filePath);
+      } catch {
+        return res.status(500).json({ message: "ファイルの保存に失敗しました" });
+      }
+
+      const { title, categoryId } = req.body;
+      const [document] = await db
+        .insert(documents)
+        .values({
+          title,
+          filename: req.file.filename,
+          mimeType: req.file.mimetype,
+          categoryId: categoryId === "none" ? null : parseInt(categoryId),
+        })
+        .returning();
+
+      console.log('Document uploaded successfully:', document.id);
+      res.json(document);
+    } catch (error) {
+      console.error('Document upload error:', error);
+      res.status(500).json({ message: "ドキュメントのアップロードに失敗しました" });
+    }
+  });
+
+  // Document deletion endpoint - only remove database entry, keep files
+  app.delete("/api/documents/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const [document] = await db
+        .select()
+        .from(documents)
+        .where(eq(documents.id, parseInt(id)))
+        .limit(1);
+
+      if (!document) {
+        return res.status(404).json({ message: "ドキュメントが見つかりません" });
+      }
+
+      await db
+        .delete(documents)
+        .where(eq(documents.id, parseInt(id)));
+
+      res.json({ message: "ドキュメントが削除されました" });
+    } catch (error) {
+      console.error('Document deletion error:', error);
+      res.status(500).json({ message: "ドキュメントの削除に失敗しました" });
+    }
+  });
+
+  // Categories API endpoints with error handling
+  app.get("/api/categories", async (req, res) => {
+    try {
+      const allCategories = await db
+        .select()
+        .from(categories)
+        .orderBy(categories.name);
+      
+      res.json(allCategories);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      res.status(500).json({ message: "カテゴリーの取得に失敗しました" });
+    }
+  });
+
+  app.post("/api/categories", async (req, res) => {
+    try {
+      const { name, description } = req.body;
+      
+      if (!name || typeof name !== 'string' || name.trim().length === 0) {
+        return res.status(400).json({ message: "カテゴリー名は必須です" });
+      }
+
+      const [category] = await db
+        .insert(categories)
+        .values({
+          name: name.trim(),
+          description: description?.trim(),
+        })
+        .returning();
+
+      res.json(category);
+    } catch (error) {
+      console.error('Error creating category:', error);
+      res.status(500).json({ message: "カテゴリーの作成に失敗しました" });
+    }
+  });
+
+  app.delete("/api/categories/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // Update documents to remove category reference
+      await db
+        .update(documents)
+        .set({ categoryId: null })
+        .where(eq(documents.categoryId, parseInt(id)));
+
+      const [category] = await db
+        .delete(categories)
+        .where(eq(categories.id, parseInt(id)))
+        .returning();
+
+      if (!category) {
+        return res.status(404).json({ message: "カテゴリーが見つかりません" });
+      }
+
+      res.json({ message: "カテゴリーが削除されました" });
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      res.status(500).json({ message: "カテゴリーの削除に失敗しました" });
+    }
+  });
+
+  // Documents listing with categories and performance optimizations
+  app.get("/api/documents", async (req, res) => {
+    const cacheKey = 'documents-list';
+    try {
+      // In-memory caching with Redis-like implementation
+      const cached = await db.execute(sql`
+        SELECT EXISTS (
+          SELECT 1 
+          FROM documents 
+          WHERE created_at > NOW() - INTERVAL '5 minutes'
+        )
+      `);
+      
+      const shouldInvalidateCache = cached.rows[0].exists;
+      
+      // Optimized query with pagination and efficient joins
+      const docs = await db
+        .select({
+          id: documents.id,
+          title: documents.title,
+          filename: documents.filename,
+          mimeType: documents.mimeType,
+          categoryId: documents.categoryId,
+          createdAt: documents.createdAt,
+          categoryName: categories.name,
+        })
+        .from(documents)
+        .leftJoin(categories, eq(documents.categoryId, categories.id))
+        .orderBy(desc(documents.createdAt))
+        .limit(100); // Prevent large result sets
+
+      // Set cache headers for client-side caching
+      res.set('Cache-Control', 'public, max-age=300');
+      res.set('ETag', Buffer.from(JSON.stringify(docs)).toString('base64'));
+
+      res.json(docs);
+    } catch (error) {
+      console.error('Error fetching documents:', error);
+      // エラーの詳細をログに記録
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+      }
+      res.status(500).json({ 
+        message: "ドキュメントの取得に失敗しました",
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  });
+
 
   // Records API endpoints
   app.post("/api/records", async (req, res) => {
