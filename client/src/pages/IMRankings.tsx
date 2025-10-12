@@ -176,10 +176,10 @@ export default function IMRankings() {
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
+              <h1 className="text-xl sm:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-600">
                 IM測定ランキング
               </h1>
-              <p className="text-2xl sm:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-600 mt-1">
+              <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">
                 {targetMonthName}
               </p>
             </div>
