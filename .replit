@@ -34,6 +34,10 @@ externalPort = 3001
 localPort = 37499
 externalPort = 3003
 
+[[ports]]
+localPort = 40719
+externalPort = 4200
+
 [packager]
 language = "nodejs"
   [packager.features]
