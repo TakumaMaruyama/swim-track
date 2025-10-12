@@ -35,6 +35,7 @@ const Athletes = lazy(() => retryImport(() => import("./pages/Athletes")));
 const RecordsAll = lazy(() => retryImport(() => import("./pages/RecordsAll")));
 const Competitions = lazy(() => retryImport(() => import("./pages/Competitions")));
 const AdminLogin = lazy(() => retryImport(() => import("./pages/AdminLogin")));
+const IMRankings = lazy(() => retryImport(() => import("./pages/IMRankings")));
 
 const LoadingSpinner = () => (
   <div className="flex items-center justify-center min-h-screen">
@@ -110,6 +111,13 @@ root.render(
             <Suspense fallback={<LoadingSpinner />}>
               <ErrorBoundary>
                 <AdminLogin />
+              </ErrorBoundary>
+            </Suspense>
+          </Route>
+          <Route path="/im-rankings">
+            <Suspense fallback={<LoadingSpinner />}>
+              <ErrorBoundary>
+                <IMRankings />
               </ErrorBoundary>
             </Suspense>
           </Route>

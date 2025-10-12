@@ -1,0 +1,229 @@
+import React from 'react';
+import { useLocation } from 'wouter';
+import { ArrowLeft, Medal } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { useSwimRecords } from '@/hooks/use-swim-records';
+
+type RankingRecord = {
+  rank: number;
+  athleteName: string;
+  time: string;
+  date: Date;
+};
+
+// 最新の偶数月を取得する関数
+function getLatestEvenMonth(): { year: number; month: number } {
+  const now = new Date();
+  let currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1; // 0-indexed なので +1
+
+  // 現在の月が偶数ならそのまま、奇数なら1つ前の偶数月
+  let targetMonth = currentMonth % 2 === 0 ? currentMonth : currentMonth - 1;
+
+  // 1月の場合は前年の12月を返す
+  if (targetMonth === 0) {
+    targetMonth = 12;
+    currentYear = currentYear - 1;
+  }
+
+  return { year: currentYear, month: targetMonth };
+}
+
+// タイムを秒数に変換
+function timeToSeconds(time: string): number {
+  const [minutes, seconds] = time.split(':').map(parseFloat);
+  return minutes * 60 + seconds;
+}
+
+// タイムをフォーマット
+function formatTime(time: string): string {
+  const [minutes, seconds] = time.split(':');
+  if (!seconds) return time;
+  return `${minutes}'${seconds}"`;
+}
+
+export default function IMRankings() {
+  const [, navigate] = useLocation();
+  const { records, isLoading, error } = useSwimRecords();
+
+  const { year, month } = getLatestEvenMonth();
+  const targetMonthName = `${year}年${month}月`;
+
+  // IM測定記録を抽出してランキングを作成
+  const rankings = React.useMemo(() => {
+    if (!records) return null;
+
+    // 最新の偶数月の記録のみフィルタリング
+    const imRecords = records.filter(record => {
+      if (record.style !== '個人メドレー') return false;
+      if (record.poolLength !== 15) return false;
+      if (!record.date) return false;
+
+      const recordDate = new Date(record.date);
+      const recordYear = recordDate.getFullYear();
+      const recordMonth = recordDate.getMonth() + 1;
+
+      return recordYear === year && recordMonth === month;
+    });
+
+    // 距離別・性別でグループ化してランキング作成
+    const createRanking = (distance: number, gender: 'male' | 'female'): RankingRecord[] => {
+      const filtered = imRecords
+        .filter(r => r.distance === distance && r.gender === gender)
+        .sort((a, b) => timeToSeconds(a.time) - timeToSeconds(b.time))
+        .slice(0, 3);
+
+      return filtered.map((record, index) => ({
+        rank: index + 1,
+        athleteName: record.athleteName || '不明',
+        time: record.time,
+        date: new Date(record.date!),
+      }));
+    };
+
+    return {
+      '60m': {
+        male: createRanking(60, 'male'),
+        female: createRanking(60, 'female'),
+      },
+      '120m': {
+        male: createRanking(120, 'male'),
+        female: createRanking(120, 'female'),
+      },
+    };
+  }, [records, year, month]);
+
+  const RankingTable: React.FC<{
+    title: string;
+    rankings: RankingRecord[];
+  }> = ({ title, rankings }) => {
+    const getMedalColor = (rank: number) => {
+      switch (rank) {
+        case 1: return 'text-yellow-500';
+        case 2: return 'text-gray-400';
+        case 3: return 'text-orange-600';
+        default: return 'text-gray-500';
+      }
+    };
+
+    return (
+      <div className="space-y-3">
+        <h3 className="font-semibold text-lg flex items-center gap-2">
+          {title === '男子' ? '🏊‍♂️' : '🏊‍♀️'} {title}
+        </h3>
+        {rankings.length === 0 ? (
+          <p className="text-sm text-muted-foreground">記録がありません</p>
+        ) : (
+          <div className="space-y-2">
+            {rankings.map((record) => (
+              <div
+                key={record.rank}
+                className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <Medal className={`h-5 w-5 ${getMedalColor(record.rank)}`} />
+                  <div>
+                    <p className="font-medium">{record.athleteName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(record.date).toLocaleDateString('ja-JP')}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-lg font-bold text-primary">
+                  {formatTime(record.time)}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p className="text-red-500">エラーが発生しました</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
+      <header className="bg-white border-b sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate('/')}
+              className="shrink-0"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-600">
+                IM測定ランキング
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                {targetMonthName} • 15mプール
+              </p>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <div className="space-y-6">
+          {/* 60m 個人メドレー */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl sm:text-2xl">
+                60m 個人メドレー
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-6 md:grid-cols-2">
+              {rankings && (
+                <>
+                  <RankingTable title="男子" rankings={rankings['60m'].male} />
+                  <RankingTable title="女子" rankings={rankings['60m'].female} />
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* 120m 個人メドレー */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl sm:text-2xl">
+                120m 個人メドレー
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-6 md:grid-cols-2">
+              {rankings && (
+                <>
+                  <RankingTable title="男子" rankings={rankings['120m'].male} />
+                  <RankingTable title="女子" rankings={rankings['120m'].female} />
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+    </div>
+  );
+}
