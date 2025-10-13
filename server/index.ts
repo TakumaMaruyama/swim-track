@@ -36,8 +36,16 @@ app.use((req, res, next) => {
 
   // キャッシュ制御の最適化
   if (req.method === 'GET') {
-    res.header('Cache-Control', 'public, max-age=300'); // 5分のキャッシュ
-    res.header('Vary', 'Origin, Accept-Encoding');
+    // APIエンドポイントとHTMLはキャッシュしない
+    if (req.url.startsWith('/api/') || req.url === '/' || req.url.endsWith('.html')) {
+      res.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.header('Pragma', 'no-cache');
+      res.header('Expires', '0');
+    } else {
+      // 静的アセット（JS、CSS等）は短時間キャッシュ
+      res.header('Cache-Control', 'public, max-age=60'); // 1分のキャッシュ
+      res.header('Vary', 'Origin, Accept-Encoding');
+    }
   } else {
     res.header('Cache-Control', 'no-store');
   }
