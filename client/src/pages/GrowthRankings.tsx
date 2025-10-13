@@ -79,8 +79,8 @@ export default function GrowthRankings() {
                     {record.rank}
                   </div>
                   <div>
-                    <p className="font-medium">{record.athleteName}</p>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                    <p className="font-medium whitespace-nowrap">{record.athleteName}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1 whitespace-nowrap">
                       <span>自己ベスト: {formatTime(record.bestTime)}</span>
                       <span>→</span>
                       <span>今回: {formatTime(record.currentTime)}</span>

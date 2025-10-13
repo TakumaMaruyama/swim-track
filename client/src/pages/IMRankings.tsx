@@ -77,8 +77,8 @@ export default function IMRankings() {
                 <div className="flex items-center gap-3">
                   <Medal className={`h-5 w-5 ${getMedalColor(record.rank)}`} />
                   <div>
-                    <p className="font-medium">{record.athleteName}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="font-medium whitespace-nowrap">{record.athleteName}</p>
+                    <p className="text-xs text-muted-foreground whitespace-nowrap">
                       {new Date(record.date).toLocaleDateString('ja-JP')}
                     </p>
                   </div>
