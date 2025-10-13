@@ -72,7 +72,7 @@ export default function IMRankings() {
             {rankings.map((record) => (
               <div
                 key={record.rank}
-                className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                className="inline-flex items-center p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
               >
                 <div className="flex items-center gap-3">
                   <Medal className={`h-5 w-5 ${getMedalColor(record.rank)}`} />
@@ -83,7 +83,7 @@ export default function IMRankings() {
                     </p>
                   </div>
                 </div>
-                <p className="text-lg font-bold text-primary">
+                <p className="text-lg font-bold text-primary ml-4">
                   {formatTime(record.time)}
                 </p>
               </div>
