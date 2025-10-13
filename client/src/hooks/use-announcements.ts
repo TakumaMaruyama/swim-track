@@ -85,21 +85,16 @@ export function useAnnouncements() {
       const updatedAnnouncement = await response.json();
       console.log("Updated announcement:", updatedAnnouncement);
       
-      // SWRのキャッシュを更新
-      mutate(updatedAnnouncement, false);
-      
-      // ローカルのステートも更新
+      // ローカルのステートを更新
       setAnnouncement(updatedAnnouncement);
+      
+      // SWRのキャッシュを更新（再検証なし）
+      mutate(updatedAnnouncement, false);
       
       toast({
         title: "成功",
         description: "お知らせが更新されました",
       });
-
-      // 更新後、最新データを改めて取得
-      setTimeout(() => {
-        fetchLatestAnnouncement();
-      }, 500);
 
       return updatedAnnouncement;
     } catch (error) {
