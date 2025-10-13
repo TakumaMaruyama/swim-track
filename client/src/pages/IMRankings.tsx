@@ -72,18 +72,18 @@ export default function IMRankings() {
             {rankings.map((record) => (
               <div
                 key={record.rank}
-                className="inline-flex items-center p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
               >
                 <div className="flex items-center gap-3">
                   <Medal className={`h-5 w-5 ${getMedalColor(record.rank)}`} />
                   <div>
-                    <p className="font-medium whitespace-nowrap">{record.athleteName}</p>
-                    <p className="text-xs text-muted-foreground whitespace-nowrap">
+                    <p className="font-medium">{record.athleteName}</p>
+                    <p className="text-xs text-muted-foreground">
                       {new Date(record.date).toLocaleDateString('ja-JP')}
                     </p>
                   </div>
                 </div>
-                <p className="text-lg font-bold text-primary ml-4">
+                <p className="text-lg font-bold text-primary">
                   {formatTime(record.time)}
                 </p>
               </div>
@@ -160,7 +160,7 @@ export default function IMRankings() {
                 60m 個人メドレー
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="grid gap-6 md:grid-cols-2">
               {rankings && (
                 <>
                   <RankingTable title="男子" rankings={rankings['60m'].male} />
@@ -177,7 +177,7 @@ export default function IMRankings() {
                 120m 個人メドレー
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="grid gap-6 md:grid-cols-2">
               {rankings && (
                 <>
                   <RankingTable title="男子" rankings={rankings['120m'].male} />
