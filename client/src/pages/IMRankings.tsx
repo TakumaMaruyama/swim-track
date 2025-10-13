@@ -160,7 +160,7 @@ export default function IMRankings() {
                 60m 個人メドレー
               </CardTitle>
             </CardHeader>
-            <CardContent className="flex flex-col gap-6">
+            <CardContent className="space-y-6">
               {rankings && (
                 <>
                   <RankingTable title="男子" rankings={rankings['60m'].male} />
@@ -177,7 +177,7 @@ export default function IMRankings() {
                 120m 個人メドレー
               </CardTitle>
             </CardHeader>
-            <CardContent className="flex flex-col gap-6">
+            <CardContent className="space-y-6">
               {rankings && (
                 <>
                   <RankingTable title="男子" rankings={rankings['120m'].male} />
