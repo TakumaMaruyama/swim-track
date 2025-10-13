@@ -12,10 +12,9 @@ import { useSwimRecords } from '@/hooks/use-swim-records';
 import {
   getLatestEvenMonth,
   calculateIMRankings,
-  calculateGrowthRankings,
   type RankingRecord,
 } from '@/lib/rankingCalculations';
-import { generateCombinedRankingsPDF } from '@/lib/pdfGenerator';
+import { generateRankingsPDF } from '@/lib/pdfGenerator';
 
 // タイムをフォーマット
 function formatTime(time: string): string {
@@ -37,21 +36,15 @@ export default function IMRankings() {
     return calculateIMRankings(records, year, month);
   }, [records, year, month]);
 
-  // 伸び率ランキングも計算（PDF生成用）
-  const growthRankings = React.useMemo(() => {
-    if (!records) return null;
-    return calculateGrowthRankings(records);
-  }, [records]);
-
   // PDF出力ハンドラ
   const handleDownloadPDF = () => {
-    if (!rankings || !growthRankings?.rankings) {
+    if (!rankings) {
       alert('データが不足しているため、PDFを生成できません');
       return;
     }
 
-    const growthMonth = `${growthRankings.periods.current.year}年${growthRankings.periods.current.month}月`;
-    generateCombinedRankingsPDF(rankings, growthRankings, targetMonthName, growthMonth);
+    const timestamp = new Date().toISOString().split('T')[0];
+    generateRankingsPDF('im-rankings-content', `IM測定ランキング_${targetMonthName}_${timestamp}.pdf`);
   };
 
   const RankingTable: React.FC<{
@@ -121,32 +114,30 @@ export default function IMRankings() {
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
       <header className="bg-white border-b sticky top-0 z-10">
         <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate('/')}
-                className="shrink-0"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-              <div>
-                <h1 className="text-xl sm:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-600">
-                  IM測定ランキング
-                </h1>
-                <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">
-                  {targetMonthName}
-                </p>
-                <p className="text-sm text-muted-foreground mt-2">
-                  2か月ごとの測定で、各性別の上位3名を表示しています
-                </p>
-              </div>
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate('/')}
+              className="shrink-0"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="flex-1">
+              <h1 className="text-xl sm:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-600">
+                IM測定ランキング
+              </h1>
+              <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">
+                {targetMonthName}
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                2か月ごとの測定で、各性別の上位3名を表示しています
+              </p>
             </div>
             <Button
               onClick={handleDownloadPDF}
-              className="shrink-0"
-              disabled={!rankings || !growthRankings}
+              className="shrink-0 hidden sm:flex"
+              disabled={!rankings}
             >
               <Download className="h-4 w-4 mr-2" />
               PDF出力
@@ -156,7 +147,7 @@ export default function IMRankings() {
       </header>
 
       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        <div className="space-y-6">
+        <div id="im-rankings-content" className="space-y-6">
           {/* 60m 個人メドレー */}
           <Card>
             <CardHeader>
@@ -192,6 +183,18 @@ export default function IMRankings() {
           </Card>
         </div>
       </main>
+      
+      {/* モバイル用の固定ボタン */}
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 p-4 bg-white border-t shadow-lg z-10">
+        <Button
+          onClick={handleDownloadPDF}
+          className="w-full"
+          disabled={!rankings}
+        >
+          <Download className="h-4 w-4 mr-2" />
+          PDF出力
+        </Button>
+      </div>
     </div>
   );
 }

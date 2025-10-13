@@ -10,12 +10,10 @@ import {
 } from '@/components/ui/card';
 import { useSwimRecords } from '@/hooks/use-swim-records';
 import {
-  getLatestEvenMonth,
-  calculateIMRankings,
   calculateGrowthRankings,
   type GrowthRecord,
 } from '@/lib/rankingCalculations';
-import { generateCombinedRankingsPDF } from '@/lib/pdfGenerator';
+import { generateRankingsPDF } from '@/lib/pdfGenerator';
 
 // タイムをフォーマット
 function formatTime(time: string): string {
@@ -34,24 +32,16 @@ export default function GrowthRankings() {
     return calculateGrowthRankings(records);
   }, [records]);
 
-  // IM測定ランキングも計算（PDF生成用）
-  const imRankings = React.useMemo(() => {
-    if (!records) return null;
-    const { year, month } = getLatestEvenMonth();
-    return calculateIMRankings(records, year, month);
-  }, [records]);
-
   // PDF出力ハンドラ
   const handleDownloadPDF = () => {
-    if (!imRankings || !growthRankings?.rankings) {
+    if (!growthRankings?.rankings) {
       alert('データが不足しているため、PDFを生成できません');
       return;
     }
 
-    const { year, month } = getLatestEvenMonth();
-    const imMonth = `${year}年${month}月`;
     const growthMonth = `${growthRankings.periods.current.year}年${growthRankings.periods.current.month}月`;
-    generateCombinedRankingsPDF(imRankings, growthRankings, imMonth, growthMonth);
+    const timestamp = new Date().toISOString().split('T')[0];
+    generateRankingsPDF('growth-rankings-content', `IM伸び率ランキング_${growthMonth}_${timestamp}.pdf`);
   };
 
   const GrowthTable: React.FC<{
@@ -179,34 +169,32 @@ export default function GrowthRankings() {
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
       <header className="bg-white border-b sticky top-0 z-10">
         <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate('/')}
-                className="shrink-0"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-              <div>
-                <h1 className="text-xl sm:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-600 flex items-center gap-2">
-                  <TrendingUp className="h-6 w-6 text-blue-600" />
-                  IM伸び率ランキング
-                </h1>
-                <p className="text-sm sm:text-base text-gray-600 mt-1">
-                  自己ベスト→今回（{currentMonthName}）
-                </p>
-                <p className="text-sm text-muted-foreground mt-2">
-                  自己ベストからどれだけ短縮したかを全員分表示しています<br />
-                  直近2か月のがんばりを見える化し、今後の指導にも活用します
-                </p>
-              </div>
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate('/')}
+              className="shrink-0"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="flex-1">
+              <h1 className="text-xl sm:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-600 flex items-center gap-2">
+                <TrendingUp className="h-6 w-6 text-blue-600" />
+                IM伸び率ランキング
+              </h1>
+              <p className="text-sm sm:text-base text-gray-600 mt-1">
+                自己ベスト→今回（{currentMonthName}）
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                自己ベストからどれだけ短縮したかを全員分表示しています<br />
+                直近2か月のがんばりを見える化し、今後の指導にも活用します
+              </p>
             </div>
             <Button
               onClick={handleDownloadPDF}
-              className="shrink-0"
-              disabled={!imRankings || !growthRankings}
+              className="shrink-0 hidden sm:flex"
+              disabled={!growthRankings}
             >
               <Download className="h-4 w-4 mr-2" />
               PDF出力
@@ -216,7 +204,7 @@ export default function GrowthRankings() {
       </header>
 
       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        <div className="space-y-6">
+        <div id="growth-rankings-content" className="space-y-6">
           {/* 60m 個人メドレー */}
           <Card>
             <CardHeader>
@@ -252,6 +240,18 @@ export default function GrowthRankings() {
           </Card>
         </div>
       </main>
+      
+      {/* モバイル用の固定ボタン */}
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 p-4 bg-white border-t shadow-lg z-10">
+        <Button
+          onClick={handleDownloadPDF}
+          className="w-full"
+          disabled={!growthRankings}
+        >
+          <Download className="h-4 w-4 mr-2" />
+          PDF出力
+        </Button>
+      </div>
     </div>
   );
 }
