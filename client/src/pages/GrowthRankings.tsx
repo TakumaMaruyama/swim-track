@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLocation } from 'wouter';
-import { ArrowLeft, TrendingUp, ArrowDown, ArrowUp } from 'lucide-react';
+import { ArrowLeft, TrendingUp, ArrowDown, ArrowUp, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -9,63 +9,13 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { useSwimRecords } from '@/hooks/use-swim-records';
-
-type GrowthRecord = {
-  rank: number;
-  athleteName: string;
-  studentId: number;
-  bestTime: string;
-  currentTime: string;
-  growthRate: number;
-  improvementSeconds: number;
-  bestDate: Date;
-  currentDate: Date;
-};
-
-// 記録データから直近2回の偶数月を取得
-function getLatestTwoEvenMonths(records: any[]): { current: { year: number; month: number } | null; previous: { year: number; month: number } | null } {
-  // 個人メドレーの記録から偶数月を抽出
-  const evenMonths = records
-    .filter(record => 
-      record.style === '個人メドレー' && 
-      record.poolLength === 15 &&
-      record.date
-    )
-    .map(record => {
-      const date = new Date(record.date);
-      const year = date.getFullYear();
-      const month = date.getMonth() + 1;
-      
-      // 偶数月のみ
-      if (month % 2 === 0) {
-        return { year, month, timestamp: date.getTime() };
-      }
-      return null;
-    })
-    .filter(item => item !== null) as { year: number; month: number; timestamp: number }[];
-
-  // 重複を除去してタイムスタンプでソート
-  const uniqueMonths = Array.from(
-    new Map(
-      evenMonths.map(item => [`${item.year}-${item.month}`, item])
-    ).values()
-  ).sort((a, b) => b.timestamp - a.timestamp);
-
-  if (uniqueMonths.length < 2) {
-    return { current: null, previous: null };
-  }
-
-  return {
-    current: { year: uniqueMonths[0].year, month: uniqueMonths[0].month },
-    previous: { year: uniqueMonths[1].year, month: uniqueMonths[1].month },
-  };
-}
-
-// タイムを秒数に変換
-function timeToSeconds(time: string): number {
-  const [minutes, seconds] = time.split(':').map(parseFloat);
-  return minutes * 60 + seconds;
-}
+import {
+  getLatestEvenMonth,
+  calculateIMRankings,
+  calculateGrowthRankings,
+  type GrowthRecord,
+} from '@/lib/rankingCalculations';
+import { generateCombinedRankingsPDF } from '@/lib/pdfGenerator';
 
 // タイムをフォーマット
 function formatTime(time: string): string {
@@ -81,99 +31,28 @@ export default function GrowthRankings() {
   // 伸び率ランキングを計算
   const growthRankings = React.useMemo(() => {
     if (!records) return null;
+    return calculateGrowthRankings(records);
+  }, [records]);
 
-    // 記録データから直近2回の偶数月を取得
-    const { current: currentPeriod, previous: previousPeriod } = getLatestTwoEvenMonths(records);
+  // IM測定ランキングも計算（PDF生成用）
+  const imRankings = React.useMemo(() => {
+    if (!records) return null;
+    const { year, month } = getLatestEvenMonth();
+    return calculateIMRankings(records, year, month);
+  }, [records]);
 
-    // データが不足している場合
-    if (!currentPeriod || !previousPeriod) {
-      return { periods: null, rankings: null };
+  // PDF出力ハンドラ
+  const handleDownloadPDF = () => {
+    if (!imRankings || !growthRankings?.rankings) {
+      alert('データが不足しているため、PDFを生成できません');
+      return;
     }
 
-    // 個人メドレーの記録のみ抽出（15mプール）
-    const imRecords = records.filter(record => 
-      record.style === '個人メドレー' && 
-      record.poolLength === 15 &&
-      record.date
-    );
-
-    // 最新月の記録
-    const currentRecords = imRecords.filter(record => {
-      const recordDate = new Date(record.date!);
-      return recordDate.getFullYear() === currentPeriod.year && 
-             recordDate.getMonth() + 1 === currentPeriod.month;
-    });
-
-    // 伸び率を計算する関数
-    const calculateGrowth = (distance: number, gender: 'male' | 'female'): GrowthRecord[] => {
-      const currentFiltered = currentRecords.filter(r => r.distance === distance && r.gender === gender);
-
-      const growthData: GrowthRecord[] = [];
-
-      // 各選手の最新記録と自己ベストを比較
-      currentFiltered.forEach(currentRecord => {
-        // 今回のタイムを除いた全記録から自己ベストを取得
-        const athleteRecords = imRecords.filter(
-          r => r.studentId === currentRecord.studentId && 
-               r.distance === distance && 
-               r.gender === gender &&
-               r.id !== currentRecord.id // 今回の記録を除外
-        );
-
-        // 今回の記録以外に記録がない場合はスキップ
-        if (athleteRecords.length === 0) return;
-
-        // 今回を除いた自己ベスト（最速タイム）を取得
-        const bestRecord = athleteRecords.reduce((best, current) => {
-          const bestSeconds = timeToSeconds(best.time);
-          const currentSeconds = timeToSeconds(current.time);
-          return currentSeconds < bestSeconds ? current : best;
-        });
-
-        const currentSeconds = timeToSeconds(currentRecord.time);
-        const bestSeconds = timeToSeconds(bestRecord.time);
-        
-        // 伸び率 = (今回を除いた自己ベスト - 今回) / 今回を除いた自己ベスト × 100
-        const improvementSeconds = bestSeconds - currentSeconds;
-        const growthRate = (improvementSeconds / bestSeconds) * 100;
-
-        growthData.push({
-          rank: 0,
-          athleteName: currentRecord.athleteName || '不明',
-          studentId: currentRecord.studentId!,
-          bestTime: bestRecord.time,
-          currentTime: currentRecord.time,
-          growthRate,
-          improvementSeconds,
-          bestDate: new Date(bestRecord.date!),
-          currentDate: new Date(currentRecord.date!),
-        });
-      });
-
-      // 伸び率の高い順にソート
-      return growthData
-        .sort((a, b) => b.growthRate - a.growthRate)
-        .map((record, index) => ({ ...record, rank: index + 1 }))
-        .slice(0, 10); // 上位10位まで
-    };
-
-    return {
-      periods: {
-        current: currentPeriod,
-        previous: previousPeriod,
-      },
-      rankings: {
-        '60m': {
-          male: calculateGrowth(60, 'male'),
-          female: calculateGrowth(60, 'female'),
-        },
-        '120m': {
-          male: calculateGrowth(120, 'male'),
-          female: calculateGrowth(120, 'female'),
-        },
-      },
-    };
-  }, [records]);
+    const { year, month } = getLatestEvenMonth();
+    const imMonth = `${year}年${month}月`;
+    const growthMonth = `${growthRankings.periods.current.year}年${growthRankings.periods.current.month}月`;
+    generateCombinedRankingsPDF(imRankings, growthRankings, imMonth, growthMonth);
+  };
 
   const GrowthTable: React.FC<{
     title: string;
@@ -300,28 +179,38 @@ export default function GrowthRankings() {
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
       <header className="bg-white border-b sticky top-0 z-10">
         <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate('/')}
-              className="shrink-0"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-600 flex items-center gap-2">
-                <TrendingUp className="h-6 w-6 text-blue-600" />
-                IM伸び率ランキング
-              </h1>
-              <p className="text-sm sm:text-base text-gray-600 mt-1">
-                自己ベスト→今回（{currentMonthName}）
-              </p>
-              <p className="text-sm text-muted-foreground mt-2">
-                自己ベストからどれだけ短縮したかを表示しています<br />
-                直近2か月のがんばりを見える化し、今後の指導にも活用します
-              </p>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate('/')}
+                className="shrink-0"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-600 flex items-center gap-2">
+                  <TrendingUp className="h-6 w-6 text-blue-600" />
+                  IM伸び率ランキング
+                </h1>
+                <p className="text-sm sm:text-base text-gray-600 mt-1">
+                  自己ベスト→今回（{currentMonthName}）
+                </p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  自己ベストからどれだけ短縮したかを全員分表示しています<br />
+                  直近2か月のがんばりを見える化し、今後の指導にも活用します
+                </p>
+              </div>
             </div>
+            <Button
+              onClick={handleDownloadPDF}
+              className="shrink-0"
+              disabled={!imRankings || !growthRankings}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              PDF出力
+            </Button>
           </div>
         </div>
       </header>

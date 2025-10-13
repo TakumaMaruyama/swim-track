@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLocation } from 'wouter';
-import { ArrowLeft, Medal } from 'lucide-react';
+import { ArrowLeft, Medal, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -9,37 +9,13 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { useSwimRecords } from '@/hooks/use-swim-records';
-
-type RankingRecord = {
-  rank: number;
-  athleteName: string;
-  time: string;
-  date: Date;
-};
-
-// 最新の偶数月を取得する関数
-function getLatestEvenMonth(): { year: number; month: number } {
-  const now = new Date();
-  let currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1; // 0-indexed なので +1
-
-  // 現在の月が偶数ならそのまま、奇数なら1つ前の偶数月
-  let targetMonth = currentMonth % 2 === 0 ? currentMonth : currentMonth - 1;
-
-  // 1月の場合は前年の12月を返す
-  if (targetMonth === 0) {
-    targetMonth = 12;
-    currentYear = currentYear - 1;
-  }
-
-  return { year: currentYear, month: targetMonth };
-}
-
-// タイムを秒数に変換
-function timeToSeconds(time: string): number {
-  const [minutes, seconds] = time.split(':').map(parseFloat);
-  return minutes * 60 + seconds;
-}
+import {
+  getLatestEvenMonth,
+  calculateIMRankings,
+  calculateGrowthRankings,
+  type RankingRecord,
+} from '@/lib/rankingCalculations';
+import { generateCombinedRankingsPDF } from '@/lib/pdfGenerator';
 
 // タイムをフォーマット
 function formatTime(time: string): string {
@@ -58,46 +34,25 @@ export default function IMRankings() {
   // IM測定記録を抽出してランキングを作成
   const rankings = React.useMemo(() => {
     if (!records) return null;
-
-    // 最新の偶数月の記録のみフィルタリング
-    const imRecords = records.filter(record => {
-      if (record.style !== '個人メドレー') return false;
-      if (record.poolLength !== 15) return false;
-      if (!record.date) return false;
-
-      const recordDate = new Date(record.date);
-      const recordYear = recordDate.getFullYear();
-      const recordMonth = recordDate.getMonth() + 1;
-
-      return recordYear === year && recordMonth === month;
-    });
-
-    // 距離別・性別でグループ化してランキング作成
-    const createRanking = (distance: number, gender: 'male' | 'female'): RankingRecord[] => {
-      const filtered = imRecords
-        .filter(r => r.distance === distance && r.gender === gender)
-        .sort((a, b) => timeToSeconds(a.time) - timeToSeconds(b.time))
-        .slice(0, 3);
-
-      return filtered.map((record, index) => ({
-        rank: index + 1,
-        athleteName: record.athleteName || '不明',
-        time: record.time,
-        date: new Date(record.date!),
-      }));
-    };
-
-    return {
-      '60m': {
-        male: createRanking(60, 'male'),
-        female: createRanking(60, 'female'),
-      },
-      '120m': {
-        male: createRanking(120, 'male'),
-        female: createRanking(120, 'female'),
-      },
-    };
+    return calculateIMRankings(records, year, month);
   }, [records, year, month]);
+
+  // 伸び率ランキングも計算（PDF生成用）
+  const growthRankings = React.useMemo(() => {
+    if (!records) return null;
+    return calculateGrowthRankings(records);
+  }, [records]);
+
+  // PDF出力ハンドラ
+  const handleDownloadPDF = () => {
+    if (!rankings || !growthRankings?.rankings) {
+      alert('データが不足しているため、PDFを生成できません');
+      return;
+    }
+
+    const growthMonth = `${growthRankings.periods.current.year}年${growthRankings.periods.current.month}月`;
+    generateCombinedRankingsPDF(rankings, growthRankings, targetMonthName, growthMonth);
+  };
 
   const RankingTable: React.FC<{
     title: string;
@@ -166,26 +121,36 @@ export default function IMRankings() {
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
       <header className="bg-white border-b sticky top-0 z-10">
         <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate('/')}
-              className="shrink-0"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-600">
-                IM測定ランキング
-              </h1>
-              <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">
-                {targetMonthName}
-              </p>
-              <p className="text-sm text-muted-foreground mt-2">
-                2か月ごとの測定で、各性別の上位3名を表示しています
-              </p>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate('/')}
+                className="shrink-0"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-600">
+                  IM測定ランキング
+                </h1>
+                <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">
+                  {targetMonthName}
+                </p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  2か月ごとの測定で、各性別の上位3名を表示しています
+                </p>
+              </div>
             </div>
+            <Button
+              onClick={handleDownloadPDF}
+              className="shrink-0"
+              disabled={!rankings || !growthRankings}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              PDF出力
+            </Button>
           </div>
         </div>
       </header>
