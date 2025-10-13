@@ -17,7 +17,7 @@ const NAV_ITEMS = [
   { label: '選手一覧', icon: <Users className="h-4 w-4" />, href: '/athletes' },
   { label: '歴代記録', icon: <Trophy className="h-4 w-4" />, href: '/records' },
   { label: 'IM測定ランキング', icon: <Medal className="h-4 w-4" />, href: '/im-rankings' },
-  { label: '伸び率ランキング', icon: <TrendingUp className="h-4 w-4" />, href: '/growth-rankings' },
+  { label: 'IM伸び率ランキング', icon: <TrendingUp className="h-4 w-4" />, href: '/growth-rankings' },
 ];
 
 export default function Dashboard() {

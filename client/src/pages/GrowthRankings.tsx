@@ -269,7 +269,7 @@ export default function GrowthRankings() {
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-600 flex items-center gap-2">
                   <TrendingUp className="h-6 w-6 text-blue-600" />
-                  伸び率ランキング
+                  IM伸び率ランキング
                 </h1>
               </div>
             </div>
@@ -312,7 +312,7 @@ export default function GrowthRankings() {
             <div>
               <h1 className="text-xl sm:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-600 flex items-center gap-2">
                 <TrendingUp className="h-6 w-6 text-blue-600" />
-                伸び率ランキング
+                IM伸び率ランキング
               </h1>
               <p className="text-sm sm:text-base text-gray-600 mt-1">
                 自己ベスト→今回（{currentMonthName}）
