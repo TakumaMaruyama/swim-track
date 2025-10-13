@@ -26,8 +26,9 @@ export const configureAuth = (app: any) => {
         checkPeriod: 86400000 // 24時間でメモリをクリーンアップ
       }),
       cookie: {
-        secure: process.env.NODE_ENV === "production",
+        secure: false, // Replitのプレビュー環境に対応するためfalseに設定
         httpOnly: true,
+        sameSite: 'lax', // CORS対応のためsameSiteを設定
         maxAge: 24 * 60 * 60 * 1000 // 24時間
       }
     })
