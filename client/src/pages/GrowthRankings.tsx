@@ -72,13 +72,13 @@ export default function GrowthRankings() {
             {rankings.map((record) => (
               <div
                 key={record.studentId}
-                className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
               >
-                <div className="flex items-center gap-3 flex-1">
+                <div className="flex items-center gap-3">
                   <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold text-sm">
                     {record.rank}
                   </div>
-                  <div className="flex-1">
+                  <div className="min-w-0">
                     <p className="font-medium">{record.athleteName}</p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
                       <span>自己ベスト: {formatTime(record.bestTime)}</span>
@@ -87,7 +87,7 @@ export default function GrowthRankings() {
                     </div>
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="text-right ml-auto">
                   <div className={`flex items-center gap-1 font-bold ${getGrowthColor(record.growthRate)}`}>
                     {getGrowthIcon(record.growthRate)}
                     <span>{record.growthRate > 0 ? '+' : ''}{record.growthRate.toFixed(2)}%</span>
@@ -205,6 +205,11 @@ export default function GrowthRankings() {
 
       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div id="growth-rankings-content" className="space-y-6">
+          {/* PDFタイトル */}
+          <div className="text-center mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">IM伸び率ランキング</h2>
+            <p className="text-sm text-muted-foreground">{currentMonthName}測定</p>
+          </div>
           {/* 60m 個人メドレー */}
           <Card>
             <CardHeader>

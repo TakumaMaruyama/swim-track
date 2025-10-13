@@ -148,6 +148,11 @@ export default function IMRankings() {
 
       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div id="im-rankings-content" className="space-y-6">
+          {/* PDFタイトル */}
+          <div className="text-center mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">IM測定ランキング</h2>
+            <p className="text-sm text-muted-foreground">{targetMonthName}測定</p>
+          </div>
           {/* 60m 個人メドレー */}
           <Card>
             <CardHeader>
