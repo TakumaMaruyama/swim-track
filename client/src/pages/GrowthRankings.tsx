@@ -75,7 +75,7 @@ export default function GrowthRankings() {
                 className="inline-flex items-center p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold text-sm">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold text-sm leading-none">
                     {record.rank}
                   </div>
                   <div>
