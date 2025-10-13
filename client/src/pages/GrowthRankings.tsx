@@ -72,13 +72,13 @@ export default function GrowthRankings() {
             {rankings.map((record) => (
               <div
                 key={record.studentId}
-                className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                className="flex items-start gap-2 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors max-w-2xl"
               >
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold text-sm">
+                <div className="flex items-start gap-2">
+                  <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-primary font-bold text-sm mt-0.5">
                     {record.rank}
                   </div>
-                  <div className="min-w-0">
+                  <div>
                     <p className="font-medium">{record.athleteName}</p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
                       <span>自己ベスト: {formatTime(record.bestTime)}</span>
