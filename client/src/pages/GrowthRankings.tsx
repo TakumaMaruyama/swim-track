@@ -14,11 +14,11 @@ type GrowthRecord = {
   rank: number;
   athleteName: string;
   studentId: number;
-  previousTime: string;
+  bestTime: string;
   currentTime: string;
   growthRate: number;
   improvementSeconds: number;
-  previousDate: Date;
+  bestDate: Date;
   currentDate: Date;
 };
 
@@ -104,46 +104,48 @@ export default function GrowthRankings() {
              recordDate.getMonth() + 1 === currentPeriod.month;
     });
 
-    // 前回月の記録
-    const previousRecords = imRecords.filter(record => {
-      const recordDate = new Date(record.date!);
-      return recordDate.getFullYear() === previousPeriod.year && 
-             recordDate.getMonth() + 1 === previousPeriod.month;
-    });
-
     // 伸び率を計算する関数
     const calculateGrowth = (distance: number, gender: 'male' | 'female'): GrowthRecord[] => {
       const currentFiltered = currentRecords.filter(r => r.distance === distance && r.gender === gender);
-      const previousFiltered = previousRecords.filter(r => r.distance === distance && r.gender === gender);
 
       const growthData: GrowthRecord[] = [];
 
-      // 両方の期間に記録がある選手のみ処理
+      // 各選手の最新記録と自己ベストを比較
       currentFiltered.forEach(currentRecord => {
-        const previousRecord = previousFiltered.find(
-          prev => prev.studentId === currentRecord.studentId
+        // その選手の全記録から自己ベストを取得
+        const athleteRecords = imRecords.filter(
+          r => r.studentId === currentRecord.studentId && 
+               r.distance === distance && 
+               r.gender === gender
         );
 
-        if (previousRecord) {
-          const currentSeconds = timeToSeconds(currentRecord.time);
-          const previousSeconds = timeToSeconds(previousRecord.time);
-          
-          // 伸び率 = (前回 - 今回) / 前回 × 100
-          const improvementSeconds = previousSeconds - currentSeconds;
-          const growthRate = (improvementSeconds / previousSeconds) * 100;
+        if (athleteRecords.length === 0) return;
 
-          growthData.push({
-            rank: 0,
-            athleteName: currentRecord.athleteName || '不明',
-            studentId: currentRecord.studentId!,
-            previousTime: previousRecord.time,
-            currentTime: currentRecord.time,
-            growthRate,
-            improvementSeconds,
-            previousDate: new Date(previousRecord.date!),
-            currentDate: new Date(currentRecord.date!),
-          });
-        }
+        // 自己ベスト（最速タイム）を取得
+        const bestRecord = athleteRecords.reduce((best, current) => {
+          const bestSeconds = timeToSeconds(best.time);
+          const currentSeconds = timeToSeconds(current.time);
+          return currentSeconds < bestSeconds ? current : best;
+        });
+
+        const currentSeconds = timeToSeconds(currentRecord.time);
+        const bestSeconds = timeToSeconds(bestRecord.time);
+        
+        // 伸び率 = (自己ベスト - 今回) / 自己ベスト × 100
+        const improvementSeconds = bestSeconds - currentSeconds;
+        const growthRate = (improvementSeconds / bestSeconds) * 100;
+
+        growthData.push({
+          rank: 0,
+          athleteName: currentRecord.athleteName || '不明',
+          studentId: currentRecord.studentId!,
+          bestTime: bestRecord.time,
+          currentTime: currentRecord.time,
+          growthRate,
+          improvementSeconds,
+          bestDate: new Date(bestRecord.date!),
+          currentDate: new Date(currentRecord.date!),
+        });
       });
 
       // 伸び率の高い順にソート
@@ -193,7 +195,7 @@ export default function GrowthRankings() {
           {title === '男子' ? '🏊‍♂️' : '🏊‍♀️'} {title}
         </h3>
         {rankings.length === 0 ? (
-          <p className="text-sm text-muted-foreground">両期間の記録がある選手がいません</p>
+          <p className="text-sm text-muted-foreground">最新月の記録がある選手がいません</p>
         ) : (
           <div className="space-y-2">
             {rankings.map((record) => (
@@ -208,9 +210,9 @@ export default function GrowthRankings() {
                   <div className="flex-1">
                     <p className="font-medium">{record.athleteName}</p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                      <span>{formatTime(record.previousTime)}</span>
+                      <span>自己ベスト: {formatTime(record.bestTime)}</span>
                       <span>→</span>
-                      <span>{formatTime(record.currentTime)}</span>
+                      <span>今回: {formatTime(record.currentTime)}</span>
                     </div>
                   </div>
                 </div>
@@ -277,10 +279,10 @@ export default function GrowthRankings() {
             <CardContent className="py-12 text-center">
               <TrendingUp className="h-16 w-16 mx-auto text-gray-300 mb-4" />
               <p className="text-lg text-muted-foreground mb-2">
-                伸び率を計算するには直近2回の偶数月の記録が必要です
+                伸び率を表示するには偶数月の記録が必要です
               </p>
               <p className="text-sm text-muted-foreground">
-                個人メドレー（15mプール）の記録を2回以上登録してください
+                個人メドレー（15mプール）の記録を登録してください
               </p>
             </CardContent>
           </Card>
