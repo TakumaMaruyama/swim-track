@@ -293,9 +293,8 @@ export default function GrowthRankings() {
     );
   }
 
-  const { current: currentPeriod, previous: previousPeriod } = growthRankings.periods;
+  const { current: currentPeriod } = growthRankings.periods;
   const currentMonthName = `${currentPeriod.year}年${currentPeriod.month}月`;
-  const previousMonthName = `${previousPeriod.year}年${previousPeriod.month}月`;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
@@ -316,7 +315,7 @@ export default function GrowthRankings() {
                 伸び率ランキング
               </h1>
               <p className="text-sm sm:text-base text-gray-600 mt-1">
-                {previousMonthName} → {currentMonthName}
+                自己ベスト→今回（{currentMonthName}）
               </p>
             </div>
           </div>
