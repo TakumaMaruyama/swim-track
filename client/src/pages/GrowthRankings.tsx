@@ -317,6 +317,10 @@ export default function GrowthRankings() {
               <p className="text-sm sm:text-base text-gray-600 mt-1">
                 自己ベスト→今回（{currentMonthName}）
               </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                自己ベストからどれだけ短縮したかを表示しています<br />
+                直近2か月のがんばりを見える化し、今後の指導にも活用します
+              </p>
             </div>
           </div>
         </div>
