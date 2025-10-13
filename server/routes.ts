@@ -56,8 +56,13 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // 選手登録エンドポイントを追加
+  // 選手登録エンドポイントを追加 (Admin only)
   app.post("/api/athletes", async (req, res) => {
+    // 管理者権限チェック
+    if (req.session.role !== "admin") {
+      return res.status(403).json({ message: "管理者権限が必要です" });
+    }
+
     try {
       const { username, gender = 'male' } = req.body;
 
@@ -494,8 +499,13 @@ app.get("/api/records", async (req, res) => {
     res.json({ status: "ok" });
   });
 
-  // Delete athlete and associated records
+  // Delete athlete and associated records (Admin only)
   app.delete("/api/athletes/:id", async (req, res) => {
+    // 管理者権限チェック
+    if (req.session.role !== "admin") {
+      return res.status(403).json({ message: "管理者権限が必要です" });
+    }
+
     const { id } = req.params;
     
     try {
@@ -530,8 +540,13 @@ app.get("/api/records", async (req, res) => {
     }
   });
 
-  // Update athlete status
+  // Update athlete status (Admin only)
   app.patch("/api/athletes/:id/status", async (req, res) => {
+    // 管理者権限チェック
+    if (req.session.role !== "admin") {
+      return res.status(403).json({ message: "管理者権限が必要です" });
+    }
+
     try {
       const { id } = req.params;
       const { isActive } = req.body;
@@ -553,8 +568,13 @@ app.get("/api/records", async (req, res) => {
     }
   });
 
-  // Update athlete
+  // Update athlete (Admin only)
   app.put("/api/athletes/:id", async (req, res) => {
+    // 管理者権限チェック
+    if (req.session.role !== "admin") {
+      return res.status(403).json({ message: "管理者権限が必要です" });
+    }
+
     const { id } = req.params;
     const { username, gender } = req.body;
 
