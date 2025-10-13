@@ -182,6 +182,9 @@ export default function IMRankings() {
               <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">
                 {targetMonthName}
               </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                2か月ごとの測定で、各性別の上位3名を表示しています
+              </p>
             </div>
           </div>
         </div>
