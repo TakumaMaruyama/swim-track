@@ -68,29 +68,31 @@ export default function GrowthRankings() {
         {rankings.length === 0 ? (
           <p className="text-sm text-muted-foreground">最新月の記録がある選手がいません</p>
         ) : (
-          <div className="space-y-2 max-w-xl">
+          <div className="space-y-2">
             {rankings.map((record) => (
               <div
                 key={record.studentId}
-                className="flex items-center gap-1.5 p-2.5 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                className="flex items-center p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
               >
-                <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary font-bold text-xs flex-shrink-0">
-                  {record.rank}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm">{record.athleteName}</p>
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                    <span className="whitespace-nowrap">ベスト: {formatTime(record.bestTime)}</span>
-                    <span>→</span>
-                    <span className="whitespace-nowrap">今回: {formatTime(record.currentTime)}</span>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold text-sm">
+                    {record.rank}
+                  </div>
+                  <div>
+                    <p className="font-medium">{record.athleteName}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                      <span>自己ベスト: {formatTime(record.bestTime)}</span>
+                      <span>→</span>
+                      <span>今回: {formatTime(record.currentTime)}</span>
+                    </div>
                   </div>
                 </div>
-                <div className="text-right flex-shrink-0">
-                  <div className={`flex items-center gap-0.5 font-bold text-sm ${getGrowthColor(record.growthRate)}`}>
+                <div className="text-right ml-4">
+                  <div className={`flex items-center gap-1 font-bold ${getGrowthColor(record.growthRate)}`}>
                     {getGrowthIcon(record.growthRate)}
                     <span>{record.growthRate > 0 ? '+' : ''}{record.growthRate.toFixed(2)}%</span>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <p className="text-xs text-muted-foreground mt-1">
                     {record.improvementSeconds > 0 ? '-' : '+'}{Math.abs(record.improvementSeconds).toFixed(2)}秒
                   </p>
                 </div>
