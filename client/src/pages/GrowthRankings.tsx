@@ -112,16 +112,18 @@ export default function GrowthRankings() {
 
       // 各選手の最新記録と自己ベストを比較
       currentFiltered.forEach(currentRecord => {
-        // その選手の全記録から自己ベストを取得
+        // 今回のタイムを除いた全記録から自己ベストを取得
         const athleteRecords = imRecords.filter(
           r => r.studentId === currentRecord.studentId && 
                r.distance === distance && 
-               r.gender === gender
+               r.gender === gender &&
+               r.id !== currentRecord.id // 今回の記録を除外
         );
 
+        // 今回の記録以外に記録がない場合はスキップ
         if (athleteRecords.length === 0) return;
 
-        // 自己ベスト（最速タイム）を取得
+        // 今回を除いた自己ベスト（最速タイム）を取得
         const bestRecord = athleteRecords.reduce((best, current) => {
           const bestSeconds = timeToSeconds(best.time);
           const currentSeconds = timeToSeconds(current.time);
@@ -131,7 +133,7 @@ export default function GrowthRankings() {
         const currentSeconds = timeToSeconds(currentRecord.time);
         const bestSeconds = timeToSeconds(bestRecord.time);
         
-        // 伸び率 = (自己ベスト - 今回) / 自己ベスト × 100
+        // 伸び率 = (今回を除いた自己ベスト - 今回) / 今回を除いた自己ベスト × 100
         const improvementSeconds = bestSeconds - currentSeconds;
         const growthRate = (improvementSeconds / bestSeconds) * 100;
 
