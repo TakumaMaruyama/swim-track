@@ -33,6 +33,12 @@ import type { ExtendedSwimRecord } from "@/hooks/use-swim-records";
 import { lazy, Suspense } from 'react';
 import { ErrorBoundary } from './ErrorBoundary';
 import { EditRecordForm } from '@/components/EditRecordForm';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { ChevronDown } from "lucide-react";
 
 const TimeProgressChart = lazy(() => import('./TimeProgressChart'));
 
@@ -80,6 +86,7 @@ export function TimeHistoryModal({
   const [customStartDate, setCustomStartDate] = React.useState<string>("");
   const [customEndDate, setCustomEndDate] = React.useState<string>("");
   const [isDeleting, setIsDeleting] = React.useState(false);
+  const [openSections, setOpenSections] = React.useState<{[key: string]: boolean}>({});
 
   const filterRecordsByDate = React.useCallback((record: ExtendedSwimRecord, now: Date) => {
     if (!record.date || periodFilter === "all") return true;
@@ -355,70 +362,164 @@ export function TimeHistoryModal({
                     </ErrorBoundary>
 
                     <div className="space-y-3 mt-4">
-                      {records.map((record) => {
-                        const poolLengthKey = `${record.style}-${record.distance}-${record.poolLength}`;
-                        const isBestTime = record.time === personalBests[poolLengthKey];
-                        
-                        return (
-                          <div
-                            key={record.id}
-                            className="p-3 rounded-lg flex flex-col gap-2 md:flex-row md:justify-between md:items-center"
-                          >
-                            <div className="flex flex-col gap-2">
-                              <span className="text-xl font-bold">{record.time}</span>
-                              <div className="flex flex-wrap gap-2">
-                                {isBestTime && (
-                                  <Badge variant="secondary" className="flex items-center gap-1">
-                                    <Trophy className="h-3 w-3" />
-                                    自己ベスト ({
-                                      record.poolLength === 15 ? "15m" : 
-                                      record.poolLength === 25 ? "25m（短水路）" : 
-                                      "50m（長水路）"
-                                    })
-                                  </Badge>
-                                )}
-                                {record.isCompetition && record.competitionName && (
-                                  <Badge variant="outline" className="flex items-center gap-1">
-                                    {record.competitionName}
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex flex-col items-start md:items-end gap-1">
-                              <div className="text-sm text-muted-foreground">
-                                {formatDate(record.date)}
-                              </div>
-                              <div className="text-sm text-muted-foreground">
-                                {record.poolLength === 15 ? "15m" : 
-                                record.poolLength === 25 ? "25m（短水路）" : 
-                                "50m（長水路）"}
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              {isAdmin && (
-                                <>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => setEditingRecord(record)}
-                                    disabled={isDeleting}
-                                  >
-                                    <Edit2 className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => setDeletingRecord(record.id)}
-                                    disabled={isDeleting}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </>
+                      {(() => {
+                        // Group records by pool length
+                        const recordsByPool = records.reduce((acc, record) => {
+                          const poolKey = `${record.poolLength}`;
+                          if (!acc[poolKey]) {
+                            acc[poolKey] = [];
+                          }
+                          acc[poolKey].push(record);
+                          return acc;
+                        }, {} as {[key: string]: ExtendedSwimRecord[]});
+
+                        return Object.entries(recordsByPool).map(([poolLength, poolRecords]) => {
+                          const poolLengthKey = `${style}-${distance}-${poolLength}`;
+                          const bestRecord = poolRecords.find(r => r.time === personalBests[poolLengthKey]);
+                          const otherRecords = poolRecords.filter(r => r.time !== personalBests[poolLengthKey]);
+                          const sectionKey = `${key}-${poolLength}`;
+                          const isOpen = openSections[sectionKey] ?? false;
+
+                          return (
+                            <div key={poolLength} className="space-y-2">
+                              {bestRecord && (
+                                <div className="p-3 rounded-lg bg-muted/30 flex flex-col gap-2 md:flex-row md:justify-between md:items-center">
+                                  <div className="flex flex-col gap-2">
+                                    <span className="text-xl font-bold">{bestRecord.time}</span>
+                                    <div className="flex flex-wrap gap-2">
+                                      <Badge variant="secondary" className="flex items-center gap-1">
+                                        <Trophy className="h-3 w-3" />
+                                        自己ベスト ({
+                                          bestRecord.poolLength === 15 ? "15m" : 
+                                          bestRecord.poolLength === 25 ? "25m（短水路）" : 
+                                          "50m（長水路）"
+                                        })
+                                      </Badge>
+                                      {bestRecord.isCompetition && bestRecord.competitionName && (
+                                        <Badge variant="outline" className="flex items-center gap-1">
+                                          {bestRecord.competitionName}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex flex-col items-start md:items-end gap-1">
+                                    <div className="text-sm text-muted-foreground">
+                                      {formatDate(bestRecord.date)}
+                                    </div>
+                                    <div className="text-sm text-muted-foreground">
+                                      {bestRecord.poolLength === 15 ? "15m" : 
+                                      bestRecord.poolLength === 25 ? "25m（短水路）" : 
+                                      "50m（長水路）"}
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    {isAdmin && (
+                                      <>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => setEditingRecord(bestRecord)}
+                                          disabled={isDeleting}
+                                        >
+                                          <Edit2 className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => setDeletingRecord(bestRecord.id)}
+                                          disabled={isDeleting}
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {otherRecords.length > 0 && (
+                                <Collapsible
+                                  open={isOpen}
+                                  onOpenChange={(open) => {
+                                    setOpenSections(prev => ({
+                                      ...prev,
+                                      [sectionKey]: open
+                                    }));
+                                  }}
+                                >
+                                  <CollapsibleTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="w-full justify-between"
+                                    >
+                                      <span className="text-sm text-muted-foreground">
+                                        他の記録を{isOpen ? '隠す' : '表示'} ({otherRecords.length}件)
+                                      </span>
+                                      <ChevronDown
+                                        className={`h-4 w-4 transition-transform ${
+                                          isOpen ? 'transform rotate-180' : ''
+                                        }`}
+                                      />
+                                    </Button>
+                                  </CollapsibleTrigger>
+                                  <CollapsibleContent className="space-y-2 mt-2">
+                                    {otherRecords.map((record) => (
+                                      <div
+                                        key={record.id}
+                                        className="p-3 rounded-lg bg-muted/10 flex flex-col gap-2 md:flex-row md:justify-between md:items-center"
+                                      >
+                                        <div className="flex flex-col gap-2">
+                                          <span className="text-xl font-bold">{record.time}</span>
+                                          <div className="flex flex-wrap gap-2">
+                                            {record.isCompetition && record.competitionName && (
+                                              <Badge variant="outline" className="flex items-center gap-1">
+                                                {record.competitionName}
+                                              </Badge>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <div className="flex flex-col items-start md:items-end gap-1">
+                                          <div className="text-sm text-muted-foreground">
+                                            {formatDate(record.date)}
+                                          </div>
+                                          <div className="text-sm text-muted-foreground">
+                                            {record.poolLength === 15 ? "15m" : 
+                                            record.poolLength === 25 ? "25m（短水路）" : 
+                                            "50m（長水路）"}
+                                          </div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                          {isAdmin && (
+                                            <>
+                                              <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => setEditingRecord(record)}
+                                                disabled={isDeleting}
+                                              >
+                                                <Edit2 className="h-4 w-4" />
+                                              </Button>
+                                              <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => setDeletingRecord(record.id)}
+                                                disabled={isDeleting}
+                                              >
+                                                <Trash2 className="h-4 w-4" />
+                                              </Button>
+                                            </>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </CollapsibleContent>
+                                </Collapsible>
                               )}
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        });
+                      })()}
                     </div>
                   </CardContent>
                 </Card>
