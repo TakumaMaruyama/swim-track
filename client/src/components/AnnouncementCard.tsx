@@ -23,7 +23,7 @@ export function AnnouncementCard() {
   }, [announcement]);
 
   const handleSave = async () => {
-    if (!content.trim()) return;
+    if (typeof content !== 'string') return;
     
     setIsSaving(true);
     try {
@@ -141,7 +141,7 @@ export function AnnouncementCard() {
                 variant="default" 
                 size="sm" 
                 onClick={handleSave}
-                disabled={isSaving || !content.trim()}
+                disabled={isSaving}
               >
                 {isSaving ? (
                   <div className="h-4 w-4 border-2 border-t-transparent border-white rounded-full animate-spin mr-1" />
