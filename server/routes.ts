@@ -260,9 +260,9 @@ app.get("/api/records", async (req, res) => {
       const { content } = req.body;
       console.log("Received announcement content:", content);
       
-      if (!content || typeof content !== 'string' || content.trim().length === 0) {
+      if (typeof content !== 'string') {
         console.log("Invalid announcement content received");
-        return res.status(400).json({ message: "お知らせ内容は必須です" });
+        return res.status(400).json({ message: "お知らせ内容は文字列である必要があります" });
       }
       
       // Get latest announcement to determine if we should update or create
