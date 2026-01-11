@@ -85,8 +85,19 @@ function AllTimeRecords(): JSX.Element {
 
     try {
       const filteredRecords = records.filter(record => {
-        return record.poolLength === parseInt(poolLengthFilter) &&
-               record.gender === genderFilter;
+        // 基本フィルター
+        if (record.poolLength !== parseInt(poolLengthFilter) || record.gender !== genderFilter) {
+          return false;
+        }
+        // 加入日以降の記録のみ歴代記録に含める
+        if (record.athleteJoinDate && record.date) {
+          const joinDate = new Date(record.athleteJoinDate);
+          const recordDate = new Date(record.date);
+          if (recordDate < joinDate) {
+            return false;
+          }
+        }
+        return true;
       });
 
       return filteredRecords.reduce((acc, record) => {

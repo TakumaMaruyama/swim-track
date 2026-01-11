@@ -165,6 +165,7 @@ app.get("/api/records", async (req, res) => {
             id: users.id,
             username: users.username,
             gender: users.gender,
+            joinDate: users.joinDate,
           })
           .from(users)
           .where(eq(users.id, studentId))
@@ -181,15 +182,17 @@ app.get("/api/records", async (req, res) => {
 
     console.log('Athletes fetched:', athletes?.length || 0);
 
-    // Create lookup maps for athlete names and genders, with safeguards
+    // Create lookup maps for athlete names, genders and joinDates, with safeguards
     const athleteNameMap = new Map();
     const athleteGenderMap = new Map();
+    const athleteJoinDateMap = new Map();
     
     if (Array.isArray(athletes)) {
       athletes.forEach(athlete => {
         if (athlete && athlete.id != null) {
           athleteNameMap.set(athlete.id, athlete.username || '');
           athleteGenderMap.set(athlete.id, athlete.gender || 'male');
+          athleteJoinDateMap.set(athlete.id, athlete.joinDate || null);
         }
       });
     }
@@ -198,12 +201,14 @@ app.get("/api/records", async (req, res) => {
     const recordsWithAthletes = validRecords.map(record => {
       // Get athlete gender from user data if record doesn't have gender
       const athleteGender = athleteGenderMap.get(record.studentId);
+      const athleteJoinDate = athleteJoinDateMap.get(record.studentId);
       
       return {
         ...record,
         athleteName: athleteNameMap.get(record.studentId) || 'Unknown',
         // Always use the athlete's gender from users table
-        gender: athleteGender || 'male'
+        gender: athleteGender || 'male',
+        athleteJoinDate: athleteJoinDate
       };
     });
 
@@ -604,11 +609,13 @@ app.get("/api/records", async (req, res) => {
       }
 
       // Update athlete
+      const { joinDate } = req.body;
       const [updatedAthlete] = await db
         .update(users)
         .set({ 
           username,
-          gender: gender || athlete.gender || 'male' // Use provided gender, fallback to existing or default
+          gender: gender || athlete.gender || 'male',
+          joinDate: joinDate ? new Date(joinDate) : athlete.joinDate
         })
         .where(eq(users.id, parseInt(id)))
         .returning();

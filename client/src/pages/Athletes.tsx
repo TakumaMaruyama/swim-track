@@ -218,7 +218,7 @@ export default function Athletes() {
     }
   };
 
-  const handleEdit = async (athleteId: number, data: { username: string, gender: string }) => {
+  const handleEdit = async (athleteId: number, data: { username: string, gender: string, joinDate?: string }) => {
     if (!isAdmin) {
       toast({
         title: "権限エラー",
@@ -234,7 +234,11 @@ export default function Athletes() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          username: data.username,
+          gender: data.gender,
+          joinDate: data.joinDate || null
+        }),
         credentials: 'include',
       });
 

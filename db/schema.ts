@@ -9,6 +9,7 @@ export const users = pgTable("users", {
   role: text("role").notNull().default("student"),
   isActive: boolean("is_active").notNull().default(true),
   gender: text("gender").notNull().default("male"),
+  joinDate: timestamp("join_date"),
   createdAt: timestamp("created_at").defaultNow()
 });
 

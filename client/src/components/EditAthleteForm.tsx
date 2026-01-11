@@ -27,6 +27,7 @@ import * as z from "zod";
 const editAthleteSchema = z.object({
   username: z.string().min(2, "ユーザー名は2文字以上である必要があります"),
   gender: z.enum(["male", "female"]),
+  joinDate: z.string().optional(),
 });
 
 type EditAthleteFormProps = {
@@ -45,6 +46,7 @@ export function EditAthleteForm({ athlete, isOpen, onClose, onSubmit }: EditAthl
     defaultValues: {
       username: athlete.username,
       gender: athlete.gender as "male" | "female",
+      joinDate: athlete.joinDate ? new Date(athlete.joinDate).toISOString().split('T')[0] : '',
     },
   });
 
@@ -108,6 +110,26 @@ export function EditAthleteForm({ athlete, isOpen, onClose, onSubmit }: EditAthl
                       <option value="female">女性</option>
                     </select>
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="joinDate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>加入日</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="date"
+                      {...field}
+                      disabled={isSubmitting}
+                    />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground">
+                    加入日以降の記録のみが歴代記録に反映されます
+                  </p>
                   <FormMessage />
                 </FormItem>
               )}
