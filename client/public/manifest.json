@@ -1,7 +1,7 @@
 {
-  "name": "SwimTime",
-  "short_name": "SwimTime",
-  "description": "水泳タイム管理アプリ",
+  "name": "SwimTrack",
+  "short_name": "SwimTrack",
+  "description": "水泳チーム管理システム",
   "theme_color": "#3b82f6",
   "background_color": "#ffffff",
   "display": "standalone",
