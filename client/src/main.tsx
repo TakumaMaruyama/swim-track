@@ -39,8 +39,9 @@ const IMRankings = lazy(() => retryImport(() => import("./pages/IMRankings")));
 const GrowthRankings = lazy(() => retryImport(() => import("./pages/GrowthRankings")));
 
 const LoadingSpinner = () => (
-  <div className="flex items-center justify-center min-h-screen">
-    <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+  <div className="flex flex-col items-center justify-center min-h-screen">
+    <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mb-4" />
+    <p className="text-muted-foreground animate-pulse">読み込み中...</p>
   </div>
 );
 
