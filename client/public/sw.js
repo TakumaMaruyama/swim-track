@@ -1,5 +1,6 @@
-const CACHE_NAME = 'swimtime-v2';
-const STATIC_ASSETS = [
+const CACHE_NAME = 'swimtime-v1';
+const urlsToCache = [
+  '/',
   '/icon-192.png',
   '/icon-512.png'
 ];
@@ -7,7 +8,7 @@ const STATIC_ASSETS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(STATIC_ASSETS))
+      .then((cache) => cache.addAll(urlsToCache))
   );
   self.skipWaiting();
 });
@@ -28,25 +29,13 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
-  
-  if (url.pathname.startsWith('/api/')) {
-    event.respondWith(fetch(event.request));
-    return;
-  }
-  
-  if (event.request.method !== 'GET') {
-    event.respondWith(fetch(event.request));
-    return;
-  }
-  
-  if (STATIC_ASSETS.some(asset => url.pathname === asset)) {
-    event.respondWith(
-      caches.match(event.request)
-        .then((response) => response || fetch(event.request))
-    );
-    return;
-  }
-  
-  event.respondWith(fetch(event.request));
+  event.respondWith(
+    caches.match(event.request)
+      .then((response) => {
+        if (response) {
+          return response;
+        }
+        return fetch(event.request);
+      })
+  );
 });

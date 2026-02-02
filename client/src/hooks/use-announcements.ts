@@ -1,5 +1,5 @@
 import useSWR from "swr";
-import { useCallback } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "./use-auth";
 import { fetcher } from "@/lib/fetcher";
@@ -13,16 +13,44 @@ export interface Announcement {
 }
 
 export function useAnnouncements() {
-  const { data, error, mutate, isLoading } = useSWR<Announcement>(
-    "/api/announcements/latest",
-    fetcher,
-    {
-      revalidateOnFocus: false,
-      dedupingInterval: 10000,
-    }
-  );
+  const { data, error, mutate } = useSWR<Announcement>("/api/announcements/latest", fetcher);
+  const [announcement, setAnnouncement] = useState<Announcement | null>(null);
   const { toast } = useToast();
   const { isAdmin } = useAuth();
+
+  // データが変わったときにステートを更新
+  useEffect(() => {
+    if (data) {
+      console.log("Setting announcement from data:", data);
+      setAnnouncement(data);
+    }
+  }, [data]);
+
+  // 手動でデータを取得する関数
+  const fetchLatestAnnouncement = useCallback(async () => {
+    try {
+      const response = await fetch("/api/announcements/latest");
+      
+      if (!response.ok) {
+        throw new Error("お知らせの取得に失敗しました");
+      }
+      
+      const data = await response.json();
+      console.log("Manually fetched announcement:", data);
+      setAnnouncement(data);
+      mutate(data, false); // SWRキャッシュも更新
+      return data;
+    } catch (error) {
+      console.error("Error fetching announcement:", error);
+    }
+  }, [mutate]);
+
+  // コンポーネントがマウントされたときに一度だけ実行
+  useEffect(() => {
+    if (!data && !error) {
+      fetchLatestAnnouncement();
+    }
+  }, [fetchLatestAnnouncement, data, error]);
 
   const updateAnnouncement = useCallback(async (content: string) => {
     if (!isAdmin) {
@@ -35,6 +63,8 @@ export function useAnnouncements() {
     }
 
     try {
+      console.log("Sending announcement update request with content:", content);
+      
       const response = await fetch("/api/admin/announcements", {
         method: "POST",
         headers: {
@@ -44,13 +74,21 @@ export function useAnnouncements() {
         credentials: "include",
       });
 
+      console.log("Announcement update response status:", response.status);
+      
       if (!response.ok) {
         const errorData = await response.json();
+        console.error("Server returned error:", errorData);
         throw new Error(errorData.message || "お知らせの更新に失敗しました");
       }
 
       const updatedAnnouncement = await response.json();
+      console.log("Updated announcement:", updatedAnnouncement);
       
+      // ローカルのステートを更新
+      setAnnouncement(updatedAnnouncement);
+      
+      // SWRのキャッシュを更新（再検証なし）
       mutate(updatedAnnouncement, false);
       
       toast({
@@ -60,22 +98,18 @@ export function useAnnouncements() {
 
       return updatedAnnouncement;
     } catch (error) {
+      console.error("Failed to update announcement:", error);
       toast({
         title: "エラー",
         description: error instanceof Error ? error.message : "お知らせの更新に失敗しました",
         variant: "destructive",
       });
-      return null;
     }
-  }, [isAdmin, toast, mutate]);
-
-  const fetchLatestAnnouncement = useCallback(async () => {
-    return mutate();
-  }, [mutate]);
+  }, [isAdmin, toast, mutate, fetchLatestAnnouncement]);
 
   return {
-    announcement: data || null,
-    isLoading,
+    announcement: announcement,
+    isLoading: !error && !data && !announcement,
     error,
     updateAnnouncement,
     fetchLatestAnnouncement,

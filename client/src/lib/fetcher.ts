@@ -8,52 +8,53 @@ export class FetchError extends Error {
   }
 }
 
-const TIMEOUT_MS = 10000;
-
 export const fetcher = async (url: string) => {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const maxRetries = 3;
+  const retryDelay = 1000;
 
-  try {
-    const res = await fetch(url, {
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      signal: controller.signal,
-    });
+  const fetchWithRetry = async (attempt: number): Promise<any> => {
+    try {
+      const res = await fetch(url, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
-    clearTimeout(timeoutId);
+      if (!res.ok) {
+        const errorInfo = await res.json().catch(() => ({}));
+        const error = new FetchError(
+          errorInfo.message || `APIリクエストでエラーが発生しました（ステータス: ${res.status}）`,
+          errorInfo,
+          res.status
+        );
 
-    if (!res.ok) {
-      const errorInfo = await res.json().catch(() => ({}));
+        // 認証エラーの場合は再試行しない
+        if (res.status === 401) {
+          throw error;
+        }
+
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, retryDelay * attempt));
+          return fetchWithRetry(attempt + 1);
+        }
+
+        throw error;
+      }
+
+      return res.json();
+    } catch (error) {
+      if (error instanceof FetchError) {
+        throw error;
+      }
+
       throw new FetchError(
-        errorInfo.message || `APIリクエストでエラーが発生しました（ステータス: ${res.status}）`,
-        errorInfo,
-        res.status
-      );
-    }
-
-    return res.json();
-  } catch (error) {
-    clearTimeout(timeoutId);
-    
-    if (error instanceof FetchError) {
-      throw error;
-    }
-
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new FetchError(
-        'リクエストがタイムアウトしました',
-        { message: 'Request timeout' },
+        'ネットワークエラーが発生しました',
+        { message: error instanceof Error ? error.message : 'Unknown error' },
         0
       );
     }
+  };
 
-    throw new FetchError(
-      'ネットワークエラーが発生しました',
-      { message: error instanceof Error ? error.message : 'Unknown error' },
-      0
-    );
-  }
+  return fetchWithRetry(1);
 };
