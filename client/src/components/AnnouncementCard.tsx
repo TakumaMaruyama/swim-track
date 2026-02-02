@@ -16,7 +16,6 @@ export function AnnouncementCard() {
 
   // Initialize content from announcement when it loads
   useEffect(() => {
-    console.log("Announcement data:", announcement);
     if (announcement?.content) {
       setContent(announcement.content);
     }
@@ -46,22 +45,6 @@ export function AnnouncementCard() {
     setContent(announcement?.content || '');
     setIsEditing(false);
   };
-
-  // デバッグ用
-  useEffect(() => {
-    // 2秒ごとに最新のお知らせとステータスをコンソールに出力
-    const interval = setInterval(() => {
-      console.log("Current announcement state:", {
-        announcement,
-        isLoading,
-        error,
-        isEditing,
-        content,
-      });
-    }, 2000);
-    
-    return () => clearInterval(interval);
-  }, [announcement, isLoading, error, isEditing, content]);
 
   if (isLoading) {
     return (
