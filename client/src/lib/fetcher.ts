@@ -29,12 +29,9 @@ export const fetcher = async (url: string) => {
           res.status
         );
 
-        // 認証エラーの場合は再試行しない
-        if (res.status === 401) {
-          throw error;
-        }
-
-        if (attempt < maxRetries) {
+        // 4xx は再試行しても改善しないため即時終了（429のみ例外）
+        const isRetryableStatus = res.status >= 500 || res.status === 429;
+        if (isRetryableStatus && attempt < maxRetries) {
           await new Promise(resolve => setTimeout(resolve, retryDelay * attempt));
           return fetchWithRetry(attempt + 1);
         }
