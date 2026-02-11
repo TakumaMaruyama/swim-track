@@ -26,6 +26,7 @@ export function registerRoutes(app: Express) {
         .select({
           id: users.id,
           username: users.username,
+          nameKana: users.nameKana,
           isActive: users.isActive,
           role: users.role,
           gender: users.gender,
@@ -34,7 +35,7 @@ export function registerRoutes(app: Express) {
         })
         .from(users)
         .where(eq(users.role, 'student'))
-        .orderBy(users.username);
+        .orderBy(sql`COALESCE(${users.nameKana}, ${users.username})`);
 
       console.log('Athletes fetched successfully:', athletes.length);
       res.json(athletes);
@@ -62,7 +63,7 @@ export function registerRoutes(app: Express) {
     }
 
     try {
-      const { username, gender = 'male' } = req.body;
+      const { username, gender = 'male', nameKana } = req.body;
 
       if (!username || typeof username !== 'string' || username.trim().length === 0) {
         return res.status(400).json({ message: "選手名は必須です" });
@@ -84,10 +85,11 @@ export function registerRoutes(app: Express) {
         .insert(users)
         .values({
           username: username.trim(),
-          password: await hashPassword("temporary"), // 一時的なパスワード
+          nameKana: nameKana ? nameKana.trim() : null,
+          password: await hashPassword("temporary"),
           role: "student",
           isActive: true,
-          gender: gender, // 性別を追加
+          gender: gender,
         })
         .returning();
 
@@ -500,7 +502,7 @@ export function registerRoutes(app: Express) {
     }
 
     const { id } = req.params;
-    const { username, gender } = req.body;
+    const { username, gender, nameKana } = req.body;
 
     try {
       // Check if athlete exists and is a student
@@ -538,6 +540,7 @@ export function registerRoutes(app: Express) {
         .update(users)
         .set({ 
           username,
+          nameKana: nameKana !== undefined ? (nameKana ? nameKana.trim() : null) : athlete.nameKana,
           gender: gender || athlete.gender || 'male',
           joinDate: nextJoinDate,
           allTimeStartDate: nextAllTimeStartDate

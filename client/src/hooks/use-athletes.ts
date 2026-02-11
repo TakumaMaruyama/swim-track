@@ -5,7 +5,9 @@ export function useAthletes() {
   const { data: athletes, error, mutate } = useSWR<User[]>("/api/athletes");
 
   const sortedAthletes = athletes?.slice().sort((a, b) => {
-    return a.username.localeCompare(b.username, 'ja-JP', { 
+    const aKey = a.nameKana || a.username;
+    const bKey = b.nameKana || b.username;
+    return aKey.localeCompare(bKey, 'ja-JP', { 
       sensitivity: 'base',
       ignorePunctuation: true,
       usage: 'sort'

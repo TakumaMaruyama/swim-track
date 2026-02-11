@@ -73,6 +73,7 @@ const FormLoadingFallback = () => (
 // Add new component inside Athletes.tsx
 const AddAthleteDialog = ({ isOpen, onClose, onSubmit }) => {
   const [username, setUsername] = useState("");
+  const [nameKana, setNameKana] = useState("");
   const [gender, setGender] = useState("male");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -80,8 +81,9 @@ const AddAthleteDialog = ({ isOpen, onClose, onSubmit }) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      await onSubmit(username, gender);
+      await onSubmit(username, gender, nameKana);
       setUsername("");
+      setNameKana("");
       setGender("male");
     } finally {
       setIsSubmitting(false);
@@ -94,7 +96,7 @@ const AddAthleteDialog = ({ isOpen, onClose, onSubmit }) => {
         <DialogHeader>
           <DialogTitle>新規選手登録</DialogTitle>
           <DialogDescription>
-            新しい選手を登録します。選手名と性別を入力してください。
+            新しい選手を登録します。選手名・ふりがな・性別を入力してください。
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -110,6 +112,20 @@ const AddAthleteDialog = ({ isOpen, onClose, onSubmit }) => {
                 onChange={(e) => setUsername(e.target.value)}
                 required
               />
+            </div>
+            <div className="grid gap-2">
+              <label htmlFor="nameKana" className="text-sm font-medium">
+                ふりがな
+              </label>
+              <Input
+                id="nameKana"
+                placeholder="ふりがな（例：やまだ たろう）"
+                value={nameKana}
+                onChange={(e) => setNameKana(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                ふりがなを入力すると、選手一覧が名簿順（五十音順）で並びます
+              </p>
             </div>
             <div className="grid gap-2">
               <label htmlFor="gender" className="text-sm font-medium">
@@ -222,6 +238,7 @@ export default function Athletes() {
     athleteId: number,
     data: {
       username: string;
+      nameKana?: string;
       gender: string;
       joinDate?: string;
       excludePreviousClubRecords: boolean;
@@ -245,6 +262,7 @@ export default function Athletes() {
         },
         body: JSON.stringify({
           username: data.username,
+          nameKana: data.nameKana || null,
           gender: data.gender,
           joinDate: data.joinDate || null,
           allTimeStartDate: data.excludePreviousClubRecords
@@ -425,14 +443,14 @@ export default function Athletes() {
     }
   };
 
-  const handleCreateAthlete = async (username: string, gender: string = 'male') => {
+  const handleCreateAthlete = async (username: string, gender: string = 'male', nameKana: string = '') => {
     try {
       const response = await fetch('/api/athletes', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ username, gender }),
+        body: JSON.stringify({ username, gender, nameKana: nameKana || null }),
         credentials: 'include',
       });
 
@@ -556,6 +574,9 @@ export default function Athletes() {
                           {athlete.isActive ? '有効' : '無効'}
                         </Badge>
                       </div>
+                      {athlete.nameKana && (
+                        <p className="text-xs text-muted-foreground truncate">{athlete.nameKana}</p>
+                      )}
                     </div>
                     <div className="flex gap-1 shrink-0">
                       {isAdmin && (

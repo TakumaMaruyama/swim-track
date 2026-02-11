@@ -26,6 +26,7 @@ import * as z from "zod";
 
 const editAthleteSchema = z.object({
   username: z.string().min(2, "ユーザー名は2文字以上である必要があります"),
+  nameKana: z.string().optional(),
   gender: z.enum(["male", "female"]),
   joinDate: z.string().optional(),
   excludePreviousClubRecords: z.boolean().default(false),
@@ -55,6 +56,7 @@ export function EditAthleteForm({ athlete, isOpen, onClose, onSubmit }: EditAthl
     resolver: zodResolver(editAthleteSchema),
     defaultValues: {
       username: athlete.username,
+      nameKana: athlete.nameKana || '',
       gender: athlete.gender as "male" | "female",
       joinDate: athlete.joinDate ? new Date(athlete.joinDate).toISOString().split('T')[0] : '',
       excludePreviousClubRecords: !!athlete.allTimeStartDate,
@@ -103,6 +105,26 @@ export function EditAthleteForm({ athlete, isOpen, onClose, onSubmit }: EditAthl
                   <FormControl>
                     <Input {...field} disabled={isSubmitting} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="nameKana"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>ふりがな</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="ふりがな（例：やまだ たろう）"
+                      {...field}
+                      disabled={isSubmitting}
+                    />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground">
+                    ふりがなを入力すると、選手一覧が名簿順（五十音順）で並びます
+                  </p>
                   <FormMessage />
                 </FormItem>
               )}
