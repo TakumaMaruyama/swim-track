@@ -10,6 +10,7 @@ export const users = pgTable("users", {
   isActive: boolean("is_active").notNull().default(true),
   gender: text("gender").notNull().default("male"),
   joinDate: timestamp("join_date"),
+  allTimeStartDate: timestamp("all_time_start_date"),
   createdAt: timestamp("created_at").defaultNow()
 });
 
@@ -65,4 +66,3 @@ export const insertAnnouncementSchema = createInsertSchema(announcements);
 export const selectAnnouncementSchema = createSelectSchema(announcements);
 export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
 export type Announcement = z.infer<typeof selectAnnouncementSchema>;
-

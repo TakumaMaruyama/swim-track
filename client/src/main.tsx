@@ -6,12 +6,10 @@ import { fetcher } from "./lib/fetcher";
 import { Toaster } from "./components/ui/toaster";
 import { setupErrorHandlers } from "./lib/error-handler";
 import { ErrorBoundary } from "./components/ErrorBoundary";
-import { preloadComponents } from "./lib/preload";
 import "./index.css";
 
-// Initialize error handlers and preload components
+// Initialize error handlers
 setupErrorHandlers();
-preloadComponents();
 
 // Lazy load pages with retry configuration
 const retryImport = async (importFn: () => Promise<any>, retries = 3) => {
@@ -62,8 +60,8 @@ root.render(
           suspense: false,
           provider: () => new Map(),
           onErrorRetry: (error: any, _key: string, _config: any, revalidate: (options?: any) => Promise<any>, { retryCount }: { retryCount: number }) => {
-            // Never retry on 404
-            if (error.status === 404) return;
+            // Never retry on non-recoverable client errors
+            if (error.status >= 400 && error.status < 500 && error.status !== 429) return;
 
             // Only retry up to 3 times
             if (retryCount >= 3) return;

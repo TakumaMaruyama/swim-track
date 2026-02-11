@@ -47,22 +47,6 @@ export function AnnouncementCard() {
     setIsEditing(false);
   };
 
-  // デバッグ用
-  useEffect(() => {
-    // 2秒ごとに最新のお知らせとステータスをコンソールに出力
-    const interval = setInterval(() => {
-      console.log("Current announcement state:", {
-        announcement,
-        isLoading,
-        error,
-        isEditing,
-        content,
-      });
-    }, 2000);
-    
-    return () => clearInterval(interval);
-  }, [announcement, isLoading, error, isEditing, content]);
-
   if (isLoading) {
     return (
       <Card className="col-span-full">

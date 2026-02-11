@@ -2,7 +2,6 @@ import { Express } from "express";
 import { db } from "db";
 import { swimRecords, users, announcements } from "db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
-import { configureAuth } from "./auth";
 import cors from 'cors';
 
 // Add CORS configuration
@@ -19,9 +18,6 @@ export function registerRoutes(app: Express) {
   // Enable CORS with credentials
   app.use(cors(corsOptions));
 
-  // Configure authentication
-  configureAuth(app);
-
   // Public endpoints that don't require authentication
   app.get("/api/athletes", async (req, res) => {
     try {
@@ -33,6 +29,8 @@ export function registerRoutes(app: Express) {
           isActive: users.isActive,
           role: users.role,
           gender: users.gender,
+          joinDate: users.joinDate,
+          allTimeStartDate: users.allTimeStartDate,
         })
         .from(users)
         .where(eq(users.role, 'student'))
@@ -101,139 +99,60 @@ export function registerRoutes(app: Express) {
     }
   });
 
-app.get("/api/records", async (req, res) => {
-  try {
-    console.log('Fetching swim records...');
-    // First try to get records without join to isolate the issue
-    const allRecords = await db
-      .select({
-        id: swimRecords.id,
-        style: swimRecords.style,
-        distance: swimRecords.distance,
-        time: swimRecords.time,
-        date: swimRecords.date,
-        poolLength: swimRecords.poolLength,
-        studentId: swimRecords.studentId,
-        isCompetition: swimRecords.isCompetition,
-        competitionName: swimRecords.competitionName,
-        competitionLocation: swimRecords.competitionLocation,
-        gender: swimRecords.gender
-      })
-      .from(swimRecords)
-      .orderBy(desc(swimRecords.date));
+  app.get("/api/records", async (_req, res) => {
+    try {
+      const records = await db
+        .select({
+          id: swimRecords.id,
+          style: swimRecords.style,
+          distance: swimRecords.distance,
+          time: swimRecords.time,
+          date: swimRecords.date,
+          poolLength: swimRecords.poolLength,
+          studentId: swimRecords.studentId,
+          isCompetition: swimRecords.isCompetition,
+          competitionName: swimRecords.competitionName,
+          competitionLocation: swimRecords.competitionLocation,
+          athleteName: users.username,
+          athleteGender: users.gender,
+          athleteJoinDate: users.joinDate,
+          athleteAllTimeStartDate: users.allTimeStartDate,
+        })
+        .from(swimRecords)
+        .leftJoin(users, eq(swimRecords.studentId, users.id))
+        .where(sql`${swimRecords.studentId} is not null`)
+        .orderBy(desc(swimRecords.date));
 
-    console.log('Raw records fetched:', allRecords?.length || 0);
-    
-    // Check if allRecords is valid and has entries
-    if (!allRecords || !Array.isArray(allRecords) || allRecords.length === 0) {
-      console.log('No records found or invalid records data');
-      return res.json([]); // Return empty array instead of throwing error
-    }
+      const recordsWithAthletes = records.map((record) => {
+        const { athleteGender, ...baseRecord } = record;
+        return {
+          ...baseRecord,
+          studentId: record.studentId as number,
+          athleteName: baseRecord.athleteName || "Unknown",
+          // Keep behavior: prefer gender from users table with fallback
+          gender: athleteGender || "male",
+          athleteJoinDate: baseRecord.athleteJoinDate || null,
+          athleteAllTimeStartDate: baseRecord.athleteAllTimeStartDate || null,
+        };
+      });
 
-    // Filter out records with null studentId to prevent errors
-    const validRecords = allRecords.filter(record => record.studentId != null);
-    if (validRecords.length === 0) {
-      console.log('No valid records with studentId found');
-      return res.json([]);
-    }
-
-    // Extract unique student IDs, ensuring they are all valid
-    const athleteIds = [...new Set(validRecords.map(record => record.studentId))].filter(id => id != null);
-    
-    if (athleteIds.length === 0) {
-      console.log('No valid athlete IDs found');
-      return res.json(validRecords.map(record => ({
-        ...record,
-        athleteName: 'Unknown'
-      })));
-    }
-
-    console.log('Fetching athlete data for IDs:', athleteIds);
-    
-    // Fetch user names with a simpler approach - querying each ID individually and combining results
-    const athletes = [];
-    
-    // Process in smaller batches to avoid potential issues with too many parameters
-    for (let i = 0; i < athleteIds.length; i++) {
-      const studentId = athleteIds[i];
-      if (studentId == null) continue;
-      
-      try {
-        // Query each user one at a time to avoid complex parameterized IN clauses
-        const result = await db
-          .select({
-            id: users.id,
-            username: users.username,
-            gender: users.gender,
-            joinDate: users.joinDate,
-          })
-          .from(users)
-          .where(eq(users.id, studentId))
-          .limit(1);
-          
-        if (result && result.length > 0) {
-          athletes.push(result[0]);
-        }
-      } catch (idError) {
-        console.error(`Error fetching athlete with ID ${studentId}:`, idError);
-        // Continue with other IDs even if one fails
+      res.json(recordsWithAthletes);
+    } catch (error) {
+      console.error('Error fetching records:', error);
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name,
+          cause: error.cause
+        });
       }
-    }
-
-    console.log('Athletes fetched:', athletes?.length || 0);
-
-    // Create lookup maps for athlete names, genders and joinDates, with safeguards
-    const athleteNameMap = new Map();
-    const athleteGenderMap = new Map();
-    const athleteJoinDateMap = new Map();
-    
-    if (Array.isArray(athletes)) {
-      athletes.forEach(athlete => {
-        if (athlete && athlete.id != null) {
-          athleteNameMap.set(athlete.id, athlete.username || '');
-          athleteGenderMap.set(athlete.id, athlete.gender || 'male');
-          athleteJoinDateMap.set(athlete.id, athlete.joinDate || null);
-        }
+      res.status(500).json({
+        message: "記録の取得に失敗しました",
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
-
-    // Combine the data with fallbacks for missing info
-    const recordsWithAthletes = validRecords.map(record => {
-      // Get athlete gender from user data if record doesn't have gender
-      const athleteGender = athleteGenderMap.get(record.studentId);
-      const athleteJoinDate = athleteJoinDateMap.get(record.studentId);
-      
-      return {
-        ...record,
-        athleteName: athleteNameMap.get(record.studentId) || 'Unknown',
-        // Always use the athlete's gender from users table
-        gender: athleteGender || 'male',
-        athleteJoinDate: athleteJoinDate
-      };
-    });
-
-    console.log('Records processed successfully:', recordsWithAthletes.length);
-    if (recordsWithAthletes.length > 0) {
-      console.log('Sample record:', JSON.stringify(recordsWithAthletes[0]));
-    }
-
-    res.json(recordsWithAthletes);
-  } catch (error) {
-    console.error('Error fetching records:', error);
-    if (error instanceof Error) {
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-        name: error.name,
-        cause: error.cause
-      });
-    }
-    res.status(500).json({ 
-      message: "記録の取得に失敗しました",
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
-});
+  });
 
   // Announcements API endpoints
   // Get latest announcement
@@ -609,13 +528,19 @@ app.get("/api/records", async (req, res) => {
       }
 
       // Update athlete
-      const { joinDate } = req.body;
+      const { joinDate, allTimeStartDate } = req.body;
+      const nextJoinDate = joinDate ? new Date(joinDate) : athlete.joinDate;
+      const nextAllTimeStartDate = allTimeStartDate === undefined
+        ? athlete.allTimeStartDate
+        : (allTimeStartDate ? new Date(allTimeStartDate) : null);
+
       const [updatedAthlete] = await db
         .update(users)
         .set({ 
           username,
           gender: gender || athlete.gender || 'male',
-          joinDate: joinDate ? new Date(joinDate) : athlete.joinDate
+          joinDate: nextJoinDate,
+          allTimeStartDate: nextAllTimeStartDate
         })
         .where(eq(users.id, parseInt(id)))
         .returning();

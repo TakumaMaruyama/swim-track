@@ -1,5 +1,5 @@
 import useSWR from "swr";
-import { useCallback, useState, useEffect } from "react";
+import { useCallback } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "./use-auth";
 import { fetcher } from "@/lib/fetcher";
@@ -13,44 +13,24 @@ export interface Announcement {
 }
 
 export function useAnnouncements() {
-  const { data, error, mutate } = useSWR<Announcement>("/api/announcements/latest", fetcher);
-  const [announcement, setAnnouncement] = useState<Announcement | null>(null);
+  const { data, error, mutate, isLoading } = useSWR<Announcement>(
+    "/api/announcements/latest",
+    fetcher
+  );
   const { toast } = useToast();
   const { isAdmin } = useAuth();
-
-  // データが変わったときにステートを更新
-  useEffect(() => {
-    if (data) {
-      console.log("Setting announcement from data:", data);
-      setAnnouncement(data);
-    }
-  }, [data]);
 
   // 手動でデータを取得する関数
   const fetchLatestAnnouncement = useCallback(async () => {
     try {
-      const response = await fetch("/api/announcements/latest");
-      
-      if (!response.ok) {
-        throw new Error("お知らせの取得に失敗しました");
-      }
-      
-      const data = await response.json();
-      console.log("Manually fetched announcement:", data);
-      setAnnouncement(data);
-      mutate(data, false); // SWRキャッシュも更新
-      return data;
+      const latest = await fetcher("/api/announcements/latest");
+      mutate(latest, false); // SWRキャッシュを即時更新
+      return latest;
     } catch (error) {
       console.error("Error fetching announcement:", error);
+      return null;
     }
   }, [mutate]);
-
-  // コンポーネントがマウントされたときに一度だけ実行
-  useEffect(() => {
-    if (!data && !error) {
-      fetchLatestAnnouncement();
-    }
-  }, [fetchLatestAnnouncement, data, error]);
 
   const updateAnnouncement = useCallback(async (content: string) => {
     if (!isAdmin) {
@@ -85,9 +65,6 @@ export function useAnnouncements() {
       const updatedAnnouncement = await response.json();
       console.log("Updated announcement:", updatedAnnouncement);
       
-      // ローカルのステートを更新
-      setAnnouncement(updatedAnnouncement);
-      
       // SWRのキャッシュを更新（再検証なし）
       mutate(updatedAnnouncement, false);
       
@@ -105,11 +82,11 @@ export function useAnnouncements() {
         variant: "destructive",
       });
     }
-  }, [isAdmin, toast, mutate, fetchLatestAnnouncement]);
+  }, [isAdmin, toast, mutate]);
 
   return {
-    announcement: announcement,
-    isLoading: !error && !data && !announcement,
+    announcement: data || null,
+    isLoading: isLoading && !data,
     error,
     updateAnnouncement,
     fetchLatestAnnouncement,
