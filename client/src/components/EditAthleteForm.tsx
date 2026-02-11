@@ -95,111 +95,67 @@ export function EditAthleteForm({ athlete, isOpen, onClose, onSubmit }: EditAthl
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="username"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>選手名</FormLabel>
-                  <FormControl>
-                    <Input {...field} disabled={isSubmitting} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="nameKana"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>ふりがな</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="ふりがな（例：やまだ たろう）"
-                      {...field}
-                      disabled={isSubmitting}
-                    />
-                  </FormControl>
-                  <p className="text-xs text-muted-foreground">
-                    ふりがなを入力すると、選手一覧が名簿順（五十音順）で並びます
-                  </p>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="gender"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>性別</FormLabel>
-                  <FormControl>
-                    <select
-                      {...field}
-                      disabled={isSubmitting}
-                      className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <option value="male">男性</option>
-                      <option value="female">女性</option>
-                    </select>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="joinDate"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>加入日</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="date"
-                      {...field}
-                      disabled={isSubmitting}
-                    />
-                  </FormControl>
-                  <p className="text-xs text-muted-foreground">
-                    加入日は選手プロフィール情報として保持されます
-                  </p>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="excludePreviousClubRecords"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>歴代記録の反映設定</FormLabel>
-                  <FormControl>
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={field.value}
-                        onChange={(e) => field.onChange(e.target.checked)}
-                        disabled={isSubmitting}
-                      />
-                      前クラブ在籍時の記録を歴代記録に含めない
-                    </label>
-                  </FormControl>
-                  <p className="text-xs text-muted-foreground">
-                    ONにすると、下の日付以降の記録だけが歴代記録に表示されます
-                  </p>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            {excludePreviousClubRecords && (
+          <div className="max-h-[60vh] overflow-y-auto pr-2 -mr-2">
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
-                name="allTimeStartDate"
+                name="username"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>歴代記録の反映開始日</FormLabel>
+                    <FormLabel>選手名</FormLabel>
+                    <FormControl>
+                      <Input {...field} disabled={isSubmitting} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="nameKana"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>ふりがな</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="ふりがな（例：やまだ たろう）"
+                        {...field}
+                        disabled={isSubmitting}
+                      />
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground">
+                      ふりがなを入力すると、選手一覧が名簿順（五十音順）で並びます
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="gender"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>性別</FormLabel>
+                    <FormControl>
+                      <select
+                        {...field}
+                        disabled={isSubmitting}
+                        className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <option value="male">男性</option>
+                        <option value="female">女性</option>
+                      </select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="joinDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>加入日</FormLabel>
                     <FormControl>
                       <Input
                         type="date"
@@ -207,32 +163,81 @@ export function EditAthleteForm({ athlete, isOpen, onClose, onSubmit }: EditAthl
                         disabled={isSubmitting}
                       />
                     </FormControl>
+                    <p className="text-xs text-muted-foreground">
+                      加入日は選手プロフィール情報として保持されます
+                    </p>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            )}
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onClose}
-                disabled={isSubmitting}
-              >
-                キャンセル
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    更新中...
-                  </>
-                ) : (
-                  "更新"
+              <FormField
+                control={form.control}
+                name="excludePreviousClubRecords"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>歴代記録の反映設定</FormLabel>
+                    <FormControl>
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={field.value}
+                          onChange={(e) => field.onChange(e.target.checked)}
+                          disabled={isSubmitting}
+                        />
+                        前クラブ在籍時の記録を歴代記録に含めない
+                      </label>
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground">
+                      ONにすると、下の日付以降の記録だけが歴代記録に表示されます
+                    </p>
+                    <FormMessage />
+                  </FormItem>
                 )}
-              </Button>
-            </DialogFooter>
-          </form>
+              />
+              {excludePreviousClubRecords && (
+                <FormField
+                  control={form.control}
+                  name="allTimeStartDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>歴代記録の反映開始日</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          {...field}
+                          disabled={isSubmitting}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+            </form>
+          </div>
+          <DialogFooter className="mt-6">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
+              キャンセル
+            </Button>
+            <Button 
+              onClick={form.handleSubmit(handleSubmit)} 
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  更新中...
+                </>
+              ) : (
+                "更新"
+              )}
+            </Button>
+          </DialogFooter>
         </Form>
       </DialogContent>
     </Dialog>
