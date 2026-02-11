@@ -29,6 +29,8 @@ export function registerRoutes(app: Express) {
           isActive: users.isActive,
           role: users.role,
           gender: users.gender,
+          joinDate: users.joinDate,
+          allTimeStartDate: users.allTimeStartDate,
         })
         .from(users)
         .where(eq(users.role, 'student'))
@@ -114,6 +116,7 @@ export function registerRoutes(app: Express) {
           athleteName: users.username,
           athleteGender: users.gender,
           athleteJoinDate: users.joinDate,
+          athleteAllTimeStartDate: users.allTimeStartDate,
         })
         .from(swimRecords)
         .leftJoin(users, eq(swimRecords.studentId, users.id))
@@ -129,6 +132,7 @@ export function registerRoutes(app: Express) {
           // Keep behavior: prefer gender from users table with fallback
           gender: athleteGender || "male",
           athleteJoinDate: baseRecord.athleteJoinDate || null,
+          athleteAllTimeStartDate: baseRecord.athleteAllTimeStartDate || null,
         };
       });
 
@@ -524,13 +528,19 @@ export function registerRoutes(app: Express) {
       }
 
       // Update athlete
-      const { joinDate } = req.body;
+      const { joinDate, allTimeStartDate } = req.body;
+      const nextJoinDate = joinDate ? new Date(joinDate) : athlete.joinDate;
+      const nextAllTimeStartDate = allTimeStartDate === undefined
+        ? athlete.allTimeStartDate
+        : (allTimeStartDate ? new Date(allTimeStartDate) : null);
+
       const [updatedAthlete] = await db
         .update(users)
         .set({ 
           username,
           gender: gender || athlete.gender || 'male',
-          joinDate: joinDate ? new Date(joinDate) : athlete.joinDate
+          joinDate: nextJoinDate,
+          allTimeStartDate: nextAllTimeStartDate
         })
         .where(eq(users.id, parseInt(id)))
         .returning();

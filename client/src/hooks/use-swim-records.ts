@@ -17,6 +17,7 @@ export interface ExtendedSwimRecord {
   competitionLocation: string | null;
   gender: 'male' | 'female';
   athleteJoinDate: Date | null;
+  athleteAllTimeStartDate: Date | null;
 }
 
 export function useSwimRecords() {

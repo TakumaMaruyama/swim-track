@@ -74,13 +74,23 @@ function RecordsAll(): JSX.Element {
     if (!records) return {};
 
     try {
-      console.log('Records total:', records.length);
-      console.log('Males:', records.filter(r => r.gender === 'male').length);
-      console.log('Females:', records.filter(r => r.gender === 'female').length);
-      
       const filteredRecords = records.filter(record => {
-        return record.poolLength === parseInt(poolLengthFilter) &&
-               record.gender === genderFilter;
+        if (record.poolLength !== parseInt(poolLengthFilter) || record.gender !== genderFilter) {
+          return false;
+        }
+
+        // 選手ごとの反映開始日がある場合は、それ以前の記録を除外
+        if (record.athleteAllTimeStartDate) {
+          if (!record.date) return false;
+
+          const startDate = new Date(record.athleteAllTimeStartDate);
+          const recordDate = new Date(record.date);
+          if (recordDate < startDate) {
+            return false;
+          }
+        }
+
+        return true;
       });
 
       return filteredRecords.reduce((acc, record) => {

@@ -28,6 +28,16 @@ const editAthleteSchema = z.object({
   username: z.string().min(2, "ユーザー名は2文字以上である必要があります"),
   gender: z.enum(["male", "female"]),
   joinDate: z.string().optional(),
+  excludePreviousClubRecords: z.boolean().default(false),
+  allTimeStartDate: z.string().optional(),
+}).superRefine((values, ctx) => {
+  if (values.excludePreviousClubRecords && !values.allTimeStartDate) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "反映開始日を入力してください",
+      path: ["allTimeStartDate"],
+    });
+  }
 });
 
 type EditAthleteFormProps = {
@@ -47,8 +57,11 @@ export function EditAthleteForm({ athlete, isOpen, onClose, onSubmit }: EditAthl
       username: athlete.username,
       gender: athlete.gender as "male" | "female",
       joinDate: athlete.joinDate ? new Date(athlete.joinDate).toISOString().split('T')[0] : '',
+      excludePreviousClubRecords: !!athlete.allTimeStartDate,
+      allTimeStartDate: athlete.allTimeStartDate ? new Date(athlete.allTimeStartDate).toISOString().split('T')[0] : '',
     },
   });
+  const excludePreviousClubRecords = form.watch("excludePreviousClubRecords");
 
   const handleSubmit = async (values: z.infer<typeof editAthleteSchema>) => {
     try {
@@ -128,12 +141,55 @@ export function EditAthleteForm({ athlete, isOpen, onClose, onSubmit }: EditAthl
                     />
                   </FormControl>
                   <p className="text-xs text-muted-foreground">
-                    加入日以降の記録のみが歴代記録に反映されます
+                    加入日は選手プロフィール情報として保持されます
                   </p>
                   <FormMessage />
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="excludePreviousClubRecords"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>歴代記録の反映設定</FormLabel>
+                  <FormControl>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={field.value}
+                        onChange={(e) => field.onChange(e.target.checked)}
+                        disabled={isSubmitting}
+                      />
+                      前クラブ在籍時の記録を歴代記録に含めない
+                    </label>
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground">
+                    ONにすると、下の日付以降の記録だけが歴代記録に表示されます
+                  </p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {excludePreviousClubRecords && (
+              <FormField
+                control={form.control}
+                name="allTimeStartDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>歴代記録の反映開始日</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        {...field}
+                        disabled={isSubmitting}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             <DialogFooter>
               <Button
                 type="button"
