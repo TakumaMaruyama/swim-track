@@ -31,12 +31,12 @@ interface TimeProgressChartProps {
 }
 
 type ChartRecord = ExtendedSwimRecord & {
-  chartKey: string;
+  chartX: number;
   dateLabel: string;
 };
 
 type ChartPoint = {
-  x: string;
+  x: number;
   y: number;
   isCompetition: boolean;
   competitionName: string | null;
@@ -77,12 +77,21 @@ const formatDate = (date: Date | string | null) => {
   return parsedDate ? parsedDate.toLocaleDateString('ja-JP') : '';
 };
 
+const createChartX = (date: Date | string | null, duplicateIndex: number) => {
+  const timestamp = parseDate(date)?.getTime() ?? 0;
+
+  // 同日同時刻の複数記録でも、描画順が崩れないよう微小差を付ける
+  return timestamp + duplicateIndex;
+};
+
 const TimeProgressChart: React.FC<TimeProgressChartProps> = ({ 
   records, 
   style, 
   distance
 }) => {
   const filteredRecords = React.useMemo<ChartRecord[]>(() => {
+    const duplicateCounts = new Map<number, number>();
+
     return records
       .filter(r => {
         return r.style === style &&
@@ -98,11 +107,17 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
 
         return a.id - b.id;
       })
-      .map((record, index) => ({
-        ...record,
-        chartKey: `${record.id}-${index}`,
-        dateLabel: formatDate(record.date),
-      }));
+      .map((record) => {
+        const timestamp = parseDate(record.date)?.getTime() ?? 0;
+        const duplicateIndex = duplicateCounts.get(timestamp) ?? 0;
+        duplicateCounts.set(timestamp, duplicateIndex + 1);
+
+        return {
+          ...record,
+          chartX: createChartX(record.date, duplicateIndex),
+          dateLabel: formatDate(record.date),
+        };
+      });
   }, [records, style, distance]);
 
   // プール長ごとの色を定義
@@ -118,7 +133,6 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
   ).sort((a, b) => a - b);
 
   const data = {
-    labels: filteredRecords.map((record) => record.chartKey),
     datasets: poolLengths.map(poolLength => {
       const color = poolColors[poolLength as keyof typeof poolColors];
       const poolRecords = filteredRecords.filter(record => record.poolLength === poolLength);
@@ -128,7 +142,7 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
                poolLength === 25 ? "25m（短水路）" :
                "50m（長水路）",
         data: poolRecords.map((record): ChartPoint => ({
-          x: record.chartKey,
+          x: record.chartX,
           y: timeToSeconds(record.time),
           isCompetition: record.isCompetition,
           competitionName: record.competitionName,
@@ -137,10 +151,10 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
           poolLength: record.poolLength,
           dateLabel: record.dateLabel,
         })),
+        parsing: false,
         borderColor: color.border,
         backgroundColor: color.background,
-        tension: 0.25,
-        cubicInterpolationMode: 'monotone' as const,
+        tension: 0,
         pointStyle: poolRecords.map(record => record.isCompetition ? 'star' : 'circle'),
         pointRadius: poolRecords.map(record => record.isCompetition ? 8 : 4),
       };
@@ -190,22 +204,17 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
     },
     scales: {
       x: {
+        type: 'linear',
+        afterBuildTicks: (axis) => {
+          axis.ticks = filteredRecords.map((record) => ({
+            value: record.chartX,
+          }));
+        },
         ticks: {
           maxRotation: 45,
           minRotation: 45,
-          callback: (_value, index) => {
-            const currentRecord = filteredRecords[index];
-            const previousRecord = filteredRecords[index - 1];
-
-            if (!currentRecord) {
-              return '';
-            }
-
-            if (previousRecord?.dateLabel === currentRecord.dateLabel) {
-              return '';
-            }
-
-            return currentRecord.dateLabel;
+          callback: (value) => {
+            return formatDate(new Date(Number(value)));
           },
         },
       },
