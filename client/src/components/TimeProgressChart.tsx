@@ -30,49 +30,80 @@ interface TimeProgressChartProps {
   distance: number;
 }
 
+type ChartRecord = ExtendedSwimRecord & {
+  chartKey: string;
+  dateLabel: string;
+};
+
+type ChartPoint = {
+  x: string;
+  y: number;
+  isCompetition: boolean;
+  competitionName: string | null;
+  competitionLocation: string | null;
+  time: string;
+  poolLength: number;
+  dateLabel: string;
+};
+
+const parseDate = (date: Date | string | null) => {
+  if (!date) return null;
+
+  const parsedDate = new Date(date);
+  return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+};
+
+const timeToSeconds = (time: string | null): number => {
+  if (!time) return 0;
+
+  const [minutes, seconds] = time.split(':').map((value) => {
+    const parsedValue = parseFloat(value);
+    return Number.isNaN(parsedValue) ? 0 : parsedValue;
+  });
+
+  return (minutes * 60) + seconds;
+};
+
+const formatSeconds = (totalSeconds: number): string => {
+  if (Number.isNaN(totalSeconds) || totalSeconds === 0) return '0:00.00';
+
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = (totalSeconds % 60).toFixed(2);
+  return `${minutes}:${seconds.padStart(5, '0')}`;
+};
+
+const formatDate = (date: Date | string | null) => {
+  const parsedDate = parseDate(date);
+  return parsedDate ? parsedDate.toLocaleDateString('ja-JP') : '';
+};
+
 const TimeProgressChart: React.FC<TimeProgressChartProps> = ({ 
   records, 
   style, 
   distance
 }) => {
-  const filteredRecords = React.useMemo(() => {
+  const filteredRecords = React.useMemo<ChartRecord[]>(() => {
     return records
       .filter(r => {
         return r.style === style &&
                r.distance === distance;
       })
       .sort((a, b) => {
-        const dateA = new Date(a.date || '');
-        const dateB = new Date(b.date || '');
-        return dateA.getTime() - dateB.getTime();
-      });
+        const timeDiff =
+          (parseDate(a.date)?.getTime() ?? 0) - (parseDate(b.date)?.getTime() ?? 0);
+
+        if (timeDiff !== 0) {
+          return timeDiff;
+        }
+
+        return a.id - b.id;
+      })
+      .map((record, index) => ({
+        ...record,
+        chartKey: `${record.id}-${index}`,
+        dateLabel: formatDate(record.date),
+      }));
   }, [records, style, distance]);
-
-  const timeToSeconds = (time: string | null): number => {
-    if (!time) return 0;
-    try {
-      const [minutes, seconds] = time.split(':').map(str => {
-        const num = parseFloat(str);
-        return isNaN(num) ? 0 : num;
-      });
-      return (minutes * 60) + seconds;
-    } catch (error) {
-      console.error('Error parsing time:', error);
-      return 0;
-    }
-  };
-
-  const formatSeconds = (totalSeconds: number): string => {
-    if (isNaN(totalSeconds) || totalSeconds === 0) return '0:00.00';
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = (totalSeconds % 60).toFixed(2);
-    return `${minutes}:${seconds.padStart(5, '0')}`;
-  };
-
-  const formatDate = (date: Date | string | null) => {
-    if (!date) return '';
-    return new Date(date).toLocaleDateString('ja-JP');
-  };
 
   // プール長ごとの色を定義
   const poolColors = {
@@ -87,35 +118,31 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
   ).sort((a, b) => a - b);
 
   const data = {
-    labels: filteredRecords.map(r => formatDate(r.date)),
+    labels: filteredRecords.map((record) => record.chartKey),
     datasets: poolLengths.map(poolLength => {
       const color = poolColors[poolLength as keyof typeof poolColors];
+      const poolRecords = filteredRecords.filter(record => record.poolLength === poolLength);
+
       return {
         label: poolLength === 15 ? "15m" :
                poolLength === 25 ? "25m（短水路）" :
                "50m（長水路）",
-        data: filteredRecords
-          .filter(r => r.poolLength === poolLength)
-          .map(r => {
-            return {
-              x: formatDate(r.date),
-              y: timeToSeconds(r.time),
-              isCompetition: r.isCompetition,
-              competitionName: r.competitionName,
-              competitionLocation: r.competitionLocation,
-              time: r.time,
-              poolLength: r.poolLength
-            };
-          }),
+        data: poolRecords.map((record): ChartPoint => ({
+          x: record.chartKey,
+          y: timeToSeconds(record.time),
+          isCompetition: record.isCompetition,
+          competitionName: record.competitionName,
+          competitionLocation: record.competitionLocation,
+          time: record.time,
+          poolLength: record.poolLength,
+          dateLabel: record.dateLabel,
+        })),
         borderColor: color.border,
         backgroundColor: color.background,
-        tension: 0.3,
-        pointStyle: filteredRecords
-          .filter(r => r.poolLength === poolLength)
-          .map(r => r.isCompetition ? 'star' : 'circle'),
-        pointRadius: filteredRecords
-          .filter(r => r.poolLength === poolLength)
-          .map(r => r.isCompetition ? 8 : 4),
+        tension: 0.25,
+        cubicInterpolationMode: 'monotone' as const,
+        pointStyle: poolRecords.map(record => record.isCompetition ? 'star' : 'circle'),
+        pointRadius: poolRecords.map(record => record.isCompetition ? 8 : 4),
       };
     }),
   };
@@ -132,9 +159,16 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
       },
       tooltip: {
         callbacks: {
+          title: (items) => {
+            const raw = items[0]?.raw;
+            if (!raw || typeof raw !== 'object' || !('dateLabel' in raw)) {
+              return '';
+            }
+
+            return String(raw.dateLabel);
+          },
           label: (context: TooltipItem<'line'>) => {
             if (!context.raw || typeof context.raw !== 'object') return '';
-            console.log('Tooltip data:', context.raw);
             const data = context.raw as { 
               y: number, 
               isCompetition: boolean,
@@ -155,6 +189,26 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
       },
     },
     scales: {
+      x: {
+        ticks: {
+          maxRotation: 45,
+          minRotation: 45,
+          callback: (_value, index) => {
+            const currentRecord = filteredRecords[index];
+            const previousRecord = filteredRecords[index - 1];
+
+            if (!currentRecord) {
+              return '';
+            }
+
+            if (previousRecord?.dateLabel === currentRecord.dateLabel) {
+              return '';
+            }
+
+            return currentRecord.dateLabel;
+          },
+        },
+      },
       y: {
         reverse: true,
         title: {
