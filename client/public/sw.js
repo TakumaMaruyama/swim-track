@@ -1,4 +1,4 @@
-const CACHE_NAME = "swimtime-static-v2";
+const CACHE_NAME = "swimtime-static-v3";
 const STATIC_ASSETS = [
   "/icon-192.png",
   "/icon-512.png",
