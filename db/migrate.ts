@@ -1,13 +1,8 @@
-import { drizzle } from 'drizzle-orm/neon-http';
-import { migrate } from 'drizzle-orm/neon-http/migrator';
-import { neon } from '@neondatabase/serverless';
-
-const sql = neon(process.env.DATABASE_URL!);
-const db = drizzle(sql);
+import { runMigrations } from "./runMigrations";
 
 async function main() {
   console.log('Migration started');
-  await migrate(db, { migrationsFolder: 'migrations' });
+  await runMigrations();
   console.log('Migration completed');
   process.exit(0);
 }
