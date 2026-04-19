@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Download, Edit2, Plus, Power, History, Trash2 } from "lucide-react";
+import { AlertCircle, Download, Edit2, Plus, Power, History, Trash2, Flag } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -75,16 +75,18 @@ const AddAthleteDialog = ({ isOpen, onClose, onSubmit }) => {
   const [username, setUsername] = useState("");
   const [nameKana, setNameKana] = useState("");
   const [gender, setGender] = useState("male");
+  const [birthDate, setBirthDate] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      await onSubmit(username, gender, nameKana);
+      await onSubmit(username, gender, nameKana, birthDate);
       setUsername("");
       setNameKana("");
       setGender("male");
+      setBirthDate("");
     } finally {
       setIsSubmitting(false);
     }
@@ -140,6 +142,20 @@ const AddAthleteDialog = ({ isOpen, onClose, onSubmit }) => {
                 <option value="male">男性</option>
                 <option value="female">女性</option>
               </select>
+            </div>
+            <div className="grid gap-2">
+              <label htmlFor="birthDate" className="text-sm font-medium">
+                生年月日
+              </label>
+              <Input
+                id="birthDate"
+                type="date"
+                value={birthDate}
+                onChange={(e) => setBirthDate(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                大会目標一覧の標準タイム判定に使います
+              </p>
             </div>
           </div>
           <DialogFooter>
@@ -240,6 +256,7 @@ export default function Athletes() {
       username: string;
       nameKana?: string;
       gender: string;
+      birthDate?: string;
       joinDate?: string;
       excludePreviousClubRecords: boolean;
       allTimeStartDate?: string;
@@ -264,6 +281,7 @@ export default function Athletes() {
           username: data.username,
           nameKana: data.nameKana || null,
           gender: data.gender,
+          birthDate: data.birthDate || null,
           joinDate: data.joinDate || null,
           allTimeStartDate: data.excludePreviousClubRecords
             ? (data.allTimeStartDate || null)
@@ -443,14 +461,24 @@ export default function Athletes() {
     }
   };
 
-  const handleCreateAthlete = async (username: string, gender: string = 'male', nameKana: string = '') => {
+  const handleCreateAthlete = async (
+    username: string,
+    gender: string = 'male',
+    nameKana: string = '',
+    birthDate: string = '',
+  ) => {
     try {
       const response = await fetch('/api/athletes', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ username, gender, nameKana: nameKana || null }),
+        body: JSON.stringify({
+          username,
+          gender,
+          nameKana: nameKana || null,
+          birthDate: birthDate || null,
+        }),
         credentials: 'include',
       });
 
@@ -514,6 +542,14 @@ export default function Athletes() {
         title="選手一覧"
         children={
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => navigate("/qualification-progress")}
+              className="flex items-center gap-2"
+            >
+              <Flag className="h-4 w-4" />
+              大会目標一覧を見る
+            </Button>
             {isAdmin && (
               <>
                 <Button
@@ -708,6 +744,7 @@ export default function Athletes() {
               <TimeHistoryModal
                 isOpen={!!viewingHistory.athleteId}
                 onClose={() => setViewingHistory({ athleteId: null, athleteName: '' })}
+                athleteId={viewingHistory.athleteId}
                 records={getAthleteRecords(viewingHistory.athleteId)}
                 athleteName={viewingHistory.athleteName}
                 onRecordDeleted={async () => {
