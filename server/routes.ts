@@ -18,6 +18,117 @@ const QUALIFICATION_COURSES = ["SCM", "LCM", "ANY"] as const;
 type QualificationLevel = (typeof QUALIFICATION_LEVELS)[number];
 type QualificationCourse = (typeof QUALIFICATION_COURSES)[number];
 
+const QUALIFICATION_COLUMN_NAMES = [
+  "is_qualification_target",
+  "qualifying_meet_id",
+  "qualifying_level",
+  "qualifying_season",
+  "qualifying_course",
+] as const;
+
+const athleteListFields = {
+  id: users.id,
+  username: users.username,
+  nameKana: users.nameKana,
+  isActive: users.isActive,
+  role: users.role,
+  gender: users.gender,
+  birthDate: users.birthDate,
+  joinDate: users.joinDate,
+  allTimeStartDate: users.allTimeStartDate,
+};
+
+const legacyAthleteListFields = {
+  id: users.id,
+  username: users.username,
+  nameKana: users.nameKana,
+  isActive: users.isActive,
+  role: users.role,
+  gender: users.gender,
+  joinDate: users.joinDate,
+  allTimeStartDate: users.allTimeStartDate,
+};
+
+const athleteFieldsWithoutBirthDate = {
+  id: users.id,
+  username: users.username,
+  nameKana: users.nameKana,
+  password: users.password,
+  role: users.role,
+  isActive: users.isActive,
+  gender: users.gender,
+  joinDate: users.joinDate,
+  allTimeStartDate: users.allTimeStartDate,
+  createdAt: users.createdAt,
+};
+
+const athleteReturnFields = {
+  id: users.id,
+  username: users.username,
+  nameKana: users.nameKana,
+  role: users.role,
+  isActive: users.isActive,
+  gender: users.gender,
+  birthDate: users.birthDate,
+  joinDate: users.joinDate,
+  allTimeStartDate: users.allTimeStartDate,
+  createdAt: users.createdAt,
+};
+
+const legacyAthleteReturnFields = {
+  id: users.id,
+  username: users.username,
+  nameKana: users.nameKana,
+  role: users.role,
+  isActive: users.isActive,
+  gender: users.gender,
+  joinDate: users.joinDate,
+  allTimeStartDate: users.allTimeStartDate,
+  createdAt: users.createdAt,
+};
+
+const competitionListFields = {
+  id: competitions.id,
+  name: competitions.name,
+  location: competitions.location,
+  date: competitions.date,
+  isQualificationTarget: competitions.isQualificationTarget,
+  qualifyingMeetId: competitions.qualifyingMeetId,
+  qualifyingLevel: competitions.qualifyingLevel,
+  qualifyingSeason: competitions.qualifyingSeason,
+  qualifyingCourse: competitions.qualifyingCourse,
+  recordCount: count(swimRecords.id),
+};
+
+const legacyCompetitionListFields = {
+  id: competitions.id,
+  name: competitions.name,
+  location: competitions.location,
+  date: competitions.date,
+  recordCount: count(swimRecords.id),
+};
+
+const competitionReturnFields = {
+  id: competitions.id,
+  name: competitions.name,
+  location: competitions.location,
+  date: competitions.date,
+  isQualificationTarget: competitions.isQualificationTarget,
+  qualifyingMeetId: competitions.qualifyingMeetId,
+  qualifyingLevel: competitions.qualifyingLevel,
+  qualifyingSeason: competitions.qualifyingSeason,
+  qualifyingCourse: competitions.qualifyingCourse,
+  createdAt: competitions.createdAt,
+};
+
+const legacyCompetitionReturnFields = {
+  id: competitions.id,
+  name: competitions.name,
+  location: competitions.location,
+  date: competitions.date,
+  createdAt: competitions.createdAt,
+};
+
 const corsOptions = {
   origin:
     process.env.NODE_ENV === "production"
@@ -55,6 +166,57 @@ function isQualificationLevel(value: unknown): value is QualificationLevel {
 
 function isQualificationCourse(value: unknown): value is QualificationCourse {
   return typeof value === "string" && QUALIFICATION_COURSES.includes(value as QualificationCourse);
+}
+
+function isMissingColumnError(error: unknown, columnNames: readonly string[]) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  const code =
+    typeof error === "object" && error !== null && "code" in error
+      ? String((error as { code?: unknown }).code ?? "")
+      : "";
+
+  const matchesColumn = columnNames.some((column) => message.includes(column));
+  const matchesCode = code === "" || code === "42703" || code === "42704";
+
+  return matchesColumn && matchesCode;
+}
+
+function isUsersBirthDateMissingError(error: unknown) {
+  return isMissingColumnError(error, ["birth_date"]);
+}
+
+function isCompetitionQualificationColumnMissingError(error: unknown) {
+  return isMissingColumnError(error, QUALIFICATION_COLUMN_NAMES);
+}
+
+function withLegacyBirthDate<T extends Record<string, unknown>>(athlete: T) {
+  return {
+    ...athlete,
+    birthDate: null,
+  };
+}
+
+function withLegacyCompetitionFields<T extends Record<string, unknown>>(competition: T) {
+  return {
+    ...competition,
+    isQualificationTarget: false,
+    qualifyingMeetId: null,
+    qualifyingLevel: null,
+    qualifyingSeason: null,
+    qualifyingCourse: null,
+  };
+}
+
+function buildSchemaOutdatedMessage(feature: "athletes" | "competitions" | "qualification-progress") {
+  if (feature === "athletes") {
+    return "開発DBの migration が未適用のため選手情報を完全に読めません。サーバーを再起動すると自動 migration が走ります。";
+  }
+
+  if (feature === "competitions") {
+    return "開発DBの migration が未適用のため大会目標設定を保存できません。サーバー再起動後にもう一度お試しください。";
+  }
+
+  return "開発DBの migration が未適用のため大会目標一覧を作れません。サーバーを再起動して migration を反映してください。";
 }
 
 function normalizeCompetitionPayload(body: Record<string, unknown>) {
@@ -114,23 +276,25 @@ export function registerRoutes(app: Express) {
   app.get("/api/athletes", async (_req, res) => {
     try {
       const athletes = await db
-        .select({
-          id: users.id,
-          username: users.username,
-          nameKana: users.nameKana,
-          isActive: users.isActive,
-          role: users.role,
-          gender: users.gender,
-          birthDate: users.birthDate,
-          joinDate: users.joinDate,
-          allTimeStartDate: users.allTimeStartDate,
-        })
+        .select(athleteListFields)
         .from(users)
         .where(eq(users.role, "student"))
         .orderBy(sql`COALESCE(${users.nameKana}, ${users.username})`);
 
       res.json(athletes);
     } catch (error) {
+      if (isUsersBirthDateMissingError(error)) {
+        console.warn("users.birth_date column is missing. Falling back to legacy athlete query.");
+
+        const legacyAthletes = await db
+          .select(legacyAthleteListFields)
+          .from(users)
+          .where(eq(users.role, "student"))
+          .orderBy(sql`COALESCE(${users.nameKana}, ${users.username})`);
+
+        return res.json(legacyAthletes.map((athlete) => withLegacyBirthDate(athlete)));
+      }
+
       console.error("Error fetching athletes:", error);
       res.status(500).json({ message: "選手情報の取得に失敗しました" });
     }
@@ -150,7 +314,7 @@ export function registerRoutes(app: Express) {
       }
 
       const [existingUser] = await db
-        .select()
+        .select({ id: users.id })
         .from(users)
         .where(eq(users.username, normalizedUsername))
         .limit(1);
@@ -159,21 +323,40 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ message: "この選手名は既に使用されています" });
       }
 
-      const [athlete] = await db
-        .insert(users)
-        .values({
-          username: normalizedUsername,
-          nameKana: typeof nameKana === "string" && nameKana.trim().length > 0 ? nameKana.trim() : null,
-          password: await hashPassword("temporary"),
-          role: "student",
-          isActive: true,
-          gender,
-          birthDate: parseOptionalDate(birthDate),
-        })
-        .returning();
+      const baseAthletePayload = {
+        username: normalizedUsername,
+        nameKana: typeof nameKana === "string" && nameKana.trim().length > 0 ? nameKana.trim() : null,
+        password: await hashPassword("temporary"),
+        role: "student" as const,
+        isActive: true,
+        gender,
+      };
+      const parsedBirthDate = parseOptionalDate(birthDate);
 
-      const { password: _password, ...athleteWithoutPassword } = athlete;
-      res.json(athleteWithoutPassword);
+      try {
+        const [athlete] = await db
+          .insert(users)
+          .values({
+            ...baseAthletePayload,
+            birthDate: parsedBirthDate,
+          })
+          .returning(athleteReturnFields);
+
+        return res.json(athlete);
+      } catch (error) {
+        if (!isUsersBirthDateMissingError(error)) {
+          throw error;
+        }
+
+        console.warn("users.birth_date column is missing. Creating athlete without birthDate.");
+
+        const [athlete] = await db
+          .insert(users)
+          .values(baseAthletePayload)
+          .returning(legacyAthleteReturnFields);
+
+        return res.json(withLegacyBirthDate(athlete));
+      }
     } catch (error) {
       console.error("Error creating athlete:", error);
       res.status(500).json({ message: "選手の作成に失敗しました" });
@@ -223,18 +406,7 @@ export function registerRoutes(app: Express) {
   app.get("/api/competitions", async (_req, res) => {
     try {
       const rows = await db
-        .select({
-          id: competitions.id,
-          name: competitions.name,
-          location: competitions.location,
-          date: competitions.date,
-          isQualificationTarget: competitions.isQualificationTarget,
-          qualifyingMeetId: competitions.qualifyingMeetId,
-          qualifyingLevel: competitions.qualifyingLevel,
-          qualifyingSeason: competitions.qualifyingSeason,
-          qualifyingCourse: competitions.qualifyingCourse,
-          recordCount: count(swimRecords.id),
-        })
+        .select(competitionListFields)
         .from(competitions)
         .leftJoin(swimRecords, eq(swimRecords.competitionId, competitions.id))
         .groupBy(competitions.id)
@@ -247,6 +419,26 @@ export function registerRoutes(app: Express) {
         })),
       );
     } catch (error) {
+      if (isCompetitionQualificationColumnMissingError(error)) {
+        console.warn("Competition qualification columns are missing. Falling back to legacy competition query.");
+
+        const legacyRows = await db
+          .select(legacyCompetitionListFields)
+          .from(competitions)
+          .leftJoin(swimRecords, eq(swimRecords.competitionId, competitions.id))
+          .groupBy(competitions.id)
+          .orderBy(asc(competitions.date), asc(competitions.name));
+
+        return res.json(
+          legacyRows.map((row) =>
+            withLegacyCompetitionFields({
+              ...row,
+              recordCount: Number(row.recordCount ?? 0),
+            }),
+          ),
+        );
+      }
+
       console.error("Error fetching competitions:", error);
       res.status(500).json({ message: "大会情報の取得に失敗しました" });
     }
@@ -259,12 +451,34 @@ export function registerRoutes(app: Express) {
 
     try {
       const payload = normalizeCompetitionPayload(req.body);
-      const [competition] = await db
-        .insert(competitions)
-        .values(payload)
-        .returning();
 
-      res.json(competition);
+      try {
+        const [competition] = await db
+          .insert(competitions)
+          .values(payload)
+          .returning(competitionReturnFields);
+
+        return res.json(competition);
+      } catch (error) {
+        if (!isCompetitionQualificationColumnMissingError(error)) {
+          throw error;
+        }
+
+        if (payload.isQualificationTarget) {
+          return res.status(409).json({ message: buildSchemaOutdatedMessage("competitions") });
+        }
+
+        const [competition] = await db
+          .insert(competitions)
+          .values({
+            name: payload.name,
+            location: payload.location,
+            date: payload.date,
+          })
+          .returning(legacyCompetitionReturnFields);
+
+        return res.json(withLegacyCompetitionFields(competition));
+      }
     } catch (error) {
       console.error("Error creating competition:", error);
       res.status(400).json({
@@ -285,17 +499,44 @@ export function registerRoutes(app: Express) {
       }
 
       const payload = normalizeCompetitionPayload(req.body);
-      const [competition] = await db
-        .update(competitions)
-        .set(payload)
-        .where(eq(competitions.id, competitionId))
-        .returning();
 
-      if (!competition) {
-        return res.status(404).json({ message: "大会が見つかりません" });
+      try {
+        const [competition] = await db
+          .update(competitions)
+          .set(payload)
+          .where(eq(competitions.id, competitionId))
+          .returning(competitionReturnFields);
+
+        if (!competition) {
+          return res.status(404).json({ message: "大会が見つかりません" });
+        }
+
+        return res.json(competition);
+      } catch (error) {
+        if (!isCompetitionQualificationColumnMissingError(error)) {
+          throw error;
+        }
+
+        if (payload.isQualificationTarget) {
+          return res.status(409).json({ message: buildSchemaOutdatedMessage("competitions") });
+        }
+
+        const [competition] = await db
+          .update(competitions)
+          .set({
+            name: payload.name,
+            location: payload.location,
+            date: payload.date,
+          })
+          .where(eq(competitions.id, competitionId))
+          .returning(legacyCompetitionReturnFields);
+
+        if (!competition) {
+          return res.status(404).json({ message: "大会が見つかりません" });
+        }
+
+        return res.json(withLegacyCompetitionFields(competition));
       }
-
-      res.json(competition);
     } catch (error) {
       console.error("Error updating competition:", error);
       res.status(400).json({
@@ -341,18 +582,36 @@ export function registerRoutes(app: Express) {
   app.get("/api/qualification-progress", async (_req, res) => {
     try {
       const [athletes, targetCompetitions, records] = await Promise.all([
-        db
-          .select({
-            id: users.id,
-            username: users.username,
-            nameKana: users.nameKana,
-            gender: users.gender,
-            birthDate: users.birthDate,
-            isActive: users.isActive,
-          })
-          .from(users)
-          .where(eq(users.role, "student"))
-          .orderBy(sql`COALESCE(${users.nameKana}, ${users.username})`),
+        (async () => {
+          try {
+            return await db
+              .select({
+                id: users.id,
+                username: users.username,
+                nameKana: users.nameKana,
+                gender: users.gender,
+                birthDate: users.birthDate,
+                isActive: users.isActive,
+              })
+              .from(users)
+              .where(eq(users.role, "student"))
+              .orderBy(sql`COALESCE(${users.nameKana}, ${users.username})`);
+          } catch (error) {
+            if (!isUsersBirthDateMissingError(error)) {
+              throw error;
+            }
+
+            console.warn("users.birth_date column is missing. Building qualification progress without age data.");
+
+            const legacyAthletes = await db
+              .select(legacyAthleteListFields)
+              .from(users)
+              .where(eq(users.role, "student"))
+              .orderBy(sql`COALESCE(${users.nameKana}, ${users.username})`);
+
+            return legacyAthletes.map((athlete) => withLegacyBirthDate(athlete));
+          }
+        })(),
         db
           .select({
             id: competitions.id,
@@ -403,6 +662,15 @@ export function registerRoutes(app: Express) {
 
       res.json(payload);
     } catch (error) {
+      if (isCompetitionQualificationColumnMissingError(error)) {
+        console.warn("Qualification progress is unavailable because the DB schema is outdated.");
+        return res.json({
+          targetCompetitions: [],
+          schemaOutdated: true,
+          message: buildSchemaOutdatedMessage("qualification-progress"),
+        });
+      }
+
       console.error("Error building qualification progress:", error);
       res.status(500).json({ message: "大会目標一覧の生成に失敗しました" });
     }
@@ -672,7 +940,7 @@ export function registerRoutes(app: Express) {
 
     try {
       const [athlete] = await db
-        .select()
+        .select(athleteFieldsWithoutBirthDate)
         .from(users)
         .where(and(eq(users.id, athleteId), eq(users.role, "student")))
         .limit(1);
@@ -704,7 +972,7 @@ export function registerRoutes(app: Express) {
         .update(users)
         .set({ isActive })
         .where(and(eq(users.id, athleteId), eq(users.role, "student")))
-        .returning();
+        .returning(legacyAthleteReturnFields);
 
       if (!athlete) {
         return res.status(404).json({ message: "選手が見つかりません" });
@@ -726,11 +994,42 @@ export function registerRoutes(app: Express) {
     const { username, gender, nameKana, joinDate, allTimeStartDate, birthDate } = req.body;
 
     try {
-      const [athlete] = await db
-        .select()
-        .from(users)
-        .where(and(eq(users.id, athleteId), eq(users.role, "student")))
-        .limit(1);
+      let athleteBirthDate: Date | null = null;
+      let legacyUsersSchema = false;
+      let athlete: {
+        username: string;
+        nameKana: string | null;
+        gender: string;
+        joinDate: Date | null;
+        allTimeStartDate: Date | null;
+      } | null = null;
+
+      try {
+        const [fullAthlete] = await db
+          .select({
+            ...athleteFieldsWithoutBirthDate,
+            birthDate: users.birthDate,
+          })
+          .from(users)
+          .where(and(eq(users.id, athleteId), eq(users.role, "student")))
+          .limit(1);
+
+        athlete = fullAthlete;
+        athleteBirthDate = fullAthlete?.birthDate ?? null;
+      } catch (error) {
+        if (!isUsersBirthDateMissingError(error)) {
+          throw error;
+        }
+
+        legacyUsersSchema = true;
+        const [legacyAthlete] = await db
+          .select(athleteFieldsWithoutBirthDate)
+          .from(users)
+          .where(and(eq(users.id, athleteId), eq(users.role, "student")))
+          .limit(1);
+
+        athlete = legacyAthlete;
+      }
 
       if (!athlete) {
         return res.status(404).json({ message: "選手が見つかりません" });
@@ -738,7 +1037,7 @@ export function registerRoutes(app: Express) {
 
       if (username !== athlete.username) {
         const [existingUser] = await db
-          .select()
+          .select({ id: users.id })
           .from(users)
           .where(eq(users.username, username))
           .limit(1);
@@ -748,25 +1047,45 @@ export function registerRoutes(app: Express) {
         }
       }
 
-      const [updatedAthlete] = await db
-        .update(users)
-        .set({
-          username,
-          nameKana: nameKana !== undefined ? (nameKana ? nameKana.trim() : null) : athlete.nameKana,
-          gender: gender || athlete.gender || "male",
-          birthDate: birthDate === undefined ? athlete.birthDate : parseOptionalDate(birthDate),
-          joinDate: joinDate ? new Date(joinDate) : athlete.joinDate,
-          allTimeStartDate:
-            allTimeStartDate === undefined
-              ? athlete.allTimeStartDate
-              : allTimeStartDate
-                ? new Date(allTimeStartDate)
-                : null,
-        })
-        .where(eq(users.id, athleteId))
-        .returning();
+      const baseUpdatePayload = {
+        username,
+        nameKana: nameKana !== undefined ? (nameKana ? nameKana.trim() : null) : athlete.nameKana,
+        gender: gender || athlete.gender || "male",
+        joinDate: joinDate ? new Date(joinDate) : athlete.joinDate,
+        allTimeStartDate:
+          allTimeStartDate === undefined
+            ? athlete.allTimeStartDate
+            : allTimeStartDate
+              ? new Date(allTimeStartDate)
+              : null,
+      };
 
-      res.json(updatedAthlete);
+      try {
+        const [updatedAthlete] = await db
+          .update(users)
+          .set({
+            ...baseUpdatePayload,
+            birthDate: birthDate === undefined ? athleteBirthDate : parseOptionalDate(birthDate),
+          })
+          .where(eq(users.id, athleteId))
+          .returning(athleteReturnFields);
+
+        return res.json(updatedAthlete);
+      } catch (error) {
+        if (!legacyUsersSchema && !isUsersBirthDateMissingError(error)) {
+          throw error;
+        }
+
+        console.warn("users.birth_date column is missing. Updating athlete without birthDate.");
+
+        const [updatedAthlete] = await db
+          .update(users)
+          .set(baseUpdatePayload)
+          .where(eq(users.id, athleteId))
+          .returning(legacyAthleteReturnFields);
+
+        return res.json(withLegacyBirthDate(updatedAthlete));
+      }
     } catch (error) {
       console.error("Error updating athlete:", error);
       res.status(500).json({ message: "選手の更新に失敗しました" });

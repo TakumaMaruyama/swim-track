@@ -72,6 +72,8 @@ type QualificationProgressCompetition = {
 
 type QualificationProgressResponse = {
   targetCompetitions: QualificationProgressCompetition[];
+  schemaOutdated?: boolean;
+  message?: string;
 };
 
 const LEVEL_LABELS: Record<QualificationLevel, string> = {
@@ -190,7 +192,18 @@ export default function QualificationProgressPage() {
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              大会目標一覧の読み込みに失敗しました。標準タイム API の接続先や大会設定を確認してください。
+              {(error as { info?: { message?: string } })?.info?.message ||
+                "大会目標一覧の読み込みに失敗しました。標準タイム API の接続先や大会設定を確認してください。"}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {!error && data?.schemaOutdated && (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              {data.message ||
+                "DB migration がまだ反映されていないため、大会目標一覧は準備中です。サーバー再起動後にもう一度開いてください。"}
             </AlertDescription>
           </Alert>
         )}
@@ -201,7 +214,7 @@ export default function QualificationProgressPage() {
           </div>
         )}
 
-        {!isLoading && !error && (data?.targetCompetitions?.length ?? 0) === 0 && (
+        {!isLoading && !error && !data?.schemaOutdated && (data?.targetCompetitions?.length ?? 0) === 0 && (
           <Alert>
             <AlertDescription>
               表示対象の大会がまだありません。大会情報ページで「標準タイム連携」を有効にすると、ここに大会が並びます。

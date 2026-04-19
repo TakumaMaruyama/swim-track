@@ -4,6 +4,7 @@ import { setupVite, serveStatic } from "./vite";
 import { createServer } from "http";
 import { configureAuth } from "./auth";
 import configuration from "./config";
+import { runMigrations } from "../db/runMigrations";
 
 const app = express();
 app.use(express.json());
@@ -90,7 +91,28 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 // Configure authentication
 configureAuth(app);
 
+async function maybeRunDevelopmentMigrations() {
+  if (configuration.nodeEnv === "production") {
+    return;
+  }
+
+  if (process.env.AUTO_RUN_MIGRATIONS === "false") {
+    console.log("Skipping development migrations because AUTO_RUN_MIGRATIONS=false");
+    return;
+  }
+
+  try {
+    console.log("Running development migrations...");
+    await runMigrations();
+    console.log("Development migrations completed");
+  } catch (error) {
+    console.error("Development migrations failed. The app will keep running, but new pages may not load until the DB schema is updated.");
+    console.error(error);
+  }
+}
+
 (async () => {
+  await maybeRunDevelopmentMigrations();
   registerRoutes(app);
   const server = createServer(app);
 
