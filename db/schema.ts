@@ -10,6 +10,7 @@ export const users = pgTable("users", {
   role: text("role").notNull().default("student"),
   isActive: boolean("is_active").notNull().default(true),
   gender: text("gender").notNull().default("male"),
+  birthDate: timestamp("birth_date"),
   joinDate: timestamp("join_date"),
   allTimeStartDate: timestamp("all_time_start_date"),
   createdAt: timestamp("created_at").defaultNow()
@@ -29,6 +30,11 @@ export const competitions = pgTable("competitions", {
   name: text("name").notNull(),
   date: timestamp("date").notNull(),
   location: text("location").notNull(),
+  isQualificationTarget: boolean("is_qualification_target").notNull().default(false),
+  qualifyingMeetId: text("qualifying_meet_id"),
+  qualifyingLevel: text("qualifying_level"),
+  qualifyingSeason: integer("qualifying_season"),
+  qualifyingCourse: text("qualifying_course"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
