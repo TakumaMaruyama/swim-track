@@ -15,6 +15,7 @@ interface Config {
   nodeEnv: string;
   databaseUrl: string;
   sessionSecret: string;
+  qualifyingTimesApiBaseUrl?: string;
   googleClientId?: string;
   googleClientSecret?: string;
   uploadDir: string;
@@ -25,6 +26,7 @@ const configuration: Config = {
   nodeEnv: process.env.NODE_ENV || "development",
   databaseUrl: process.env.DATABASE_URL || "postgresql://localhost:5432/swimtrack",
   sessionSecret: process.env.SESSION_SECRET || "development-secret-key",
+  qualifyingTimesApiBaseUrl: process.env.QUALIFYING_TIMES_API_BASE_URL,
   googleClientId: process.env.GOOGLE_CLIENT_ID,
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
   uploadDir: process.env.UPLOAD_DIR || path.join(__dirname, "..", "storage", "uploads"),
