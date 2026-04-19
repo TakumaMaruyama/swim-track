@@ -198,6 +198,10 @@ export default function Athletes() {
   }>({ athleteId: null, athleteName: '' });
   const isMobile = window.innerWidth < 768; // Detect mobile
   const [showAddAthlete, setShowAddAthlete] = useState(false);
+  const athleteErrorMessage =
+    (athletesError as { info?: { message?: string } } | undefined)?.info?.message ||
+    (recordsError as { info?: { message?: string } } | undefined)?.info?.message ||
+    "データの取得中にエラーが発生しました。再度お試しください。";
 
   const getLatestPerformance = (studentId: number) => {
     if (!records) return null;
@@ -525,7 +529,7 @@ export default function Athletes() {
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              データの取得中にエラーが発生しました。再度お試しください。
+              {athleteErrorMessage}
             </AlertDescription>
           </Alert>
         </div>
