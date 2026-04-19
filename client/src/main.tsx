@@ -32,6 +32,7 @@ const Dashboard = lazy(() => retryImport(() => import("./pages/Dashboard")));
 const Athletes = lazy(() => retryImport(() => import("./pages/Athletes")));
 const RecordsAll = lazy(() => retryImport(() => import("./pages/RecordsAll")));
 const Competitions = lazy(() => retryImport(() => import("./pages/Competitions")));
+const QualificationProgress = lazy(() => retryImport(() => import("./pages/QualificationProgress")));
 const AdminLogin = lazy(() => retryImport(() => import("./pages/AdminLogin")));
 const IMRankings = lazy(() => retryImport(() => import("./pages/IMRankings")));
 const GrowthRankings = lazy(() => retryImport(() => import("./pages/GrowthRankings")));
@@ -104,6 +105,13 @@ root.render(
             <Suspense fallback={<LoadingSpinner />}>
               <ErrorBoundary>
                 <Competitions />
+              </ErrorBoundary>
+            </Suspense>
+          </Route>
+          <Route path="/qualification-progress">
+            <Suspense fallback={<LoadingSpinner />}>
+              <ErrorBoundary>
+                <QualificationProgress />
               </ErrorBoundary>
             </Suspense>
           </Route>
