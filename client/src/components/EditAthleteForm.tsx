@@ -28,6 +28,7 @@ const editAthleteSchema = z.object({
   username: z.string().min(2, "ユーザー名は2文字以上である必要があります"),
   nameKana: z.string().optional(),
   gender: z.enum(["male", "female"]),
+  birthDate: z.string().optional(),
   joinDate: z.string().optional(),
   excludePreviousClubRecords: z.boolean().default(false),
   allTimeStartDate: z.string().optional(),
@@ -58,6 +59,7 @@ export function EditAthleteForm({ athlete, isOpen, onClose, onSubmit }: EditAthl
       username: athlete.username,
       nameKana: athlete.nameKana || '',
       gender: athlete.gender as "male" | "female",
+      birthDate: athlete.birthDate ? new Date(athlete.birthDate).toISOString().split('T')[0] : '',
       joinDate: athlete.joinDate ? new Date(athlete.joinDate).toISOString().split('T')[0] : '',
       excludePreviousClubRecords: !!athlete.allTimeStartDate,
       allTimeStartDate: athlete.allTimeStartDate ? new Date(athlete.allTimeStartDate).toISOString().split('T')[0] : '',
@@ -146,6 +148,26 @@ export function EditAthleteForm({ athlete, isOpen, onClose, onSubmit }: EditAthl
                         <option value="female">女性</option>
                       </select>
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="birthDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>生年月日</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        {...field}
+                        disabled={isSubmitting}
+                      />
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground">
+                      標準タイム連携では大会日時点の年齢計算に利用します
+                    </p>
                     <FormMessage />
                   </FormItem>
                 )}
