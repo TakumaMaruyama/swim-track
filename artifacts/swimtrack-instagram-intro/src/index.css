@@ -242,7 +242,7 @@ body {
   margin: 22px 0 16px;
   color: #f5fcff;
   font-family: var(--font-display);
-  font-size: clamp(40px, 8.7vw, 82px);
+  font-size: clamp(32px, 10cqw, 76px);
   line-height: 1.12;
   letter-spacing: -0.08em;
   font-weight: 600;
