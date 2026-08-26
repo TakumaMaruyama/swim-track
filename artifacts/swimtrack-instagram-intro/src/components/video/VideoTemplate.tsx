@@ -281,10 +281,10 @@ function AthletesScene() {
 function RankingsScene() {
   return (
     <SceneShell className="product-scene">
-      <SceneHeading eyebrow="03 / RANKINGS" detail="チームの熱量を、次の一泳へ。">
-        ランキングで、
+      <SceneHeading eyebrow="03 / RANKINGS" detail="今の立ち位置がわかるから、次の一歩が見える。">
+        今の自分を知って、
         <br />
-        <span>次の一泳を。</span>
+        <span>次につなげる。</span>
       </SceneHeading>
       <AppWindow title="SWIMTRACK" section="IM RANKINGS" className="rank-window">
         <div className="rank-heading"><div><span className="micro-label">MONTHLY RANKING</span><h3>IM / 15M</h3></div><span className="period-chip">AUG 2026</span></div>
