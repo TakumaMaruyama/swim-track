@@ -1,0 +1,28 @@
+kind = "video"
+previewPath = "/"
+title = "SwimTrack Instagram Intro"
+description = "A vertical Instagram Reel introducing SwimTrack's athlete records, competition goals, and IM rankings with anonymized UI visuals."
+version = "1.0.0"
+id = "artifacts/swimtrack-instagram-intro"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21133
+
+[services.development]
+run = "pnpm --filter @workspace/swimtrack-instagram-intro run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/swimtrack-instagram-intro", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/swimtrack-instagram-intro/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21133"
+BASE_PATH = "/"

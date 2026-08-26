@@ -1,0 +1,1 @@
+- [Video artifact setup](video-artifact-setup.md) — generated video artifacts may need standalone dependency cleanup when the workspace has incompatible package metadata.
