@@ -75,6 +75,7 @@ body {
   max-width: 1080px;
   max-height: 1920px;
   position: relative;
+  container-type: inline-size;
   overflow: hidden;
   isolation: isolate;
   background:
@@ -254,12 +255,7 @@ body {
 }
 
 .ranking-scene .scene-heading h1 {
-  font-size: clamp(27px, 6.6vw, 64px);
-}
-
-.ranking-scene .scene-heading h1 span {
-  display: inline-block;
-  white-space: nowrap;
+  font-size: clamp(24px, 9cqw, 72px);
 }
 
 .hook-copy p {

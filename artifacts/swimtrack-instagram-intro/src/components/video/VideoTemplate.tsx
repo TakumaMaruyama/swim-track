@@ -282,7 +282,7 @@ function RankingsScene() {
   return (
     <SceneShell className="product-scene ranking-scene">
       <SceneHeading eyebrow="03 / RANKINGS" detail="今の立ち位置がわかるから、次の一歩が見える。">
-        <span className="ranking-line">今の自分を知って、</span>
+        今の自分を知って、
         <br />
         <span>次につなげる。</span>
       </SceneHeading>
