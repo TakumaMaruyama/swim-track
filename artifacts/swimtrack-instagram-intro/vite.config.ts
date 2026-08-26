@@ -25,7 +25,9 @@ if (!basePath) {
 }
 
 export default defineConfig({
-  base: basePath,
+  // The video artifact is previewed from a proxied sub-path, so generated
+  // asset URLs must remain relative to the artifact instead of the host root.
+  base: './',
   plugins: [
     react(),
   ],
