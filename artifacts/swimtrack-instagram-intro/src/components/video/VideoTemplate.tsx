@@ -3,16 +3,13 @@ import { AnimatePresence, motion } from 'framer-motion';
 import {
   ArrowUpRight,
   BarChart3,
-  CalendarDays,
   ChevronRight,
   CircleUserRound,
   Clock3,
   Droplets,
-  Flag,
   Gauge,
   Medal,
   Sparkles,
-  Trophy,
   Waves,
 } from 'lucide-react';
 
@@ -20,7 +17,6 @@ const SCENE_DURATIONS = {
   hook: 3000,
   records: 3500,
   athletes: 3500,
-  goals: 3500,
   rankings: 3900,
   close: 3000,
 };
@@ -40,9 +36,8 @@ export default function VideoTemplate() {
           {currentScene === 0 && <HookScene key="hook" />}
           {currentScene === 1 && <RecordsScene key="records" />}
           {currentScene === 2 && <AthletesScene key="athletes" />}
-          {currentScene === 3 && <GoalsScene key="goals" />}
-          {currentScene === 4 && <RankingsScene key="rankings" />}
-          {currentScene === 5 && <CloseScene key="close" />}
+          {currentScene === 3 && <RankingsScene key="rankings" />}
+          {currentScene === 4 && <CloseScene key="close" />}
         </AnimatePresence>
         <ProgressBar scene={currentScene} />
       </div>
@@ -139,7 +134,7 @@ function HookScene() {
           <br />
           <span>ひとつに。</span>
         </h1>
-        <p>記録・大会・ランキングを、チームの力へ。</p>
+        <p>記録とランキングを、チームの力へ。</p>
       </motion.div>
       <motion.div
         className="hook-tag"
@@ -283,35 +278,10 @@ function AthletesScene() {
   );
 }
 
-function GoalsScene() {
-  return (
-    <SceneShell className="product-scene">
-      <SceneHeading eyebrow="03 / COMPETITION GOALS" detail="大会の一日を、次の自己ベストへ。">
-        大会と目標を
-        <br />
-        <span>ひとつの画面で。</span>
-      </SceneHeading>
-      <AppWindow title="SWIMTRACK" section="COMPETITIONS" className="goals-window">
-        <div className="meet-card">
-          <div className="meet-top"><span className="meet-pill"><CalendarDays size={13} /> UPCOMING</span><span className="meet-date">SEP 14</span></div>
-          <h3>秋季記録会 <span>2026</span></h3>
-          <div className="meet-meta"><span><Flag size={12} /> 目標種目</span><b>IM / 15M</b></div>
-        </div>
-        <div className="goal-card">
-          <div className="goal-header"><span>QUALIFICATION PROGRESS</span><strong>0.8s <small>TO GO</small></strong></div>
-          <div className="progress-track"><motion.div className="progress-fill" initial={{ width: '0%' }} animate={{ width: '76%' }} transition={{ delay: 0.45, duration: 1.1, ease: 'easeOut' }} /></div>
-          <div className="goal-foot"><span>PERSONAL BEST <b>00:42.8</b></span><span>TARGET <b>00:42.0</b></span></div>
-        </div>
-        <div className="goal-note"><Trophy size={14} /> 目標までの距離を、毎日の練習で確認</div>
-      </AppWindow>
-    </SceneShell>
-  );
-}
-
 function RankingsScene() {
   return (
     <SceneShell className="product-scene">
-      <SceneHeading eyebrow="04 / RANKINGS" detail="チームの熱量を、次の一泳へ。">
+      <SceneHeading eyebrow="03 / RANKINGS" detail="チームの熱量を、次の一泳へ。">
         ランキングで、
         <br />
         <span>次の一泳を。</span>
