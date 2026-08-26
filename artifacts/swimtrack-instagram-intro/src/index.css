@@ -253,6 +253,15 @@ body {
   color: #65edff;
 }
 
+.ranking-scene .scene-heading h1 {
+  font-size: clamp(27px, 6.6vw, 64px);
+}
+
+.ranking-scene .scene-heading h1 span {
+  display: inline-block;
+  white-space: nowrap;
+}
+
 .hook-copy p {
   margin: 0;
   color: rgba(226, 243, 255, 0.65);

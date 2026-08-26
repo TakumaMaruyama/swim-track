@@ -280,9 +280,9 @@ function AthletesScene() {
 
 function RankingsScene() {
   return (
-    <SceneShell className="product-scene">
+    <SceneShell className="product-scene ranking-scene">
       <SceneHeading eyebrow="03 / RANKINGS" detail="今の立ち位置がわかるから、次の一歩が見える。">
-        今の自分を知って、
+        <span className="ranking-line">今の自分を知って、</span>
         <br />
         <span>次につなげる。</span>
       </SceneHeading>
