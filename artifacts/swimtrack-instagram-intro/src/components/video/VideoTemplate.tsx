@@ -1,5 +1,5 @@
 import { useVideoPlayer } from '@/lib/video';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   ArrowUpRight,
   BarChart3,
@@ -32,13 +32,11 @@ export default function VideoTemplate() {
       <div className="video-frame">
         <Atmosphere />
         <BrandMark />
-        <AnimatePresence mode="wait" initial={false}>
-          {currentScene === 0 && <HookScene key="hook" />}
-          {currentScene === 1 && <RecordsScene key="records" />}
-          {currentScene === 2 && <AthletesScene key="athletes" />}
-          {currentScene === 3 && <RankingsScene key="rankings" />}
-          {currentScene === 4 && <CloseScene key="close" />}
-        </AnimatePresence>
+        {currentScene === 0 && <HookScene key="hook" />}
+        {currentScene === 1 && <RecordsScene key="records" />}
+        {currentScene === 2 && <AthletesScene key="athletes" />}
+        {currentScene === 3 && <RankingsScene key="rankings" />}
+        {currentScene === 4 && <CloseScene key="close" />}
         <ProgressBar scene={currentScene} />
       </div>
     </div>
