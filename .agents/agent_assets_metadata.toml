@@ -1,0 +1,9 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "a6VAF4nDF5yD-8CfKyezv"
+uri = "file://SwimTrack-Instagram-Vertical-1080x1920.mp4"
+type = "video"
+title = "SwimTrack Instagram 縦動画"
+description = "1080×1920（9:16）、16.97秒のInstagram向け縦動画。全5シーンを収録しています。"
