@@ -4,7 +4,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   selected: [] as unknown[][],
+  selections: [] as unknown[],
   returned: [] as unknown[][],
+  returningSelections: [] as unknown[],
   values: [] as unknown[],
   mutationWheres: [] as unknown[],
 }));
@@ -47,11 +49,17 @@ vi.mock("db", () => {
       state.mutationWheres.push(value);
       return mutationChain;
     },
-    returning: () => Promise.resolve(state.returned.shift() ?? []),
+    returning: (selection?: unknown) => {
+      state.returningSelections.push(selection);
+      return Promise.resolve(state.returned.shift() ?? []);
+    },
   };
   return {
     db: {
-      select: () => selectChain,
+      select: (selection?: unknown) => {
+        state.selections.push(selection);
+        return selectChain;
+      },
       update: () => mutationChain,
       insert: () => mutationChain,
       delete: () => mutationChain,
@@ -121,7 +129,9 @@ async function makeApp() {
 describe("athlete authentication and authorization", () => {
   beforeEach(() => {
     state.selected = [];
+    state.selections = [];
     state.returned = [];
+    state.returningSelections = [];
     state.values = [];
     state.mutationWheres = [];
     configState.nodeEnv = "test";
@@ -241,6 +251,7 @@ describe("athlete authentication and authorization", () => {
     expect(winner.status).toBe(200);
     expect(loser.status).toBe(401);
     expect(state.values[0]).toMatchObject({ credentialState: "active", authVersion: 2 });
+    expect(state.returningSelections[0]).not.toHaveProperty("birthDate");
   });
 
   it("supports normal athlete login", async () => {
@@ -256,6 +267,28 @@ describe("athlete authentication and authorization", () => {
     expect(response.body.user).not.toHaveProperty("authVersion");
     expect(response.body.user).not.toHaveProperty("passwordSetBy");
     expect(response.headers["set-cookie"]?.[0]).toContain("swimtrack.sid=");
+  });
+
+  it("keeps authentication queries independent of optional profile columns", async () => {
+    const app = await makeApp();
+    state.selected.push([admin()]);
+    const response = await request(app).post("/api/auth/login").send({
+      username: "admin",
+      password: "correct-password",
+    });
+
+    expect(response.status).toBe(200);
+    expect(Object.keys(state.selections[0] as Record<string, unknown>).sort()).toEqual([
+      "authVersion",
+      "credentialState",
+      "gender",
+      "id",
+      "isActive",
+      "password",
+      "role",
+      "username",
+    ]);
+    expect(state.selections[0]).not.toHaveProperty("birthDate");
   });
 
   it("invalidates an old session after admin reset and forces temporary password change", async () => {
