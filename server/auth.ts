@@ -151,12 +151,40 @@ async function findUniqueStudentByFullName(fullName: unknown) {
 }
 
 async function establishSession(req: Request, user: typeof users.$inferSelect) {
-  await regenerate(req);
+  try {
+    await regenerate(req);
+  } catch (error) {
+    logSessionFailure("regenerate", error);
+    throw error;
+  }
   req.session.userId = user.id;
   req.session.role = user.role;
   req.session.authVersion = user.authVersion;
   req.session.credentialState = user.credentialState as CredentialState;
-  await save(req);
+  try {
+    await save(req);
+  } catch (error) {
+    logSessionFailure("save", error);
+    throw error;
+  }
+}
+
+function logSessionFailure(stage: "regenerate" | "save", error: unknown) {
+  const candidate = error as {
+    name?: unknown;
+    message?: unknown;
+    code?: unknown;
+    table?: unknown;
+    constraint?: unknown;
+  } | null;
+  console.error("SwimTrack session establishment failed", {
+    stage,
+    name: typeof candidate?.name === "string" ? candidate.name : "UnknownError",
+    message: typeof candidate?.message === "string" ? candidate.message : "Unknown error",
+    code: typeof candidate?.code === "string" ? candidate.code : undefined,
+    table: typeof candidate?.table === "string" ? candidate.table : undefined,
+    constraint: typeof candidate?.constraint === "string" ? candidate.constraint : undefined,
+  });
 }
 
 export async function revalidateSession(req: Request) {
