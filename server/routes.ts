@@ -1,11 +1,11 @@
 import { Express } from "express";
-import cors from "cors";
 import { and, asc, count, desc, eq, sql } from "drizzle-orm";
 
 import { db } from "db";
 import { announcements, competitions, swimRecords, users } from "db/schema";
 import configuration from "./config";
 import { hashPassword } from "./auth";
+import { normalizeFullName } from "./fullName";
 import {
   buildImprovementSummary,
   buildQualificationProgress,
@@ -129,18 +129,8 @@ const legacyCompetitionReturnFields = {
   createdAt: competitions.createdAt,
 };
 
-const corsOptions = {
-  origin:
-    process.env.NODE_ENV === "production"
-      ? ["https://swimtrack.repl.co"]
-      : ["http://localhost:5173", "http://172.31.128.56:5173"],
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-};
-
-function requireAdmin(sessionRole: string | undefined) {
-  return sessionRole === "admin";
+function requireAdmin(authUser: Express.Request["authUser"]) {
+  return authUser?.role === "admin";
 }
 
 function parseOptionalDate(value: unknown) {
@@ -187,6 +177,11 @@ function isUsersBirthDateMissingError(error: unknown) {
 
 function isCompetitionQualificationColumnMissingError(error: unknown) {
   return isMissingColumnError(error, QUALIFICATION_COLUMN_NAMES);
+}
+
+function isLoginKeyUniqueViolation(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error &&
+    String((error as { code?: unknown }).code) === "23505";
 }
 
 function withLegacyBirthDate<T extends Record<string, unknown>>(athlete: T) {
@@ -271,8 +266,6 @@ function normalizeCompetitionPayload(body: Record<string, unknown>) {
 }
 
 export function registerRoutes(app: Express) {
-  app.use(cors(corsOptions));
-
   app.get("/api/athletes", async (_req, res) => {
     try {
       const athletes = await db
@@ -301,22 +294,23 @@ export function registerRoutes(app: Express) {
   });
 
   app.post("/api/athletes", async (req, res) => {
-    if (!requireAdmin(req.session.role)) {
+    if (!requireAdmin(req.authUser)) {
       return res.status(403).json({ message: "管理者権限が必要です" });
     }
 
     try {
       const { username, gender = "male", nameKana, birthDate } = req.body;
       const normalizedUsername = typeof username === "string" ? username.trim() : "";
+      const loginKey = normalizeFullName(normalizedUsername);
 
-      if (!normalizedUsername) {
+      if (!normalizedUsername || !loginKey) {
         return res.status(400).json({ message: "選手名は必須です" });
       }
 
       const [existingUser] = await db
         .select({ id: users.id })
         .from(users)
-        .where(eq(users.username, normalizedUsername))
+        .where(and(eq(users.role, "student"), eq(users.loginKey, loginKey)))
         .limit(1);
 
       if (existingUser) {
@@ -325,8 +319,11 @@ export function registerRoutes(app: Express) {
 
       const baseAthletePayload = {
         username: normalizedUsername,
+        loginKey,
         nameKana: typeof nameKana === "string" && nameKana.trim().length > 0 ? nameKana.trim() : null,
         password: await hashPassword("temporary"),
+        authState: "initial_setup",
+        sessionVersion: 1,
         role: "student" as const,
         isActive: true,
         gender,
@@ -358,6 +355,9 @@ export function registerRoutes(app: Express) {
         return res.json(withLegacyBirthDate(athlete));
       }
     } catch (error) {
+      if (isLoginKeyUniqueViolation(error)) {
+        return res.status(400).json({ message: "この選手名は既に使用されています" });
+      }
       console.error("Error creating athlete:", error);
       res.status(500).json({ message: "選手の作成に失敗しました" });
     }
@@ -445,7 +445,7 @@ export function registerRoutes(app: Express) {
   });
 
   app.post("/api/competitions", async (req, res) => {
-    if (!requireAdmin(req.session.role)) {
+    if (!requireAdmin(req.authUser)) {
       return res.status(403).json({ message: "管理者権限が必要です" });
     }
 
@@ -488,7 +488,7 @@ export function registerRoutes(app: Express) {
   });
 
   app.put("/api/competitions/:id", async (req, res) => {
-    if (!requireAdmin(req.session.role)) {
+    if (!requireAdmin(req.authUser)) {
       return res.status(403).json({ message: "管理者権限が必要です" });
     }
 
@@ -733,7 +733,7 @@ export function registerRoutes(app: Express) {
 
   app.post("/api/admin/announcements", async (req, res) => {
     try {
-      if (!requireAdmin(req.session.role)) {
+      if (!requireAdmin(req.authUser)) {
         return res.status(403).json({ message: "管理者権限が必要です" });
       }
 
@@ -755,7 +755,7 @@ export function registerRoutes(app: Express) {
           .set({
             content: content.trim(),
             updatedAt: new Date(),
-            createdBy: req.session.userId,
+            createdBy: req.authUser!.id,
           })
           .where(eq(announcements.id, latestAnnouncement.id))
           .returning();
@@ -764,7 +764,7 @@ export function registerRoutes(app: Express) {
           .insert(announcements)
           .values({
             content: content.trim(),
-            createdBy: req.session.userId,
+            createdBy: req.authUser!.id,
           })
           .returning();
       }
@@ -799,7 +799,7 @@ export function registerRoutes(app: Express) {
           time,
           date: new Date(date),
           poolLength,
-          studentId,
+          studentId: req.authUser?.role === "admin" ? studentId : req.authUser!.id,
           isCompetition: isCompetition ?? false,
           competitionName: competitionName || null,
           competitionLocation: competitionLocation || null,
@@ -843,6 +843,10 @@ export function registerRoutes(app: Express) {
       if (!existingRecord) {
         return res.status(404).json({ message: "記録が見つかりません" });
       }
+      const isAdmin = req.authUser?.role === "admin";
+      if (!isAdmin && existingRecord.studentId !== req.authUser?.id) {
+        return res.status(403).json({ message: "この記録を変更する権限がありません" });
+      }
 
       const [updatedRecord] = await db
         .update(swimRecords)
@@ -852,14 +856,20 @@ export function registerRoutes(app: Express) {
           time,
           date: new Date(date),
           poolLength,
-          studentId,
+          studentId: req.authUser?.role === "admin" ? studentId : existingRecord.studentId,
           isCompetition: isCompetition ?? false,
           competitionName: competitionName || null,
           competitionLocation: competitionLocation || null,
           gender,
         })
-        .where(eq(swimRecords.id, recordId))
+        .where(and(
+          eq(swimRecords.id, recordId),
+          ...(isAdmin ? [] : [eq(swimRecords.studentId, req.authUser!.id)]),
+        ))
         .returning();
+      if (!updatedRecord) {
+        return res.status(403).json({ message: "この記録を変更する権限がありません" });
+      }
 
       res.json(updatedRecord);
     } catch (error) {
@@ -878,6 +888,7 @@ export function registerRoutes(app: Express) {
       const [existingRecord] = await db
         .select({
           id: swimRecords.id,
+          studentId: swimRecords.studentId,
         })
         .from(swimRecords)
         .where(eq(swimRecords.id, recordId))
@@ -886,11 +897,21 @@ export function registerRoutes(app: Express) {
       if (!existingRecord) {
         return res.status(404).json({ success: false, message: "記録が見つかりません" });
       }
+      const isAdmin = req.authUser?.role === "admin";
+      if (!isAdmin && existingRecord.studentId !== req.authUser?.id) {
+        return res.status(403).json({ success: false, message: "この記録を削除する権限がありません" });
+      }
 
       const [deletedRecord] = await db
         .delete(swimRecords)
-        .where(eq(swimRecords.id, recordId))
+        .where(and(
+          eq(swimRecords.id, recordId),
+          ...(isAdmin ? [] : [eq(swimRecords.studentId, req.authUser!.id)]),
+        ))
         .returning();
+      if (!deletedRecord) {
+        return res.status(403).json({ success: false, message: "この記録を削除する権限がありません" });
+      }
 
       res.json({
         success: true,
@@ -932,7 +953,7 @@ export function registerRoutes(app: Express) {
   });
 
   app.delete("/api/athletes/:id", async (req, res) => {
-    if (!requireAdmin(req.session.role)) {
+    if (!requireAdmin(req.authUser)) {
       return res.status(403).json({ message: "管理者権限が必要です" });
     }
 
@@ -960,7 +981,7 @@ export function registerRoutes(app: Express) {
   });
 
   app.patch("/api/athletes/:id/status", async (req, res) => {
-    if (!requireAdmin(req.session.role)) {
+    if (!requireAdmin(req.authUser)) {
       return res.status(403).json({ message: "管理者権限が必要です" });
     }
 
@@ -970,7 +991,10 @@ export function registerRoutes(app: Express) {
 
       const [athlete] = await db
         .update(users)
-        .set({ isActive })
+        .set({
+          isActive: Boolean(isActive),
+          sessionVersion: sql`${users.sessionVersion} + 1`,
+        })
         .where(and(eq(users.id, athleteId), eq(users.role, "student")))
         .returning(legacyAthleteReturnFields);
 
@@ -986,7 +1010,7 @@ export function registerRoutes(app: Express) {
   });
 
   app.put("/api/athletes/:id", async (req, res) => {
-    if (!requireAdmin(req.session.role)) {
+    if (!requireAdmin(req.authUser)) {
       return res.status(403).json({ message: "管理者権限が必要です" });
     }
 
@@ -1035,11 +1059,20 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ message: "選手が見つかりません" });
       }
 
-      if (username !== athlete.username) {
+      const normalizedUsername = typeof username === "string" ? username.trim() : "";
+      const loginKey = normalizeFullName(normalizedUsername);
+      if (!normalizedUsername || !loginKey) {
+        return res.status(400).json({ message: "選手名は必須です" });
+      }
+      if (normalizedUsername !== athlete.username) {
         const [existingUser] = await db
           .select({ id: users.id })
           .from(users)
-          .where(eq(users.username, username))
+          .where(and(
+            eq(users.role, "student"),
+            eq(users.loginKey, loginKey),
+            sql`${users.id} <> ${athleteId}`,
+          ))
           .limit(1);
 
         if (existingUser) {
@@ -1048,7 +1081,8 @@ export function registerRoutes(app: Express) {
       }
 
       const baseUpdatePayload = {
-        username,
+        username: normalizedUsername,
+        loginKey,
         nameKana: nameKana !== undefined ? (nameKana ? nameKana.trim() : null) : athlete.nameKana,
         gender: gender || athlete.gender || "male",
         joinDate: joinDate ? new Date(joinDate) : athlete.joinDate,
@@ -1087,6 +1121,9 @@ export function registerRoutes(app: Express) {
         return res.json(withLegacyBirthDate(updatedAthlete));
       }
     } catch (error) {
+      if (isLoginKeyUniqueViolation(error)) {
+        return res.status(400).json({ message: "この選手名は既に使用されています" });
+      }
       console.error("Error updating athlete:", error);
       res.status(500).json({ message: "選手の更新に失敗しました" });
     }

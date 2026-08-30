@@ -11,6 +11,8 @@ async function createAdminUser() {
       .values({
         username: "丸山拓真",
         password: hashedPassword,
+        authState: "active",
+        passwordUpdatedAt: new Date(),
         role: "admin",
         isActive: true,
       })

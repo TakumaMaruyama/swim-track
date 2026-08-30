@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,13 @@ export default function AdminLogin() {
   const [loading, setLoading] = useState(false);
   const [, setLocation] = useLocation();
 
-  const { login } = useAuth();
+  const { login, isAuthenticated, mustChangePassword } = useAuth();
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      setLocation(mustChangePassword ? "/change-password" : "/athletes", { replace: true });
+    }
+  }, [isAuthenticated, mustChangePassword, setLocation]);
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +34,15 @@ export default function AdminLogin() {
       }
 
       // ログイン成功後、ダッシュボードへリダイレクト
-      setLocation("/athletes");
+      const requiresChange = Boolean(
+        result.mustChangePassword ||
+        result.user?.mustChangePassword ||
+        result.state === "temp_password" ||
+        result.authState === "temporary_password" ||
+        result.user?.authState === "temp_password" ||
+        result.user?.passwordState === "temporary"
+      );
+      setLocation(requiresChange ? "/change-password" : "/athletes");
     } catch (err) {
       setError(err instanceof Error ? err.message : "ログインに失敗しました");
     } finally {
@@ -79,6 +93,14 @@ export default function AdminLogin() {
               disabled={loading}
             >
               {loading ? "ログイン中..." : "ログイン"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => setLocation("/login")}
+            >
+              選手ログイン
             </Button>
           </form>
         </CardContent>

@@ -21,6 +21,12 @@ import { useToast } from "@/hooks/use-toast";
 import useSWR from "swr";
 import type { User } from "db/schema";
 
+type ManagedUser = User & {
+  passwordState?: string;
+  mustChangePassword?: boolean;
+  authState?: string;
+};
+
 interface UserPasswordListProps {
   isOpen: boolean;
   onClose: () => void;
@@ -28,9 +34,10 @@ interface UserPasswordListProps {
 
 export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
   const { toast } = useToast();
-  const { data: users, error, mutate } = useSWR<User[]>("/api/users/passwords");
+  const { data: users, error, mutate } = useSWR<ManagedUser[]>("/api/users/passwords");
   const [editingUser, setEditingUser] = React.useState<number | null>(null);
   const [newPassword, setNewPassword] = React.useState("");
+  const [passwordConfirmation, setPasswordConfirmation] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [roleFilter, setRoleFilter] = React.useState<string>("all");
 
@@ -53,13 +60,21 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
 
   const handlePasswordUpdate = async (userId: number) => {
     if (isSubmitting) return;
+    if (newPassword.length < 6) {
+      toast({ variant: "destructive", title: "入力エラー", description: "パスワードは6文字以上で入力してください" });
+      return;
+    }
+    if (newPassword !== passwordConfirmation) {
+      toast({ variant: "destructive", title: "入力エラー", description: "確認用パスワードが一致しません" });
+      return;
+    }
 
     try {
       setIsSubmitting(true);
       const response = await fetch(`/api/users/${userId}/password`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: newPassword }),
+        body: JSON.stringify({ password: newPassword, passwordConfirmation }),
         credentials: 'include',
       });
 
@@ -72,6 +87,7 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
       });
       setEditingUser(null);
       setNewPassword("");
+      setPasswordConfirmation("");
     } catch (error) {
       toast({
         variant: "destructive",
@@ -84,11 +100,11 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
   };
 
   const getRoleBadgeVariant = (role: string) => {
-    return role === 'coach' ? 'default' : 'secondary';
+    return role === 'admin' || role === 'coach' ? 'default' : 'secondary';
   };
 
   const getRoleDisplayName = (role: string) => {
-    return role === 'coach' ? 'コーチ' : '選手';
+    return role === 'admin' ? '管理者' : role === 'coach' ? 'コーチ' : '選手';
   };
 
   return (
@@ -126,6 +142,9 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
                       {user.isActive ? '有効' : '無効'}
                     </Badge>
                   )}
+                  {(user.mustChangePassword || user.passwordState === "temporary" || user.authState === "temp_password") && (
+                    <Badge variant="outline">仮パスワード</Badge>
+                  )}
                 </div>
                 {editingUser === user.id ? (
                   <div className="flex items-center gap-2">
@@ -134,6 +153,14 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="新しいパスワード"
+                      className="w-40"
+                      disabled={isSubmitting}
+                    />
+                    <Input
+                      type="password"
+                      value={passwordConfirmation}
+                      onChange={(e) => setPasswordConfirmation(e.target.value)}
+                      placeholder="確認"
                       className="w-40"
                       disabled={isSubmitting}
                     />
@@ -150,6 +177,7 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
                       onClick={() => {
                         setEditingUser(null);
                         setNewPassword("");
+                        setPasswordConfirmation("");
                       }}
                       disabled={isSubmitting}
                     >

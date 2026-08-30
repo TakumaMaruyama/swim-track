@@ -1,7 +1,7 @@
 import { hashPassword } from "../server/auth";
 import { db } from "../db";
 import { users } from "../db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 async function updateAdminPassword() {
   try {
@@ -11,7 +11,10 @@ async function updateAdminPassword() {
       .update(users)
       .set({
         password: hashedPassword,
-        role: "admin"
+        role: "admin",
+        authState: "active",
+        passwordUpdatedAt: new Date(),
+        sessionVersion: sql`${users.sessionVersion} + 1`,
       })
       .where(eq(users.username, "丸山拓真"))
       .returning();

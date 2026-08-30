@@ -6,6 +6,7 @@ import { fetcher } from "./lib/fetcher";
 import { Toaster } from "./components/ui/toaster";
 import { setupErrorHandlers } from "./lib/error-handler";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { PasswordChangeRoute } from "./components/AuthRoute";
 import "./index.css";
 
 // Initialize error handlers
@@ -36,6 +37,8 @@ const QualificationProgress = lazy(() => retryImport(() => import("./pages/Quali
 const AdminLogin = lazy(() => retryImport(() => import("./pages/AdminLogin")));
 const IMRankings = lazy(() => retryImport(() => import("./pages/IMRankings")));
 const GrowthRankings = lazy(() => retryImport(() => import("./pages/GrowthRankings")));
+const AthleteLogin = lazy(() => retryImport(() => import("./pages/AthleteLogin")));
+const ChangePassword = lazy(() => retryImport(() => import("./pages/ChangePassword")));
 
 const LoadingSpinner = () => (
   <div className="flex flex-col items-center justify-center min-h-screen">
@@ -60,7 +63,7 @@ root.render(
           keepPreviousData: true,
           suspense: false,
           provider: () => new Map(),
-          onErrorRetry: (error: any, _key: string, _config: any, revalidate: (options?: any) => Promise<any>, { retryCount }: { retryCount: number }) => {
+          onErrorRetry: (error: any, _key: string, _config: any, revalidate: (options?: any) => void | Promise<boolean>, { retryCount }: { retryCount: number }) => {
             // Never retry on non-recoverable client errors
             if (error.status >= 400 && error.status < 500 && error.status !== 429) return;
 
@@ -74,46 +77,22 @@ root.render(
       >
         <Switch>
           <Route path="/">
-            <Suspense fallback={<LoadingSpinner />}>
-              <ErrorBoundary>
-                <Dashboard />
-              </ErrorBoundary>
-            </Suspense>
+            <Suspense fallback={<LoadingSpinner />}><ErrorBoundary><Dashboard /></ErrorBoundary></Suspense>
           </Route>
           <Route path="/athletes">
-            <Suspense fallback={<LoadingSpinner />}>
-              <ErrorBoundary>
-                <Athletes />
-              </ErrorBoundary>
-            </Suspense>
+            <Suspense fallback={<LoadingSpinner />}><ErrorBoundary><Athletes /></ErrorBoundary></Suspense>
           </Route>
           <Route path="/all-time-records">
-            <Suspense fallback={<LoadingSpinner />}>
-              <ErrorBoundary>
-                <RecordsAll />
-              </ErrorBoundary>
-            </Suspense>
+            <Suspense fallback={<LoadingSpinner />}><ErrorBoundary><RecordsAll /></ErrorBoundary></Suspense>
           </Route>
           <Route path="/records">
-            <Suspense fallback={<LoadingSpinner />}>
-              <ErrorBoundary>
-                <RecordsAll />
-              </ErrorBoundary>
-            </Suspense>
+            <Suspense fallback={<LoadingSpinner />}><ErrorBoundary><RecordsAll /></ErrorBoundary></Suspense>
           </Route>
           <Route path="/competitions">
-            <Suspense fallback={<LoadingSpinner />}>
-              <ErrorBoundary>
-                <Competitions />
-              </ErrorBoundary>
-            </Suspense>
+            <Suspense fallback={<LoadingSpinner />}><ErrorBoundary><Competitions /></ErrorBoundary></Suspense>
           </Route>
           <Route path="/qualification-progress">
-            <Suspense fallback={<LoadingSpinner />}>
-              <ErrorBoundary>
-                <QualificationProgress />
-              </ErrorBoundary>
-            </Suspense>
+            <Suspense fallback={<LoadingSpinner />}><ErrorBoundary><QualificationProgress /></ErrorBoundary></Suspense>
           </Route>
           <Route path="/admin/login">
             <Suspense fallback={<LoadingSpinner />}>
@@ -122,19 +101,23 @@ root.render(
               </ErrorBoundary>
             </Suspense>
           </Route>
-          <Route path="/im-rankings">
+          <Route path="/login">
             <Suspense fallback={<LoadingSpinner />}>
-              <ErrorBoundary>
-                <IMRankings />
-              </ErrorBoundary>
+              <ErrorBoundary><AthleteLogin /></ErrorBoundary>
             </Suspense>
           </Route>
+          <Route path="/change-password">
+            <PasswordChangeRoute>
+              <Suspense fallback={<LoadingSpinner />}>
+                <ErrorBoundary><ChangePassword /></ErrorBoundary>
+              </Suspense>
+            </PasswordChangeRoute>
+          </Route>
+          <Route path="/im-rankings">
+            <Suspense fallback={<LoadingSpinner />}><ErrorBoundary><IMRankings /></ErrorBoundary></Suspense>
+          </Route>
           <Route path="/growth-rankings">
-            <Suspense fallback={<LoadingSpinner />}>
-              <ErrorBoundary>
-                <GrowthRankings />
-              </ErrorBoundary>
-            </Suspense>
+            <Suspense fallback={<LoadingSpinner />}><ErrorBoundary><GrowthRankings /></ErrorBoundary></Suspense>
           </Route>
           <Route>404 ページが見つかりません</Route>
         </Switch>

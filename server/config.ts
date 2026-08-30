@@ -24,8 +24,8 @@ interface Config {
 const configuration: Config = {
   port: parseInt(process.env.PORT || "5000", 10),
   nodeEnv: process.env.NODE_ENV || "development",
-  databaseUrl: process.env.DATABASE_URL || "postgresql://localhost:5432/swimtrack",
-  sessionSecret: process.env.SESSION_SECRET || "development-secret-key",
+  databaseUrl: process.env.DATABASE_URL || "",
+  sessionSecret: process.env.SESSION_SECRET || "",
   qualifyingTimesApiBaseUrl: process.env.QUALIFYING_TIMES_API_BASE_URL,
   googleClientId: process.env.GOOGLE_CLIENT_ID,
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,

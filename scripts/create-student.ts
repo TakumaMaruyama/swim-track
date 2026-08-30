@@ -3,6 +3,7 @@ import { db } from "../db";
 import { users } from "../db/schema";
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
+import { normalizeFullName } from "../server/fullName";
 
 async function createStudent() {
   try {
@@ -29,7 +30,10 @@ async function createStudent() {
       .insert(users)
       .values({
         username,
+        loginKey: normalizeFullName(username),
         password: hashedPassword,
+        authState: "initial_setup",
+        sessionVersion: 1,
         role: "student",
         isActive: true
       })

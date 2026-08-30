@@ -4,37 +4,14 @@ import { setupVite, serveStatic } from "./vite";
 import { createServer } from "http";
 import { configureAuth } from "./auth";
 import configuration from "./config";
-import { runMigrations } from "../db/runMigrations";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Enable CORS for development with caching improvements
+// Same-origin only: authentication, cookies, and APIs are intentionally not
+// shared with Swim Platform or any other application.
 app.use((req, res, next) => {
-  const isDevelopment = process.env.NODE_ENV !== 'production';
-  const origin = req.headers.origin;
-  
-  // Development環境では、すべてのオリジンを許可
-  if (isDevelopment) {
-    if (origin) {
-      res.header('Access-Control-Allow-Origin', origin);
-    }
-  } else {
-    // Production環境では、特定のオリジンのみを許可
-    const replSlug = process.env.REPL_SLUG;
-    const allowedOrigins = [
-      replSlug ? `https://${replSlug}.repl.co` : null,
-      replSlug ? `https://${replSlug}.repl.co:443` : null,
-      replSlug ? `https://webview.${replSlug}.repl.co` : null,
-      replSlug ? `https://${replSlug}.id.repl.co` : null
-    ].filter(Boolean);
-    
-    if (origin && allowedOrigins.includes(origin)) {
-      res.header('Access-Control-Allow-Origin', origin);
-    }
-  }
-
   // キャッシュ制御の最適化
   if (req.method === 'GET') {
     // APIエンドポイントとHTMLはキャッシュしない
@@ -51,23 +28,12 @@ app.use((req, res, next) => {
     res.header('Cache-Control', 'no-store');
   }
 
-  // 共通のCORS設定
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.header('Access-Control-Max-Age', '86400'); // CORS プリフライトの結果を24時間キャッシュ
-
-  // プリフライトリクエストの処理
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
-
   // リクエストタイミングの記録
-  req.startTime = Date.now();
+  const startTime = Date.now();
   
   // レスポンス完了時のログ記録
   res.on('finish', () => {
-    const duration = Date.now() - req.startTime;
+    const duration = Date.now() - startTime;
     console.log(`${req.method} ${req.url} - ${res.statusCode} - ${duration}ms`);
   });
 
@@ -91,28 +57,7 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 // Configure authentication
 configureAuth(app);
 
-async function maybeRunDevelopmentMigrations() {
-  if (configuration.nodeEnv === "production") {
-    return;
-  }
-
-  if (process.env.AUTO_RUN_MIGRATIONS === "false") {
-    console.log("Skipping development migrations because AUTO_RUN_MIGRATIONS=false");
-    return;
-  }
-
-  try {
-    console.log("Running development migrations...");
-    await runMigrations();
-    console.log("Development migrations completed");
-  } catch (error) {
-    console.error("Development migrations failed. The app will keep running, but new pages may not load until the DB schema is updated.");
-    console.error(error);
-  }
-}
-
 (async () => {
-  await maybeRunDevelopmentMigrations();
   registerRoutes(app);
   const server = createServer(app);
 
@@ -133,7 +78,7 @@ async function maybeRunDevelopmentMigrations() {
   }
 
   // Serve the app using configuration port
-  const PORT = process.env.PORT || 5000;
+  const PORT = Number(process.env.PORT) || 5000;
   server.listen(PORT, "0.0.0.0", () => {
     const formattedTime = new Date().toLocaleTimeString("en-US", {
       hour: "2-digit",
@@ -146,7 +91,7 @@ async function maybeRunDevelopmentMigrations() {
     console.log('Server configuration:', {
       port: PORT,
       env: process.env.NODE_ENV,
-      cors: true
+      apiAccess: "same-origin"
     });
   });
 })();
