@@ -49,11 +49,27 @@ const AUTH_ATTEMPT_LIMIT = 20;
 const IP_AUTH_ATTEMPT_LIMIT = 100;
 const AUTH_IDENTITY_MAX_CHARACTERS = 100;
 
+const authUserColumns = {
+  id: users.id,
+  username: users.username,
+  password: users.password,
+  credentialState: users.credentialState,
+  authVersion: users.authVersion,
+  role: users.role,
+  isActive: users.isActive,
+  gender: users.gender,
+};
+
+type AuthUser = Pick<
+  typeof users.$inferSelect,
+  "id" | "username" | "password" | "credentialState" | "authVersion" | "role" | "isActive" | "gender"
+>;
+
 function isCredentialState(value: string): value is CredentialState {
   return value === "setup_required" || value === "temporary" || value === "active";
 }
 
-function authResponseUser(user: typeof users.$inferSelect) {
+function authResponseUser(user: AuthUser) {
   return {
     id: user.id,
     username: user.username,
@@ -143,14 +159,14 @@ async function findUniqueStudentByFullName(fullName: unknown) {
   const loginKey = normalizeFullName(fullName);
   if (!loginKey) return null;
   const matches = await db
-    .select()
+    .select(authUserColumns)
     .from(users)
     .where(and(eq(users.role, "student"), eq(users.loginKey, loginKey)))
     .limit(2);
   return matches.length === 1 ? matches[0] : null;
 }
 
-async function establishSession(req: Request, user: typeof users.$inferSelect) {
+async function establishSession(req: Request, user: AuthUser) {
   try {
     await regenerate(req);
   } catch (error) {
@@ -201,7 +217,7 @@ function logAuthRouteFailure(route: string, stage: string, error: unknown) {
 export async function revalidateSession(req: Request) {
   if (!req.session.userId || req.session.authVersion === undefined) return null;
   const [user] = await db
-    .select()
+    .select(authUserColumns)
     .from(users)
     .where(eq(users.id, req.session.userId))
     .limit(1);
@@ -385,7 +401,7 @@ export const configureAuth = (app: Express, options?: { store?: session.Store })
             eq(users.credentialState, "temporary"),
             eq(users.isActive, true),
           ))
-          .returning();
+          .returning(authUserColumns);
         if (!updated) return res.status(401).json({ ok: false, message: GENERIC_AUTH_FAILURE });
         await establishSession(req, updated);
         return res.json({
@@ -424,7 +440,7 @@ export const configureAuth = (app: Express, options?: { store?: session.Store })
           eq(users.credentialState, "setup_required"),
           eq(users.isActive, true),
         ))
-        .returning();
+        .returning(authUserColumns);
       if (!updated) {
         clearPendingSetup(req);
         await save(req).catch(() => undefined);
@@ -452,7 +468,7 @@ export const configureAuth = (app: Express, options?: { store?: session.Store })
       }
       stage = "admin-query";
       const [admin] = await db
-        .select()
+        .select(authUserColumns)
         .from(users)
         .where(and(eq(users.username, username), eq(users.role, "admin")))
         .limit(1);
@@ -529,7 +545,7 @@ export const configureAuth = (app: Express, options?: { store?: session.Store })
       return res.status(400).json({ message: validationError || "無効な選手IDです" });
     }
     const [target] = await db
-      .select()
+      .select({ id: users.id, authVersion: users.authVersion })
       .from(users)
       .where(and(eq(users.id, userId), eq(users.role, "student")))
       .limit(1);
@@ -547,7 +563,7 @@ export const configureAuth = (app: Express, options?: { store?: session.Store })
         eq(users.role, "student"),
         eq(users.authVersion, target.authVersion),
       ))
-      .returning();
+      .returning(authUserColumns);
     if (!updated) return res.status(409).json({ message: "選手情報が更新されました。再試行してください" });
     return res.json(authResponseUser(updated));
   };
