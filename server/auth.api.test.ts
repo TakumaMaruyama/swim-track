@@ -6,6 +6,7 @@ const state = vi.hoisted(() => ({
   selected: [] as unknown[][],
   selections: [] as unknown[],
   returned: [] as unknown[][],
+  returningErrors: [] as unknown[],
   returningSelections: [] as unknown[],
   values: [] as unknown[],
   mutationWheres: [] as unknown[],
@@ -16,7 +17,10 @@ const configState = vi.hoisted(() => ({
   nodeEnv: "test",
   publicOrigin: "",
 }));
-const poolQuery = vi.hoisted(() => vi.fn(async (_sql: string, params?: unknown[]) => ({
+const poolQuery = vi.hoisted(() => vi.fn(async (
+  _sql: string,
+  params?: unknown[],
+): Promise<{ rows: Record<string, unknown>[] }> => ({
   rows: [
     { key_hash: params?.[0], attempt_count: 1 },
     { key_hash: params?.[1], attempt_count: 1 },
@@ -51,6 +55,10 @@ vi.mock("db", () => {
     },
     returning: (selection?: unknown) => {
       state.returningSelections.push(selection);
+      const error = state.returningErrors.shift();
+      if (error) {
+        return Promise.reject(error);
+      }
       return Promise.resolve(state.returned.shift() ?? []);
     },
   };
@@ -131,6 +139,7 @@ describe("athlete authentication and authorization", () => {
     state.selected = [];
     state.selections = [];
     state.returned = [];
+    state.returningErrors = [];
     state.returningSelections = [];
     state.values = [];
     state.mutationWheres = [];
@@ -402,6 +411,57 @@ describe("athlete authentication and authorization", () => {
     const duplicate = await adminAgent.post("/api/athletes").send({ username: "山田　太郎" });
     expect(duplicate.status).toBe(400);
     expect(duplicate.body.message).toBe("この選手名は既に使用されています");
+  });
+
+  it("creates an athlete when the legacy users table has no birth_date column", async () => {
+    const app = await makeApp();
+    const adminAgent = request.agent(app);
+    state.selected.push([admin()]);
+    await adminAgent.post("/api/auth/login").send({
+      username: "admin",
+      password: "correct-password",
+    });
+
+    state.selected.push([admin()], []);
+    state.returningErrors.push(Object.assign(
+      new Error('column "birth_date" of relation "users" does not exist'),
+      { code: "42703" },
+    ));
+    poolQuery.mockResolvedValueOnce({
+      rows: [{
+        id: 24,
+        username: "新選手",
+        name_kana: "しんせんしゅ",
+        role: "student",
+        is_active: true,
+        gender: "male",
+        join_date: null,
+        all_time_start_date: null,
+        created_at: new Date("2026-08-30T00:00:00.000Z"),
+      }],
+    });
+
+    const response = await adminAgent.post("/api/athletes").send({
+      username: "新選手",
+      nameKana: "しんせんしゅ",
+      gender: "male",
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      id: 24,
+      username: "新選手",
+      birthDate: null,
+      role: "student",
+    });
+    const [query, params] = poolQuery.mock.calls.at(-1) ?? [];
+    expect(String(query)).toContain("INSERT INTO users");
+    expect(String(query)).not.toContain("birth_date");
+    expect(params?.slice(0, 3)).toEqual([
+      "新選手",
+      "新選手",
+      "しんせんしゅ",
+    ]);
   });
 
   it("invalidates an athlete session when an administrator changes the full name", async () => {

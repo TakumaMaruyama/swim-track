@@ -1,7 +1,7 @@
 import { Express } from "express";
 import { and, asc, count, desc, eq, sql } from "drizzle-orm";
 
-import { db } from "db";
+import { db, pool } from "db";
 import { announcements, competitions, swimRecords, users } from "db/schema";
 import configuration from "./config";
 import { normalizeFullName } from "./fullName";
@@ -85,6 +85,18 @@ const legacyAthleteReturnFields = {
   joinDate: users.joinDate,
   allTimeStartDate: users.allTimeStartDate,
   createdAt: users.createdAt,
+};
+
+type LegacyAthleteInsertRow = {
+  id: number;
+  username: string;
+  name_kana: string | null;
+  role: string;
+  is_active: boolean;
+  gender: string;
+  join_date: Date | null;
+  all_time_start_date: Date | null;
+  created_at: Date;
 };
 
 const competitionListFields = {
@@ -374,12 +386,60 @@ export function registerRoutes(app: Express) {
 
         console.warn("users.birth_date column is missing. Creating athlete without birthDate.");
 
-        const [athlete] = await db
-          .insert(users)
-          .values(baseAthletePayload)
-          .returning(legacyAthleteReturnFields);
+        // Drizzle includes every schema column in INSERT statements, using DEFAULT for
+        // omitted values. On legacy databases that still means referencing birth_date,
+        // so use an explicit column list for this compatibility path.
+        const result = await pool.query<LegacyAthleteInsertRow>(
+          `INSERT INTO users (
+             username,
+             login_key,
+             name_kana,
+             password,
+             credential_state,
+             auth_version,
+             role,
+             is_active,
+             gender
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+           RETURNING
+             id,
+             username,
+             name_kana,
+             role,
+             is_active,
+             gender,
+             join_date,
+             all_time_start_date,
+             created_at`,
+          [
+            baseAthletePayload.username,
+            baseAthletePayload.loginKey,
+            baseAthletePayload.nameKana,
+            baseAthletePayload.password,
+            baseAthletePayload.credentialState,
+            baseAthletePayload.authVersion,
+            baseAthletePayload.role,
+            baseAthletePayload.isActive,
+            baseAthletePayload.gender,
+          ],
+        );
+        const athlete = result.rows[0];
 
-        return res.json(withLegacyBirthDate(athlete));
+        if (!athlete) {
+          throw new Error("Legacy athlete insert returned no row");
+        }
+
+        return res.json(withLegacyBirthDate({
+          id: athlete.id,
+          username: athlete.username,
+          nameKana: athlete.name_kana,
+          role: athlete.role,
+          isActive: athlete.is_active,
+          gender: athlete.gender,
+          joinDate: athlete.join_date,
+          allTimeStartDate: athlete.all_time_start_date,
+          createdAt: athlete.created_at,
+        }));
       }
     } catch (error) {
       if (isLoginKeyUniqueViolation(error)) {
