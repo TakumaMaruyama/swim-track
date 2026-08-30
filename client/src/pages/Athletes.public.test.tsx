@@ -32,6 +32,7 @@ describe("Athletes public access", () => {
 
     expect(screen.getByText("山田 太郎")).toBeTruthy();
     expect(screen.getByRole("button", { name: "ログイン" })).toBeTruthy();
+    expect(screen.queryByText("大会目標一覧を見る")).toBeNull();
     expect(screen.queryByRole("button", { name: "選手追加" })).toBeNull();
     expect(screen.queryByRole("button", { name: "ログアウト" })).toBeNull();
     expect(screen.queryByRole("button", { name: "記録追加" })).toBeNull();

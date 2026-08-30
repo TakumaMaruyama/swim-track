@@ -1,5 +1,4 @@
 import React from 'react';
-import useSWR from 'swr';
 import {
   Dialog,
   DialogContent,
@@ -27,7 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, Trash2, Edit2, TrendingUp } from "lucide-react";
+import { Trophy, Trash2, Edit2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 import type { ExtendedSwimRecord } from "@/hooks/use-swim-records";
@@ -40,6 +39,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { ChevronDown } from "lucide-react";
+import { TimeImprovementSummary } from "@/components/TimeImprovementSummary";
 
 const TimeProgressChart = lazy(() => import('./TimeProgressChart'));
 
@@ -70,24 +70,6 @@ const formatDate = (date: string | Date | null) => {
   return new Date(date).toLocaleDateString('ja-JP');
 };
 
-type ImprovementSummaryResponse = {
-  athleteId: number;
-  months: number;
-  items: Array<{
-    eventLabel: string;
-    startBestTime: string;
-    currentBestTime: string;
-    improvementMs: number;
-    improvementRate: number;
-    status: "improved" | "flat" | "regressed";
-  }>;
-};
-
-const formatImprovement = (improvementMs: number, improvementRate: number) => {
-  const seconds = Math.abs(improvementMs) / 1000;
-  return `${seconds.toFixed(2)}秒 / ${Math.abs(improvementRate).toFixed(1)}%`;
-};
-
 export function TimeHistoryModal({ 
   isOpen, 
   onClose, 
@@ -108,21 +90,6 @@ export function TimeHistoryModal({
   const [customEndDate, setCustomEndDate] = React.useState<string>("");
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [openSections, setOpenSections] = React.useState<{[key: string]: boolean}>({});
-  const summary1 = useSWR<ImprovementSummaryResponse>(
-    athleteId && isOpen ? `/api/athletes/${athleteId}/improvement-summary?months=1` : null,
-  );
-  const summary3 = useSWR<ImprovementSummaryResponse>(
-    athleteId && isOpen ? `/api/athletes/${athleteId}/improvement-summary?months=3` : null,
-  );
-  const summary6 = useSWR<ImprovementSummaryResponse>(
-    athleteId && isOpen ? `/api/athletes/${athleteId}/improvement-summary?months=6` : null,
-  );
-
-  const improvementCards = [
-    { months: 1, label: "過去1か月", response: summary1.data },
-    { months: 3, label: "過去3か月", response: summary3.data },
-    { months: 6, label: "過去6か月", response: summary6.data },
-  ];
 
   const filterRecordsByDate = React.useCallback((record: ExtendedSwimRecord, now: Date) => {
     if (!record.date || periodFilter === "all") return true;
@@ -298,48 +265,6 @@ export function TimeHistoryModal({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-3 md:grid-cols-3 mb-4">
-            {improvementCards.map((card) => {
-              const topItem = card.response?.items?.[0];
-
-              return (
-                <Card key={card.months}>
-                  <CardContent className="pt-6 space-y-2">
-                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                      <TrendingUp className="h-4 w-4" />
-                      {card.label}
-                    </div>
-                    {topItem ? (
-                      <>
-                        <p className="font-semibold">{topItem.eventLabel}</p>
-                        <p
-                          className={
-                            topItem.status === "improved"
-                              ? "text-green-600 font-medium"
-                              : topItem.status === "regressed"
-                                ? "text-red-600 font-medium"
-                                : "text-muted-foreground font-medium"
-                          }
-                        >
-                          {topItem.status === "improved"
-                            ? `短縮 ${formatImprovement(topItem.improvementMs, topItem.improvementRate)}`
-                            : topItem.status === "regressed"
-                              ? `後退 ${formatImprovement(topItem.improvementMs, topItem.improvementRate)}`
-                              : "変化なし"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {topItem.startBestTime} → {topItem.currentBestTime}
-                        </p>
-                      </>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">比較できる記録がまだありません</p>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-
           <div className="flex flex-col sm:flex-row gap-4 mb-4">
             <div className="flex flex-col sm:flex-row gap-4">
               <Select value={styleFilter} onValueChange={setStyleFilter}>
@@ -400,6 +325,8 @@ export function TimeHistoryModal({
               </div>
             )}
           </div>
+
+          <TimeImprovementSummary athleteId={athleteId} isActive={isOpen} />
 
           <div className="space-y-6">
             {Object.entries(groupedAndFilteredRecords).map(([key, records]) => {

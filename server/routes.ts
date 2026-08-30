@@ -3,28 +3,9 @@ import { and, asc, count, desc, eq, sql } from "drizzle-orm";
 
 import { db, pool } from "db";
 import { announcements, competitions, swimRecords, users } from "db/schema";
-import configuration from "./config";
 import { normalizeFullName } from "./fullName";
 import { UNUSABLE_PASSWORD_HASH } from "./passwordPolicy";
-import {
-  buildImprovementSummary,
-  buildQualificationProgress,
-  fetchQualifyingMeets,
-} from "./qualification";
-
-const QUALIFICATION_LEVELS = ["national", "kyushu", "kagoshima"] as const;
-const QUALIFICATION_COURSES = ["SCM", "LCM", "ANY"] as const;
-
-type QualificationLevel = (typeof QUALIFICATION_LEVELS)[number];
-type QualificationCourse = (typeof QUALIFICATION_COURSES)[number];
-
-const QUALIFICATION_COLUMN_NAMES = [
-  "is_qualification_target",
-  "qualifying_meet_id",
-  "qualifying_level",
-  "qualifying_season",
-  "qualifying_course",
-] as const;
+import { buildImprovementSummary } from "./improvementSummary";
 
 const athleteListFields = {
   id: users.id,
@@ -104,36 +85,10 @@ const competitionListFields = {
   name: competitions.name,
   location: competitions.location,
   date: competitions.date,
-  isQualificationTarget: competitions.isQualificationTarget,
-  qualifyingMeetId: competitions.qualifyingMeetId,
-  qualifyingLevel: competitions.qualifyingLevel,
-  qualifyingSeason: competitions.qualifyingSeason,
-  qualifyingCourse: competitions.qualifyingCourse,
-  recordCount: count(swimRecords.id),
-};
-
-const legacyCompetitionListFields = {
-  id: competitions.id,
-  name: competitions.name,
-  location: competitions.location,
-  date: competitions.date,
   recordCount: count(swimRecords.id),
 };
 
 const competitionReturnFields = {
-  id: competitions.id,
-  name: competitions.name,
-  location: competitions.location,
-  date: competitions.date,
-  isQualificationTarget: competitions.isQualificationTarget,
-  qualifyingMeetId: competitions.qualifyingMeetId,
-  qualifyingLevel: competitions.qualifyingLevel,
-  qualifyingSeason: competitions.qualifyingSeason,
-  qualifyingCourse: competitions.qualifyingCourse,
-  createdAt: competitions.createdAt,
-};
-
-const legacyCompetitionReturnFields = {
   id: competitions.id,
   name: competitions.name,
   location: competitions.location,
@@ -189,14 +144,6 @@ function validateRecordInput(body: Record<string, unknown>) {
   return { style, distance, time, date, poolLength };
 }
 
-function isQualificationLevel(value: unknown): value is QualificationLevel {
-  return typeof value === "string" && QUALIFICATION_LEVELS.includes(value as QualificationLevel);
-}
-
-function isQualificationCourse(value: unknown): value is QualificationCourse {
-  return typeof value === "string" && QUALIFICATION_COURSES.includes(value as QualificationCourse);
-}
-
 function isMissingColumnError(error: unknown, columnNames: readonly string[]) {
   const message = error instanceof Error ? error.message : String(error ?? "");
   const code =
@@ -214,10 +161,6 @@ function isUsersBirthDateMissingError(error: unknown) {
   return isMissingColumnError(error, ["birth_date"]);
 }
 
-function isCompetitionQualificationColumnMissingError(error: unknown) {
-  return isMissingColumnError(error, QUALIFICATION_COLUMN_NAMES);
-}
-
 function isLoginKeyUniqueViolation(error: unknown) {
   return typeof error === "object" && error !== null && "code" in error &&
     String((error as { code?: unknown }).code) === "23505";
@@ -230,64 +173,10 @@ function withLegacyBirthDate<T extends Record<string, unknown>>(athlete: T) {
   };
 }
 
-function withLegacyCompetitionFields<T extends Record<string, unknown>>(competition: T) {
-  return {
-    ...competition,
-    isQualificationTarget: false,
-    qualifyingMeetId: null,
-    qualifyingLevel: null,
-    qualifyingSeason: null,
-    qualifyingCourse: null,
-  };
-}
-
-function buildSchemaOutdatedMessage(feature: "athletes" | "competitions" | "qualification-progress") {
-  if (feature === "athletes") {
-    return "開発DBの migration が未適用のため選手情報を完全に読めません。サーバーを再起動すると自動 migration が走ります。";
-  }
-
-  if (feature === "competitions") {
-    return "開発DBの migration が未適用のため大会目標設定を保存できません。サーバー再起動後にもう一度お試しください。";
-  }
-
-  return "開発DBの migration が未適用のため大会目標一覧を作れません。サーバーを再起動して migration を反映してください。";
-}
-
 function normalizeCompetitionPayload(body: Record<string, unknown>) {
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const location = typeof body.location === "string" ? body.location.trim() : "";
   const date = parseRequiredDate(body.date);
-  const isQualificationTarget = Boolean(body.isQualificationTarget);
-
-  let qualifyingMeetId: string | null = null;
-  let qualifyingLevel: QualificationLevel | null = null;
-  let qualifyingSeason: number | null = null;
-  let qualifyingCourse: QualificationCourse | null = null;
-
-  if (isQualificationTarget) {
-    qualifyingMeetId =
-      typeof body.qualifyingMeetId === "string" && body.qualifyingMeetId.trim().length > 0
-        ? body.qualifyingMeetId.trim()
-        : null;
-    qualifyingLevel = isQualificationLevel(body.qualifyingLevel) ? body.qualifyingLevel : null;
-    const parsedSeason =
-      typeof body.qualifyingSeason === "number"
-        ? body.qualifyingSeason
-        : typeof body.qualifyingSeason === "string" && body.qualifyingSeason.trim().length > 0
-          ? Number.parseInt(body.qualifyingSeason, 10)
-          : null;
-    qualifyingSeason = typeof parsedSeason === "number" && Number.isFinite(parsedSeason)
-      ? parsedSeason
-      : null;
-    qualifyingCourse = isQualificationCourse(body.qualifyingCourse)
-      ? body.qualifyingCourse
-      : null;
-
-    if (!qualifyingMeetId || !qualifyingLevel || !qualifyingCourse || !qualifyingSeason) {
-      throw new Error("標準タイム連携対象の大会には外部大会情報が必要です");
-    }
-  }
-
   if (!name || !location) {
     throw new Error("大会名と開催場所は必須です");
   }
@@ -296,11 +185,6 @@ function normalizeCompetitionPayload(body: Record<string, unknown>) {
     name,
     location,
     date,
-    isQualificationTarget,
-    qualifyingMeetId,
-    qualifyingLevel,
-    qualifyingSeason,
-    qualifyingCourse,
   };
 }
 
@@ -506,26 +390,6 @@ export function registerRoutes(app: Express) {
         })),
       );
     } catch (error) {
-      if (isCompetitionQualificationColumnMissingError(error)) {
-        console.warn("Competition qualification columns are missing. Falling back to legacy competition query.");
-
-        const legacyRows = await db
-          .select(legacyCompetitionListFields)
-          .from(competitions)
-          .leftJoin(swimRecords, eq(swimRecords.competitionId, competitions.id))
-          .groupBy(competitions.id)
-          .orderBy(asc(competitions.date), asc(competitions.name));
-
-        return res.json(
-          legacyRows.map((row) =>
-            withLegacyCompetitionFields({
-              ...row,
-              recordCount: Number(row.recordCount ?? 0),
-            }),
-          ),
-        );
-      }
-
       console.error("Error fetching competitions:", error);
       res.status(500).json({ message: "大会情報の取得に失敗しました" });
     }
@@ -539,33 +403,12 @@ export function registerRoutes(app: Express) {
     try {
       const payload = normalizeCompetitionPayload(req.body);
 
-      try {
-        const [competition] = await db
-          .insert(competitions)
-          .values(payload)
-          .returning(competitionReturnFields);
+      const [competition] = await db
+        .insert(competitions)
+        .values(payload)
+        .returning(competitionReturnFields);
 
-        return res.json(competition);
-      } catch (error) {
-        if (!isCompetitionQualificationColumnMissingError(error)) {
-          throw error;
-        }
-
-        if (payload.isQualificationTarget) {
-          return res.status(409).json({ message: buildSchemaOutdatedMessage("competitions") });
-        }
-
-        const [competition] = await db
-          .insert(competitions)
-          .values({
-            name: payload.name,
-            location: payload.location,
-            date: payload.date,
-          })
-          .returning(legacyCompetitionReturnFields);
-
-        return res.json(withLegacyCompetitionFields(competition));
-      }
+      return res.json(competition);
     } catch (error) {
       console.error("Error creating competition:", error);
       res.status(400).json({
@@ -587,179 +430,22 @@ export function registerRoutes(app: Express) {
 
       const payload = normalizeCompetitionPayload(req.body);
 
-      try {
-        const [competition] = await db
-          .update(competitions)
-          .set(payload)
-          .where(eq(competitions.id, competitionId))
-          .returning(competitionReturnFields);
+      const [competition] = await db
+        .update(competitions)
+        .set(payload)
+        .where(eq(competitions.id, competitionId))
+        .returning(competitionReturnFields);
 
-        if (!competition) {
-          return res.status(404).json({ message: "大会が見つかりません" });
-        }
-
-        return res.json(competition);
-      } catch (error) {
-        if (!isCompetitionQualificationColumnMissingError(error)) {
-          throw error;
-        }
-
-        if (payload.isQualificationTarget) {
-          return res.status(409).json({ message: buildSchemaOutdatedMessage("competitions") });
-        }
-
-        const [competition] = await db
-          .update(competitions)
-          .set({
-            name: payload.name,
-            location: payload.location,
-            date: payload.date,
-          })
-          .where(eq(competitions.id, competitionId))
-          .returning(legacyCompetitionReturnFields);
-
-        if (!competition) {
-          return res.status(404).json({ message: "大会が見つかりません" });
-        }
-
-        return res.json(withLegacyCompetitionFields(competition));
+      if (!competition) {
+        return res.status(404).json({ message: "大会が見つかりません" });
       }
+
+      return res.json(competition);
     } catch (error) {
       console.error("Error updating competition:", error);
       res.status(400).json({
         message: error instanceof Error ? error.message : "大会情報の更新に失敗しました",
       });
-    }
-  });
-
-  app.get("/api/qualifying-meets", async (req, res) => {
-    if (!configuration.qualifyingTimesApiBaseUrl) {
-      return res.status(503).json({ message: "標準タイムAPIの接続先が未設定です" });
-    }
-
-    const level = req.query.level;
-    const parsedSeason =
-      typeof req.query.season === "string" && req.query.season.trim().length > 0
-        ? Number.parseInt(req.query.season, 10)
-        : null;
-    const season = typeof parsedSeason === "number" && Number.isFinite(parsedSeason) ? parsedSeason : null;
-    const course =
-      typeof req.query.course === "string" && isQualificationCourse(req.query.course)
-        ? req.query.course
-        : null;
-
-    if (!isQualificationLevel(level)) {
-      return res.status(400).json({ message: "level は必須です" });
-    }
-
-    try {
-      const meets = await fetchQualifyingMeets(configuration.qualifyingTimesApiBaseUrl, {
-        level,
-        season,
-        course,
-      });
-
-      res.json({ meets });
-    } catch (error) {
-      console.error("Error fetching qualifying meets:", error);
-      res.status(502).json({ message: "標準タイムAPIから大会一覧を取得できませんでした" });
-    }
-  });
-
-  app.get("/api/qualification-progress", async (_req, res) => {
-    try {
-      const [athletes, targetCompetitions, records] = await Promise.all([
-        (async () => {
-          try {
-            return await db
-              .select({
-                id: users.id,
-                username: users.username,
-                nameKana: users.nameKana,
-                gender: users.gender,
-                birthDate: users.birthDate,
-                isActive: users.isActive,
-              })
-              .from(users)
-              .where(eq(users.role, "student"))
-              .orderBy(sql`COALESCE(${users.nameKana}, ${users.username})`);
-          } catch (error) {
-            if (!isUsersBirthDateMissingError(error)) {
-              throw error;
-            }
-
-            console.warn("users.birth_date column is missing. Building qualification progress without age data.");
-
-            const legacyAthletes = await db
-              .select(legacyAthleteListFields)
-              .from(users)
-              .where(eq(users.role, "student"))
-              .orderBy(sql`COALESCE(${users.nameKana}, ${users.username})`);
-
-            return legacyAthletes.map((athlete) => withLegacyBirthDate(athlete));
-          }
-        })(),
-        db
-          .select({
-            id: competitions.id,
-            name: competitions.name,
-            location: competitions.location,
-            date: competitions.date,
-            isQualificationTarget: competitions.isQualificationTarget,
-            qualifyingMeetId: competitions.qualifyingMeetId,
-            qualifyingLevel: competitions.qualifyingLevel,
-            qualifyingSeason: competitions.qualifyingSeason,
-            qualifyingCourse: competitions.qualifyingCourse,
-          })
-          .from(competitions)
-          .where(eq(competitions.isQualificationTarget, true))
-          .orderBy(asc(competitions.date), asc(competitions.name)),
-        db
-          .select({
-            id: swimRecords.id,
-            studentId: swimRecords.studentId,
-            style: swimRecords.style,
-            distance: swimRecords.distance,
-            time: swimRecords.time,
-            date: swimRecords.date,
-            poolLength: swimRecords.poolLength,
-          })
-          .from(swimRecords)
-          .where(sql`${swimRecords.studentId} is not null`)
-          .orderBy(desc(swimRecords.date)),
-      ]);
-
-      const payload = await buildQualificationProgress({
-        athletes: athletes.map((athlete) => ({
-          ...athlete,
-          gender: (athlete.gender || "male") as "male" | "female",
-        })),
-        competitions: targetCompetitions.map((competition) => ({
-          ...competition,
-          qualifyingLevel: isQualificationLevel(competition.qualifyingLevel)
-            ? competition.qualifyingLevel
-            : null,
-          qualifyingCourse: isQualificationCourse(competition.qualifyingCourse)
-            ? competition.qualifyingCourse
-            : null,
-        })),
-        records,
-        qualifyingTimesApiBaseUrl: configuration.qualifyingTimesApiBaseUrl,
-      });
-
-      res.json(payload);
-    } catch (error) {
-      if (isCompetitionQualificationColumnMissingError(error)) {
-        console.warn("Qualification progress is unavailable because the DB schema is outdated.");
-        return res.json({
-          targetCompetitions: [],
-          schemaOutdated: true,
-          message: buildSchemaOutdatedMessage("qualification-progress"),
-        });
-      }
-
-      console.error("Error building qualification progress:", error);
-      res.status(500).json({ message: "大会目標一覧の生成に失敗しました" });
     }
   });
 

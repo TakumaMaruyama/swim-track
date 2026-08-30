@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Download, Edit2, Plus, Power, History, Trash2, Flag, KeyRound } from "lucide-react";
+import { AlertCircle, Download, Edit2, Plus, Power, History, Trash2, KeyRound } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -161,7 +161,7 @@ const AddAthleteDialog = ({ isOpen, onClose, onSubmit }: AddAthleteDialogProps) 
                 onChange={(e) => setBirthDate(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                大会目標一覧の標準タイム判定に使います
+                生年月日は選手プロフィール情報として保持されます
               </p>
             </div>
           </div>
@@ -559,14 +559,6 @@ export default function Athletes() {
         title="選手一覧"
         children={
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => navigate("/qualification-progress")}
-              className="flex items-center gap-2"
-            >
-              <Flag className="h-4 w-4" />
-              大会目標一覧を見る
-            </Button>
             {isAdmin && (
               <>
                 <Button

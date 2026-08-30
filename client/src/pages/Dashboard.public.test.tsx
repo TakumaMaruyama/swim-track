@@ -17,6 +17,7 @@ describe("Dashboard public access", () => {
     render(<Dashboard />);
 
     expect(screen.getByText("公開のお知らせ")).toBeTruthy();
+    expect(screen.queryByText("大会目標一覧")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "選手一覧" }));
     expect(navigate).toHaveBeenCalledWith("/athletes");
   });

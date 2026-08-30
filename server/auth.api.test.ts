@@ -153,6 +153,8 @@ describe("athlete authentication and authorization", () => {
     const app = await makeApp();
     state.selected.push([]);
     expect((await request(app).get("/api/records")).status).toBe(200);
+    expect((await request(app).get("/api/qualification-progress")).status).toBe(404);
+    expect((await request(app).get("/api/qualifying-meets")).status).toBe(404);
     expect((await request(app).post("/api/records").send({})).status).toBe(401);
     expect((await request(app)
       .post("/api/auth/athlete/start")

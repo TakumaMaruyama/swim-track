@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLocation } from 'wouter';
-import { Trophy, Users, Medal, TrendingUp, Flag } from 'lucide-react';
+import { Trophy, Users, Medal, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -15,7 +15,6 @@ import { AnnouncementCard } from '@/components/AnnouncementCard';
 
 const NAV_ITEMS = [
   { label: '選手一覧', icon: <Users className="h-4 w-4" />, href: '/athletes' },
-  { label: '大会目標一覧', icon: <Flag className="h-4 w-4" />, href: '/qualification-progress' },
   { label: '歴代記録', icon: <Trophy className="h-4 w-4" />, href: '/records' },
   { label: 'IM測定ランキング', icon: <Medal className="h-4 w-4" />, href: '/im-rankings' },
   { label: 'IM伸び率ランキング', icon: <TrendingUp className="h-4 w-4" />, href: '/growth-rankings' },

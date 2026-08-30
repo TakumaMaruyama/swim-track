@@ -166,7 +166,7 @@ export function EditAthleteForm({ athlete, isOpen, onClose, onSubmit }: EditAthl
                       />
                     </FormControl>
                     <p className="text-xs text-muted-foreground">
-                      標準タイム連携では大会日時点の年齢計算に利用します
+                      生年月日は選手プロフィール情報として保持されます
                     </p>
                     <FormMessage />
                   </FormItem>

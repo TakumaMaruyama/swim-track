@@ -7,7 +7,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -21,18 +20,6 @@ type Competition = z.infer<typeof competitionSchema> & {
   id: number;
   recordCount: number;
 };
-
-const LEVEL_LABELS = {
-  national: "全国",
-  kyushu: "九州",
-  kagoshima: "鹿児島県",
-} as const;
-
-const COURSE_LABELS = {
-  SCM: "SCM",
-  LCM: "LCM",
-  ANY: "ANY",
-} as const;
 
 export default function CompetitionsPage() {
   const { toast } = useToast();
@@ -104,24 +91,6 @@ export default function CompetitionsPage() {
                 <p className="text-sm font-medium">
                   記録数: {competition.recordCount}件
                 </p>
-                {competition.isQualificationTarget ? (
-                  <div className="flex flex-wrap gap-2 pt-2">
-                    <Badge>大会目標一覧に表示</Badge>
-                    {competition.qualifyingLevel && (
-                      <Badge variant="outline">{LEVEL_LABELS[competition.qualifyingLevel]}</Badge>
-                    )}
-                    {competition.qualifyingCourse && (
-                      <Badge variant="outline">{COURSE_LABELS[competition.qualifyingCourse]}</Badge>
-                    )}
-                    {competition.qualifyingSeason && (
-                      <Badge variant="outline">{competition.qualifyingSeason}</Badge>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground pt-2">
-                    標準タイム連携の対象外
-                  </p>
-                )}
               </div>
             </CardContent>
           </Card>
