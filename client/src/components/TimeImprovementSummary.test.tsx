@@ -53,8 +53,12 @@ describe("TimeImprovementSummary", () => {
     render(<TimeImprovementSummary athleteId={31} isActive />);
 
     const trigger = screen.getByRole("button", { name: "タイムの変化を見る" });
+    const panel = trigger.closest("section");
     expect(trigger.className).toContain("text-blue-700");
-    expect(trigger.closest("section")?.className).toContain("bg-blue-50/70");
+    expect(trigger.className).toContain("h-12");
+    expect(panel?.className).toContain("bg-blue-50/70");
+    expect(panel?.className).toContain("min-h-12");
+    expect(panel?.className).not.toContain("overflow-hidden");
     expect(screen.queryByText("自己ベストの変化")).toBeNull();
     expect(swrState.keys.at(-1)).toBeNull();
   });

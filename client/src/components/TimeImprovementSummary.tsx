@@ -58,11 +58,11 @@ export function TimeImprovementSummary({ athleteId, isActive }: TimeImprovementS
   );
 
   return (
-    <section className="mb-4 overflow-hidden rounded-lg border border-blue-200 bg-blue-50/70">
+    <section className="mb-4 min-h-12 rounded-lg border border-blue-200 bg-blue-50/70">
       <Button
         type="button"
         variant="ghost"
-        className="h-auto w-full justify-between rounded-none px-4 py-3 text-blue-700 hover:bg-blue-100 hover:text-blue-800"
+        className="h-12 w-full justify-between rounded-lg px-4 py-3 text-blue-700 hover:bg-blue-100 hover:text-blue-800"
         aria-expanded={isExpanded}
         onClick={() => setIsExpanded((current) => !current)}
       >
