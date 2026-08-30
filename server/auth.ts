@@ -187,6 +187,17 @@ function logSessionFailure(stage: "regenerate" | "save", error: unknown) {
   });
 }
 
+function logAuthRouteFailure(route: string, stage: string, error: unknown) {
+  const candidate = error as { name?: unknown; message?: unknown; code?: unknown } | null;
+  console.error("SwimTrack authentication route failed", {
+    route,
+    stage,
+    name: typeof candidate?.name === "string" ? candidate.name : "UnknownError",
+    message: typeof candidate?.message === "string" ? candidate.message : "Unknown error",
+    code: typeof candidate?.code === "string" ? candidate.code : undefined,
+  });
+}
+
 export async function revalidateSession(req: Request) {
   if (!req.session.userId || req.session.authVersion === undefined) return null;
   const [user] = await db
@@ -432,12 +443,14 @@ export const configureAuth = (app: Express, options?: { store?: session.Store })
   });
 
   app.post("/api/auth/login", async (req, res) => {
+    let stage = "rate-limit";
     try {
       const { username, password } = req.body;
       if (await consumeAuthAttempt(req, username)) return rateLimited(res);
       if (typeof username !== "string" || typeof password !== "string") {
         return res.status(401).json({ ok: false, message: GENERIC_AUTH_FAILURE });
       }
+      stage = "admin-query";
       const [admin] = await db
         .select()
         .from(users)
@@ -446,14 +459,19 @@ export const configureAuth = (app: Express, options?: { store?: session.Store })
       if (
         !admin ||
         !admin.isActive ||
-        admin.credentialState !== "active" ||
-        !(await bcrypt.compare(password, admin.password))
+        admin.credentialState !== "active"
       ) {
         return res.status(401).json({ ok: false, message: GENERIC_AUTH_FAILURE });
       }
+      stage = "password-compare";
+      if (!(await bcrypt.compare(password, admin.password))) {
+        return res.status(401).json({ ok: false, message: GENERIC_AUTH_FAILURE });
+      }
+      stage = "session";
       await establishSession(req, admin);
       res.json({ ok: true, user: authResponseUser(admin), credentialState: "active" });
-    } catch {
+    } catch (error) {
+      logAuthRouteFailure("admin-login", stage, error);
       res.status(500).json({ ok: false, message: "ログイン処理中にエラーが発生しました" });
     }
   });
