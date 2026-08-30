@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Download, Edit2, Plus, Power, History, Trash2, Flag } from "lucide-react";
+import { AlertCircle, Download, Edit2, Plus, Power, History, Trash2, Flag, KeyRound } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +32,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { UserPasswordList } from "@/components/UserPasswordList";
 
 // Lazy load components with proper loading states
 const EditAthleteForm = lazy(() =>
@@ -70,15 +71,21 @@ const FormLoadingFallback = () => (
   </div>
 );
 
+type AddAthleteDialogProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (username: string, gender: string, nameKana: string, birthDate: string) => Promise<void>;
+};
+
 // Add new component inside Athletes.tsx
-const AddAthleteDialog = ({ isOpen, onClose, onSubmit }) => {
+const AddAthleteDialog = ({ isOpen, onClose, onSubmit }: AddAthleteDialogProps) => {
   const [username, setUsername] = useState("");
   const [nameKana, setNameKana] = useState("");
   const [gender, setGender] = useState("male");
   const [birthDate, setBirthDate] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
@@ -182,7 +189,7 @@ const AddAthleteDialog = ({ isOpen, onClose, onSubmit }) => {
 
 export default function Athletes() {
   const { toast } = useToast();
-  const { user, isAdmin, logout } = useAuth();
+  const { user, isAdmin, isAuthenticated, mustChangePassword, logout } = useAuth();
   const [, navigate] = useLocation();
   const { athletes, isLoading: athletesLoading, error: athletesError, mutate: mutateAthletes } = useAthletes();
   const { records, isLoading: recordsLoading, error: recordsError, mutate: mutateRecords } = useSwimRecords();
@@ -198,16 +205,23 @@ export default function Athletes() {
   }>({ athleteId: null, athleteName: '' });
   const isMobile = window.innerWidth < 768; // Detect mobile
   const [showAddAthlete, setShowAddAthlete] = useState(false);
+  const [showPasswordManagement, setShowPasswordManagement] = useState(false);
   const athleteErrorMessage =
     (athletesError as { info?: { message?: string } } | undefined)?.info?.message ||
     (recordsError as { info?: { message?: string } } | undefined)?.info?.message ||
     "データの取得中にエラーが発生しました。再度お試しください。";
+  const canManageRecordsFor = React.useCallback((studentId: number | null | undefined) =>
+    Boolean(
+      studentId && (
+        isAdmin || (!mustChangePassword && user?.role === "student" && user.id === studentId)
+      )
+    ), [isAdmin, mustChangePassword, user]);
 
   const getLatestPerformance = (studentId: number) => {
     if (!records) return null;
     return records
       .filter(record => record.studentId === studentId)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+      .sort((a, b) => new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime())[0];
   };
 
   const getAthleteRecords = (studentId: number) => {
@@ -315,10 +329,10 @@ export default function Athletes() {
   };
 
   const handleCreateRecord = async (data: any) => {
-    if (!isAdmin) {
+    if (!canManageRecordsFor(data.studentId)) {
       toast({
         title: "権限エラー",
-        description: "記録の追加には管理者権限が必要です",
+        description: "記録を追加できるのは本人または管理者だけです",
         variant: "destructive"
       });
       return;
@@ -355,10 +369,11 @@ export default function Athletes() {
   };
 
   const handleEditRecord = async (recordId: number, data: any) => {
-    if (!isAdmin) {
+    const targetRecord = records?.find(item => item.id === recordId);
+    if (!canManageRecordsFor(targetRecord?.studentId)) {
       toast({
         title: "権限エラー",
-        description: "記録の編集には管理者権限が必要です。",
+        description: "記録を編集できるのは本人または管理者だけです。",
         variant: "destructive"
       });
       return;
@@ -538,8 +553,6 @@ export default function Athletes() {
   }
 
   const athlete = athletes?.find(a => a.id === editingAthlete);
-  const record = records?.find(r => r.id === editingRecord.id);
-
   return (
     <>
       <PageHeader
@@ -574,19 +587,18 @@ export default function Athletes() {
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => logout()}
+                  onClick={() => setShowPasswordManagement(true)}
+                  className="flex items-center gap-2"
                 >
-                  ログアウト
+                  <KeyRound className="h-4 w-4" />
+                  パスワード管理
                 </Button>
               </>
             )}
-            {!isAdmin && (
-              <Button
-                variant="outline"
-                onClick={() => navigate("/admin/login")}
-              >
-                管理者ログイン
-              </Button>
+            {isAuthenticated ? (
+              <Button variant="outline" onClick={() => logout()}>ログアウト</Button>
+            ) : (
+              <Button variant="outline" onClick={() => navigate("/login")}>ログイン</Button>
             )}
           </div>
         }
@@ -610,6 +622,9 @@ export default function Athletes() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-base truncate">{athlete.username}</span>
+                        {user?.role === "student" && user.id === athlete.id && (
+                          <Badge variant="outline" className="shrink-0">あなた</Badge>
+                        )}
                         <Badge variant={athlete.isActive ? "default" : "secondary"} className="shrink-0">
                           {athlete.isActive ? '有効' : '無効'}
                         </Badge>
@@ -664,7 +679,7 @@ export default function Athletes() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {isAdmin && (
+                    {canManageRecordsFor(athlete.id) && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -696,7 +711,7 @@ export default function Athletes() {
                           <div>
                             <p className="text-sm font-medium">日付</p>
                             <p className="text-base">
-                              {new Date(latestRecord.date).toLocaleDateString()}
+                              {new Date(latestRecord.date ?? 0).toLocaleDateString()}
                             </p>
                           </div>
                         </div>
@@ -724,7 +739,7 @@ export default function Athletes() {
             </Suspense>
           )}
 
-          {isAdmin && (
+          {canManageRecordsFor(editingRecord.studentId) && (
             <Suspense fallback={<FormLoadingFallback />}>
               <EditRecordForm
                 record={records?.find(r => r.id === editingRecord.id)}
@@ -778,7 +793,7 @@ export default function Athletes() {
                     return Promise.reject(error);
                   }
                 }}
-                isAdmin={isAdmin}
+                canManageRecords={canManageRecordsFor(viewingHistory.athleteId)}
               />
             </Suspense>
           )}
@@ -816,6 +831,12 @@ export default function Athletes() {
           onClose={() => setShowAddAthlete(false)}
           onSubmit={handleCreateAthlete}
         />
+        {isAdmin && (
+          <UserPasswordList
+            isOpen={showPasswordManagement}
+            onClose={() => setShowPasswordManagement(false)}
+          />
+        )}
       </div>
     </>
   );

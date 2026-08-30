@@ -1,46 +1,38 @@
-
-import { db } from "../db";
+import { and, eq } from "drizzle-orm";
+import { db, pool } from "../db";
 import { users } from "../db/schema";
-import bcrypt from "bcryptjs";
-import { eq } from "drizzle-orm";
+import { normalizeFullName } from "../server/fullName";
+import { UNUSABLE_PASSWORD_HASH } from "../server/passwordPolicy";
 
 async function createStudent() {
-  try {
-    const username = "寺園弥広";
-    const password = "password"; // 初期パスワード
-    
-    // パスワードのハッシュ化
-    const hashedPassword = await bcrypt.hash(password, 10);
-    
-    // ユーザーの存在チェック
-    const existingUser = await db
-      .select()
-      .from(users)
-      .where(eq(users.username, username))
-      .limit(1);
-    
-    if (existingUser.length > 0) {
-      console.log(`ユーザー "${username}" は既に存在します`);
-      process.exit(0);
-    }
-    
-    // 新しい選手の作成
-    const [newUser] = await db
-      .insert(users)
-      .values({
-        username,
-        password: hashedPassword,
-        role: "student",
-        isActive: true
-      })
-      .returning();
-    
-    console.log(`選手 "${username}" を作成しました。ID: ${newUser.id}`);
-  } catch (error) {
-    console.error("選手の作成に失敗しました:", error);
-  } finally {
-    process.exit(0);
-  }
+  const username = process.env.ATHLETE_FULL_NAME?.trim();
+  const loginKey = normalizeFullName(username ?? "");
+  if (!username || !loginKey) throw new Error("ATHLETE_FULL_NAME が必要です");
+  const [existingUser] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.role, "student"), eq(users.loginKey, loginKey)))
+    .limit(1);
+  if (existingUser) throw new Error("同じ選手名が既に登録されています");
+  const [student] = await db
+    .insert(users)
+    .values({
+      username,
+      loginKey,
+      password: UNUSABLE_PASSWORD_HASH,
+      credentialState: "setup_required",
+      authVersion: 1,
+      role: "student",
+      isActive: true,
+      gender: process.env.ATHLETE_GENDER === "female" ? "female" : "male",
+    })
+    .returning({ id: users.id, username: users.username });
+  console.log("Athlete created", { id: student.id, username: student.username });
 }
 
-createStudent();
+createStudent()
+  .catch((error) => {
+    console.error(error instanceof Error ? error.message : "Failed to create athlete");
+    process.exitCode = 1;
+  })
+  .finally(() => pool.end());

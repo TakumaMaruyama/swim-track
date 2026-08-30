@@ -1,152 +1,31 @@
-import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
-import { setupVite, serveStatic } from "./vite";
-import { createServer } from "http";
-import { configureAuth } from "./auth";
+import { createServer } from "node:http";
+import { createApp } from "./app";
+import { assertAuthSchemaReady } from "./authReadiness";
 import configuration from "./config";
-import { runMigrations } from "../db/runMigrations";
+import { serveStatic, setupVite } from "./vite";
 
-const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+const app = createApp({ requestLog: true });
 
-// Enable CORS for development with caching improvements
-app.use((req, res, next) => {
-  const isDevelopment = process.env.NODE_ENV !== 'production';
-  const origin = req.headers.origin;
-  
-  // Development環境では、すべてのオリジンを許可
-  if (isDevelopment) {
-    if (origin) {
-      res.header('Access-Control-Allow-Origin', origin);
-    }
-  } else {
-    // Production環境では、特定のオリジンのみを許可
-    const replSlug = process.env.REPL_SLUG;
-    const allowedOrigins = [
-      replSlug ? `https://${replSlug}.repl.co` : null,
-      replSlug ? `https://${replSlug}.repl.co:443` : null,
-      replSlug ? `https://webview.${replSlug}.repl.co` : null,
-      replSlug ? `https://${replSlug}.id.repl.co` : null
-    ].filter(Boolean);
-    
-    if (origin && allowedOrigins.includes(origin)) {
-      res.header('Access-Control-Allow-Origin', origin);
-    }
-  }
-
-  // キャッシュ制御の最適化
-  if (req.method === 'GET') {
-    // APIエンドポイントとHTMLはキャッシュしない
-    if (req.url.startsWith('/api/') || req.url === '/' || req.url.endsWith('.html')) {
-      res.header('Cache-Control', 'no-cache, no-store, must-revalidate');
-      res.header('Pragma', 'no-cache');
-      res.header('Expires', '0');
-    } else {
-      // 静的アセット（JS、CSS等）は短時間キャッシュ
-      res.header('Cache-Control', 'public, max-age=60'); // 1分のキャッシュ
-      res.header('Vary', 'Origin, Accept-Encoding');
-    }
-  } else {
-    res.header('Cache-Control', 'no-store');
-  }
-
-  // 共通のCORS設定
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.header('Access-Control-Max-Age', '86400'); // CORS プリフライトの結果を24時間キャッシュ
-
-  // プリフライトリクエストの処理
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
-
-  // リクエストタイミングの記録
-  req.startTime = Date.now();
-  
-  // レスポンス完了時のログ記録
-  res.on('finish', () => {
-    const duration = Date.now() - req.startTime;
-    console.log(`${req.method} ${req.url} - ${res.statusCode} - ${duration}ms`);
-  });
-
-  next();
-});
-
-// エラーハンドリングの強化
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-  console.error('Server error:', err);
-  const status = err.status || err.statusCode || 500;
-  const message = err.message || "Internal Server Error";
-  
-  // 開発環境では詳細なエラー情報を返す
-  const error = process.env.NODE_ENV === 'development' 
-    ? { message, stack: err.stack }
-    : { message };
-  
-  res.status(status).json(error);
-});
-
-// Configure authentication
-configureAuth(app);
-
-async function maybeRunDevelopmentMigrations() {
-  if (configuration.nodeEnv === "production") {
-    return;
-  }
-
-  if (process.env.AUTO_RUN_MIGRATIONS === "false") {
-    console.log("Skipping development migrations because AUTO_RUN_MIGRATIONS=false");
-    return;
-  }
-
-  try {
-    console.log("Running development migrations...");
-    await runMigrations();
-    console.log("Development migrations completed");
-  } catch (error) {
-    console.error("Development migrations failed. The app will keep running, but new pages may not load until the DB schema is updated.");
-    console.error(error);
-  }
-}
-
-(async () => {
-  await maybeRunDevelopmentMigrations();
-  registerRoutes(app);
+async function startServer() {
+  await assertAuthSchemaReady();
   const server = createServer(app);
-
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-    console.error('Server error:', err);
-    res.status(status).json({ message });
-  });
-
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (configuration.nodeEnv === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
-  // Serve the app using configuration port
-  const PORT = process.env.PORT || 5000;
-  server.listen(PORT, "0.0.0.0", () => {
-    const formattedTime = new Date().toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: true,
-    });
-
-    console.log(`${formattedTime} [express] Server is running on http://0.0.0.0:${PORT}`);
-    console.log('Server configuration:', {
-      port: PORT,
-      env: process.env.NODE_ENV,
-      cors: true
+  server.listen(configuration.port, "0.0.0.0", () => {
+    console.log("SwimTrack server started", {
+      port: configuration.port,
+      environment: configuration.nodeEnv,
+      apiAccess: "same-origin",
+      sessionCookie: "swimtrack.sid",
     });
   });
-})();
+}
+
+startServer().catch((error) => {
+  console.error("SwimTrack server failed to start", error);
+  process.exitCode = 1;
+});

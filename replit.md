@@ -41,8 +41,8 @@ Preferred communication style: Simple, everyday language.
 **Server Framework**
 - Express.js as the HTTP server with TypeScript
 - Custom route registration system for API endpoint organization
-- Session-based authentication using express-session with MemoryStore
-- CORS configuration for development/production environments
+- Session-based authentication using a dedicated PostgreSQL session table
+- Same-origin write protection fixed to the SwimTrack public origin in production
 
 **Authentication & Authorization**
 - bcrypt for password hashing with salt rounds
@@ -87,7 +87,7 @@ Preferred communication style: Simple, everyday language.
 
 **Authentication & Session Management**
 - @auth/express and @auth/core: Authentication framework integration
-- express-session with memorystore: In-memory session storage for user sessions
+- express-session with connect-pg-simple: shared PostgreSQL sessions for Autoscale instances
 - bcryptjs: Password hashing and verification
 
 **UI & Visualization**

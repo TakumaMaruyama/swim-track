@@ -50,7 +50,7 @@ type TimeHistoryModalProps = {
   records: ExtendedSwimRecord[];
   athleteName: string;
   onRecordDeleted?: () => Promise<void>;
-  isAdmin: boolean;
+  canManageRecords: boolean;
 };
 
 type GroupedRecords = {
@@ -95,7 +95,7 @@ export function TimeHistoryModal({
   records, 
   athleteName,
   onRecordDeleted,
-  isAdmin
+  canManageRecords
 }: TimeHistoryModalProps) {
   const { toast } = useToast();
   
@@ -227,7 +227,7 @@ export function TimeHistoryModal({
   }, [groupedAndFilteredRecords]);
 
   const handleDelete = async (recordId: number) => {
-    if (isDeleting) return;
+    if (isDeleting || !canManageRecords) return;
     
     try {
       setIsDeleting(true);
@@ -491,7 +491,7 @@ export function TimeHistoryModal({
                                     </div>
                                   </div>
                                   <div className="flex gap-2">
-                                    {isAdmin && (
+                                    {canManageRecords && (
                                       <>
                                         <Button
                                           variant="ghost"
@@ -568,7 +568,7 @@ export function TimeHistoryModal({
                                           </div>
                                         </div>
                                         <div className="flex gap-2">
-                                          {isAdmin && (
+                                          {canManageRecords && (
                                             <>
                                               <Button
                                                 variant="ghost"
@@ -635,12 +635,15 @@ export function TimeHistoryModal({
         </AlertDialogContent>
       </AlertDialog>
 
-      {editingRecord && (
+      {editingRecord && canManageRecords && (
         <EditRecordForm
           record={editingRecord}
           isOpen={!!editingRecord}
           onClose={() => setEditingRecord(null)}
           onSubmit={async (values) => {
+            if (!canManageRecords) {
+              throw new Error("この記録を編集する権限がありません");
+            }
             try {
               console.log('Starting record update:', editingRecord.id, values);
               

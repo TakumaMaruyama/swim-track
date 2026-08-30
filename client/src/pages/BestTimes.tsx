@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { EditRecordForm } from '@/components/EditRecordForm';
 import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '@/components/PageHeader';
+import { useAuth } from '@/hooks/use-auth';
 
 type GroupedRecords = {
   [style: string]: {
@@ -69,6 +70,7 @@ RecordCard.displayName = "RecordCard";
 
 export default function BestTimes() {
   const { toast } = useToast();
+  const { isAdmin } = useAuth();
   const { records, isLoading, error, mutate } = useSwimRecords();
   
   const [editingRecord, setEditingRecord] = React.useState<number | null>(null);
@@ -175,7 +177,7 @@ export default function BestTimes() {
     <>
       <PageHeader 
         title="ベストタイム"
-        children={
+        children={isAdmin ? (
           <Button
             onClick={() => {
               toast({
@@ -187,7 +189,7 @@ export default function BestTimes() {
             <Plus className="mr-2 h-4 w-4" />
             新規記録追加
           </Button>
-        }
+        ) : undefined}
       />
       <div className="container px-4 md:px-8">
         <div className="grid gap-4 md:grid-cols-2">
@@ -197,17 +199,17 @@ export default function BestTimes() {
         </div>
       </div>
 
-      <EditRecordForm
+      {isAdmin && <EditRecordForm
         record={editingRecord === -1 ? undefined : records?.find(r => r.id === editingRecord)}
         isOpen={!!editingRecord}
         onClose={() => setEditingRecord(null)}
         onSubmit={async (data) => {
-          if (editingRecord !== -1) {
+          if (typeof editingRecord === "number" && editingRecord !== -1) {
             await handleEdit(editingRecord, data);
           }
           setEditingRecord(null);
         }}
-      />
+      />}
     </>
   );
 }

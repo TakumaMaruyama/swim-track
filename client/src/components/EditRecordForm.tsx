@@ -57,11 +57,11 @@ const editRecordSchema = z.object({
 });
 
 type EditRecordFormProps = {
-  record?: SwimRecord;
+  record?: Omit<SwimRecord, "competitionId"> & { competitionId?: number | null };
   studentId?: number;
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (values: z.infer<typeof editRecordSchema>) => Promise<void>;
+  onSubmit: (values: z.infer<typeof editRecordSchema> & { studentId?: number }) => Promise<void>;
 };
 
 export const EditRecordForm = React.memo(function EditRecordForm(props: EditRecordFormProps) {
@@ -76,7 +76,7 @@ export const EditRecordForm = React.memo(function EditRecordForm(props: EditReco
   style: record?.style ?? "",
   distance: record?.distance ?? 50,
   time: record?.time ?? "",
-  date: record ? new Date(record.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+  date: record?.date ? new Date(record.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
   poolLength: record?.poolLength ?? 25,
   isCompetition: record?.isCompetition ?? false,
   competitionName: record?.competitionName ?? "",

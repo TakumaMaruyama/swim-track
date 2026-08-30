@@ -9,6 +9,7 @@ import {
   Tooltip,
   Legend,
   ChartOptions,
+  ChartData,
   TooltipItem,
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
@@ -132,7 +133,7 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
     filteredRecords.some(record => record.poolLength === length)
   ).sort((a, b) => a - b);
 
-  const data = {
+  const data: ChartData<'line', ChartPoint[]> = {
     datasets: poolLengths.map(poolLength => {
       const color = poolColors[poolLength as keyof typeof poolColors];
       const poolRecords = filteredRecords.filter(record => record.poolLength === poolLength);
@@ -151,7 +152,7 @@ const TimeProgressChart: React.FC<TimeProgressChartProps> = ({
           poolLength: record.poolLength,
           dateLabel: record.dateLabel,
         })),
-        parsing: false,
+        parsing: false as const,
         borderColor: color.border,
         backgroundColor: color.background,
         tension: 0,
