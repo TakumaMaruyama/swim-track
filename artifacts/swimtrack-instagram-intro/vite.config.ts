@@ -24,10 +24,13 @@ if (!basePath) {
   );
 }
 
+const normalizedBasePath = basePath.endsWith('/')
+  ? basePath
+  : `${basePath}/`;
+
 export default defineConfig({
-  // The video artifact is previewed from a proxied sub-path, so generated
-  // asset URLs must remain relative to the artifact instead of the host root.
-  base: './',
+  // Keep generated asset URLs beneath the video artifact's routed sub-path.
+  base: normalizedBasePath,
   plugins: [
     react(),
   ],
