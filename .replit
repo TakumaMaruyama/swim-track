@@ -2,13 +2,18 @@ modules = ["nodejs-20", "web", "python-base-3.13", "postgresql-16"]
 run = "npm run dev"
 hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
+[[artifacts]]
+id = "artifacts/swimtrack-web"
+
+[[artifacts]]
+id = "artifacts/swimtrack-instagram-intro"
+
 [nix]
 channel = "stable-24_05"
 
 [deployment]
-deploymentTarget = "cloudrun"
-build = ["npm", "run", "build"]
-run = ["npm", "run", "start"]
+deploymentTarget = "autoscale"
+router = "application"
 
 [[ports]]
 localPort = 3000
