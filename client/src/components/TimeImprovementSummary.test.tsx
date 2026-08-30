@@ -52,7 +52,9 @@ describe("TimeImprovementSummary", () => {
   it("keeps the comparison out of the way until the athlete opens it", () => {
     render(<TimeImprovementSummary athleteId={31} isActive />);
 
-    expect(screen.getByRole("button", { name: "タイムの変化を見る" })).toBeTruthy();
+    const trigger = screen.getByRole("button", { name: "タイムの変化を見る" });
+    expect(trigger.className).toContain("text-blue-700");
+    expect(trigger.closest("section")?.className).toContain("bg-blue-50/70");
     expect(screen.queryByText("自己ベストの変化")).toBeNull();
     expect(swrState.keys.at(-1)).toBeNull();
   });
