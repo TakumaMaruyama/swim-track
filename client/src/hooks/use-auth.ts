@@ -7,9 +7,8 @@ export interface AuthUser {
   username: string;
   role: string;
   isActive: boolean;
+  credentialState: "setup_required" | "temporary" | "active";
   mustChangePassword?: boolean;
-  passwordState?: string;
-  authState?: string;
 }
 
 interface LoginCredentials {
@@ -23,10 +22,10 @@ export interface AuthResponse<T = AuthUser> {
   message?: string;
   user?: T;
   status?: string;
-  authState?: string;
   state?: string;
   mustChangePassword?: boolean;
   requiresPasswordSetup?: boolean;
+  credentialState?: "setup_required" | "temporary" | "active";
 }
 
 export function useAuth() {
@@ -53,16 +52,20 @@ export function useAuth() {
     return result;
   }, [mutate, postAuth]);
 
-  const identify = useCallback((fullName: string) =>
-    postAuth("/api/auth/identity-check", { fullName }), [postAuth]);
+  const athleteStart = useCallback((fullName: string) =>
+    postAuth("/api/auth/athlete/start", { fullName }), [postAuth]);
+
+  const athleteLogin = useCallback(async (fullName: string, password: string) => {
+    const result = await postAuth("/api/auth/athlete/login", { fullName, password });
+    await mutate(result, false);
+    return result;
+  }, [mutate, postAuth]);
 
   const setupPassword = useCallback(async (
-    fullName: string,
     password: string,
     passwordConfirmation: string,
   ) => {
-    const result = await postAuth("/api/auth/setup-password", {
-      fullName,
+    const result = await postAuth("/api/auth/athlete/password", {
       password,
       passwordConfirmation,
     });
@@ -74,7 +77,7 @@ export function useAuth() {
     password: string,
     passwordConfirmation: string,
   ) => {
-    const result = await postAuth("/api/auth/change-password", {
+    const result = await postAuth("/api/auth/athlete/password", {
       password,
       passwordConfirmation,
     });
@@ -108,19 +111,18 @@ export function useAuth() {
     isLoading: !error && data === undefined,
     error,
     login,
-    identify,
+    athleteStart,
+    athleteLogin,
     setupPassword,
     changePassword,
     logout,
     isAuthenticated: !!data?.user,
     isAdmin: data?.user?.role === "admin",
     mustChangePassword: Boolean(
+      data?.credentialState === "temporary" ||
+      data?.user?.credentialState === "temporary" ||
       data?.mustChangePassword ||
-      data?.user?.mustChangePassword ||
-      data?.state === "temp_password" ||
-      data?.authState === "temporary_password" ||
-      data?.user?.authState === "temp_password" ||
-      data?.user?.passwordState === "temporary"
+      data?.user?.mustChangePassword
     ),
   };
 }

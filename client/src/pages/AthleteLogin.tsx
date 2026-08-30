@@ -6,12 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 
-type Step = "identity" | "login" | "setup";
+type Step = "start" | "login" | "setup";
 
 export default function AthleteLogin() {
-  const { identify, login, setupPassword, isAuthenticated, mustChangePassword } = useAuth();
+  const { athleteStart, athleteLogin, setupPassword, isAuthenticated, mustChangePassword } = useAuth();
   const [, navigate] = useLocation();
-  const [step, setStep] = React.useState<Step>("login");
+  const [step, setStep] = React.useState<Step>("start");
   const [fullName, setFullName] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [confirmation, setConfirmation] = React.useState("");
@@ -27,31 +27,21 @@ export default function AthleteLogin() {
     setError(null);
     setLoading(true);
     try {
-      if (step === "identity") {
-        const result = await identify(fullName.trim());
-        const state = result.state || result.authState || result.status;
-        setStep(
-          result.requiresPasswordSetup ||
-          state === "initial_setup" ||
-          state === "setup_required" ||
-          state === "uninitialized"
-            ? "setup"
-            : "login"
-        );
+      if (step === "start") {
+        const result = await athleteStart(fullName.trim());
+        setStep(result.credentialState === "setup_required" ? "setup" : "login");
       } else if (step === "setup") {
         if (password.length < 6) throw new Error("パスワードは6文字以上で入力してください");
         if (password !== confirmation) throw new Error("確認用パスワードが一致しません");
-        const result = await setupPassword(fullName.trim(), password, confirmation);
+        const result = await setupPassword(password, confirmation);
         navigate(result.mustChangePassword ? "/change-password" : "/", { replace: true });
       } else {
-        const result = await login({ fullName: fullName.trim(), password });
+        const result = await athleteLogin(fullName.trim(), password);
         const forced = Boolean(
           result.mustChangePassword ||
-          result.user?.mustChangePassword ||
-          result.state === "temp_password" ||
-          result.authState === "temporary_password" ||
-          result.user?.authState === "temp_password" ||
-          result.user?.passwordState === "temporary"
+          result.credentialState === "temporary" ||
+          result.user?.credentialState === "temporary" ||
+          result.user?.mustChangePassword
         );
         navigate(forced ? "/change-password" : "/", { replace: true });
       }
@@ -63,7 +53,7 @@ export default function AthleteLogin() {
   };
 
   const resetIdentity = () => {
-    setStep("login");
+    setStep("start");
     setPassword("");
     setConfirmation("");
     setError(null);
@@ -78,7 +68,7 @@ export default function AthleteLogin() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {error && <Alert variant="destructive" className="mb-4"><AlertDescription>{error}</AlertDescription></Alert>}
+          {error && <Alert variant="destructive" className="mb-4"><AlertDescription>{error}<br />新規の場合は管理者に選手追加を依頼してください</AlertDescription></Alert>}
           <form onSubmit={submit} className="space-y-4">
             <div className="space-y-2">
               <label htmlFor="fullName" className="text-sm font-medium">登録済みの氏名（フルネーム）</label>
@@ -92,7 +82,7 @@ export default function AthleteLogin() {
               />
               <p className="text-xs text-muted-foreground">空白の種類や有無にかかわらず照合されます。</p>
             </div>
-            {step !== "identity" && (
+            {step !== "start" && (
               <div className="space-y-2">
                 <label htmlFor="athlete-password" className="text-sm font-medium">
                   {step === "setup" ? "新しいパスワード（6文字以上）" : "パスワード"}
@@ -107,10 +97,9 @@ export default function AthleteLogin() {
               </div>
             )}
             <Button className="w-full" type="submit" disabled={loading || !fullName.trim()}>
-              {loading ? "処理中..." : step === "identity" ? "次へ" : step === "setup" ? "設定してログイン" : "ログイン"}
+              {loading ? "処理中..." : step === "start" ? "次へ" : step === "setup" ? "設定してログイン" : "ログイン"}
             </Button>
-            {step === "login" && <Button className="w-full" type="button" variant="ghost" onClick={() => { setStep("identity"); setPassword(""); setError(null); }} disabled={loading}>初めての方（パスワード設定）</Button>}
-            {step !== "login" && <Button className="w-full" type="button" variant="ghost" onClick={resetIdentity} disabled={loading}>ログインに戻る</Button>}
+            {step !== "start" && <Button className="w-full" type="button" variant="ghost" onClick={resetIdentity} disabled={loading}>氏名入力に戻る</Button>}
             <Button className="w-full" type="button" variant="outline" onClick={() => navigate("/admin/login")}>管理者ログイン</Button>
           </form>
         </CardContent>

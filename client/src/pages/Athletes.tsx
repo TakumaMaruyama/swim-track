@@ -189,7 +189,7 @@ const AddAthleteDialog = ({ isOpen, onClose, onSubmit }: AddAthleteDialogProps) 
 
 export default function Athletes() {
   const { toast } = useToast();
-  const { user, isAdmin, isAuthenticated, logout } = useAuth();
+  const { user, isAdmin, isAuthenticated, mustChangePassword, logout } = useAuth();
   const [, navigate] = useLocation();
   const { athletes, isLoading: athletesLoading, error: athletesError, mutate: mutateAthletes } = useAthletes();
   const { records, isLoading: recordsLoading, error: recordsError, mutate: mutateRecords } = useSwimRecords();
@@ -212,9 +212,10 @@ export default function Athletes() {
     "データの取得中にエラーが発生しました。再度お試しください。";
   const canManageRecordsFor = React.useCallback((studentId: number | null | undefined) =>
     Boolean(
-      studentId &&
-      (isAdmin || (user?.role === "student" && user.id === studentId))
-    ), [isAdmin, user]);
+      studentId && (
+        isAdmin || (!mustChangePassword && user?.role === "student" && user.id === studentId)
+      )
+    ), [isAdmin, mustChangePassword, user]);
 
   const getLatestPerformance = (studentId: number) => {
     if (!records) return null;
@@ -621,6 +622,9 @@ export default function Athletes() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-base truncate">{athlete.username}</span>
+                        {user?.role === "student" && user.id === athlete.id && (
+                          <Badge variant="outline" className="shrink-0">あなた</Badge>
+                        )}
                         <Badge variant={athlete.isActive ? "default" : "secondary"} className="shrink-0">
                           {athlete.isActive ? '有効' : '無効'}
                         </Badge>

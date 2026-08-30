@@ -1,97 +1,31 @@
-import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
-import { setupVite, serveStatic } from "./vite";
-import { createServer } from "http";
-import { configureAuth } from "./auth";
+import { createServer } from "node:http";
+import { createApp } from "./app";
+import { assertAuthSchemaReady } from "./authReadiness";
 import configuration from "./config";
+import { serveStatic, setupVite } from "./vite";
 
-const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+const app = createApp({ requestLog: true });
 
-// Same-origin only: authentication, cookies, and APIs are intentionally not
-// shared with Swim Platform or any other application.
-app.use((req, res, next) => {
-  // キャッシュ制御の最適化
-  if (req.method === 'GET') {
-    // APIエンドポイントとHTMLはキャッシュしない
-    if (req.url.startsWith('/api/') || req.url === '/' || req.url.endsWith('.html')) {
-      res.header('Cache-Control', 'no-cache, no-store, must-revalidate');
-      res.header('Pragma', 'no-cache');
-      res.header('Expires', '0');
-    } else {
-      // 静的アセット（JS、CSS等）は短時間キャッシュ
-      res.header('Cache-Control', 'public, max-age=60'); // 1分のキャッシュ
-      res.header('Vary', 'Origin, Accept-Encoding');
-    }
-  } else {
-    res.header('Cache-Control', 'no-store');
-  }
-
-  // リクエストタイミングの記録
-  const startTime = Date.now();
-  
-  // レスポンス完了時のログ記録
-  res.on('finish', () => {
-    const duration = Date.now() - startTime;
-    console.log(`${req.method} ${req.url} - ${res.statusCode} - ${duration}ms`);
-  });
-
-  next();
-});
-
-// エラーハンドリングの強化
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-  console.error('Server error:', err);
-  const status = err.status || err.statusCode || 500;
-  const message = err.message || "Internal Server Error";
-  
-  // 開発環境では詳細なエラー情報を返す
-  const error = process.env.NODE_ENV === 'development' 
-    ? { message, stack: err.stack }
-    : { message };
-  
-  res.status(status).json(error);
-});
-
-// Configure authentication
-configureAuth(app);
-
-(async () => {
-  registerRoutes(app);
+async function startServer() {
+  await assertAuthSchemaReady();
   const server = createServer(app);
-
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-    console.error('Server error:', err);
-    res.status(status).json({ message });
-  });
-
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (configuration.nodeEnv === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
-  // Serve the app using configuration port
-  const PORT = Number(process.env.PORT) || 5000;
-  server.listen(PORT, "0.0.0.0", () => {
-    const formattedTime = new Date().toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: true,
-    });
-
-    console.log(`${formattedTime} [express] Server is running on http://0.0.0.0:${PORT}`);
-    console.log('Server configuration:', {
-      port: PORT,
-      env: process.env.NODE_ENV,
-      apiAccess: "same-origin"
+  server.listen(configuration.port, "0.0.0.0", () => {
+    console.log("SwimTrack server started", {
+      port: configuration.port,
+      environment: configuration.nodeEnv,
+      apiAccess: "same-origin",
+      sessionCookie: "swimtrack.sid",
     });
   });
-})();
+}
+
+startServer().catch((error) => {
+  console.error("SwimTrack server failed to start", error);
+  process.exitCode = 1;
+});

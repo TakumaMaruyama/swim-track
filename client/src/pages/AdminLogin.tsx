@@ -33,16 +33,7 @@ export default function AdminLogin() {
         throw new Error(result.message || "ログインに失敗しました");
       }
 
-      // ログイン成功後、ダッシュボードへリダイレクト
-      const requiresChange = Boolean(
-        result.mustChangePassword ||
-        result.user?.mustChangePassword ||
-        result.state === "temp_password" ||
-        result.authState === "temporary_password" ||
-        result.user?.authState === "temp_password" ||
-        result.user?.passwordState === "temporary"
-      );
-      setLocation(requiresChange ? "/change-password" : "/athletes");
+      setLocation("/athletes");
     } catch (err) {
       setError(err instanceof Error ? err.message : "ログインに失敗しました");
     } finally {

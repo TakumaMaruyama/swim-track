@@ -10,22 +10,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import useSWR from "swr";
 import type { User } from "db/schema";
 
-type ManagedUser = User & {
-  passwordState?: string;
-  mustChangePassword?: boolean;
-  authState?: string;
-};
+type ManagedUser = Pick<User, "id" | "username" | "role" | "isActive" | "credentialState">;
 
 interface UserPasswordListProps {
   isOpen: boolean;
@@ -39,7 +28,6 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
   const [newPassword, setNewPassword] = React.useState("");
   const [passwordConfirmation, setPasswordConfirmation] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [roleFilter, setRoleFilter] = React.useState<string>("all");
 
   React.useEffect(() => {
     if (error) {
@@ -51,12 +39,10 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
     }
   }, [error, toast]);
 
-  const filteredUsers = React.useMemo(() => {
-    if (!users) return [];
-    return users.filter(user => 
-      roleFilter === "all" || user.role === roleFilter
-    );
-  }, [users, roleFilter]);
+  const filteredUsers = React.useMemo(
+    () => (users ?? []).filter((user) => user.role === "student"),
+    [users],
+  );
 
   const handlePasswordUpdate = async (userId: number) => {
     if (isSubmitting) return;
@@ -71,7 +57,7 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
 
     try {
       setIsSubmitting(true);
-      const response = await fetch(`/api/users/${userId}/password`, {
+      const response = await fetch(`/api/admin/athletes/${userId}/temporary-password`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: newPassword, passwordConfirmation }),
@@ -83,7 +69,7 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
       await mutate();
       toast({
         title: "更新成功",
-        description: "パスワードが更新されました",
+        description: "仮パスワードを設定し、選手の既存ログインを失効しました",
       });
       setEditingUser(null);
       setNewPassword("");
@@ -99,51 +85,32 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
     }
   };
 
-  const getRoleBadgeVariant = (role: string) => {
-    return role === 'admin' || role === 'coach' ? 'default' : 'secondary';
-  };
-
-  const getRoleDisplayName = (role: string) => {
-    return role === 'admin' ? '管理者' : role === 'coach' ? 'コーチ' : '選手';
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md max-h-[80vh]">
         <DialogHeader>
-          <DialogTitle>パスワード管理</DialogTitle>
+          <DialogTitle>選手の仮パスワード設定</DialogTitle>
           <DialogDescription>
-            ユーザーのパスワードを管理します
+            設定後、選手は仮パスワードでログインし、本人用パスワードへ変更します。値は再表示されません。
           </DialogDescription>
         </DialogHeader>
-        <div className="mb-4">
-          <Select value={roleFilter} onValueChange={setRoleFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="ロールで絞り込み" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">すべて</SelectItem>
-              <SelectItem value="coach">コーチ</SelectItem>
-              <SelectItem value="student">選手</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
         <div className="space-y-4 mt-4 overflow-y-auto max-h-[60vh] pr-2">
           {filteredUsers.map((user) => (
             <Card key={user.id}>
               <CardContent className="flex justify-between items-center p-4">
                 <div className="flex items-center gap-2">
                   <span className="font-medium">{user.username}</span>
-                  <Badge variant={getRoleBadgeVariant(user.role)}>
-                    {getRoleDisplayName(user.role)}
-                  </Badge>
+                  <Badge variant="secondary">選手</Badge>
                   {user.isActive !== undefined && (
                     <Badge variant={user.isActive ? 'default' : 'secondary'}>
                       {user.isActive ? '有効' : '無効'}
                     </Badge>
                   )}
-                  {(user.mustChangePassword || user.passwordState === "temporary" || user.authState === "temp_password") && (
+                  {user.credentialState === "temporary" && (
                     <Badge variant="outline">仮パスワード</Badge>
+                  )}
+                  {user.credentialState === "setup_required" && (
+                    <Badge variant="outline">初回設定待ち</Badge>
                   )}
                 </div>
                 {editingUser === user.id ? (
@@ -190,7 +157,7 @@ export function UserPasswordList({ isOpen, onClose }: UserPasswordListProps) {
                     size="sm"
                     onClick={() => setEditingUser(user.id)}
                   >
-                    パスワード変更
+                    仮パスワード設定
                   </Button>
                 )}
               </CardContent>

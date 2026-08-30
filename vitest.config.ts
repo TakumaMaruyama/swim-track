@@ -13,7 +13,11 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["client/src/**/*.test.{ts,tsx}", "server/**/*.test.{ts,tsx}"],
+    include: [
+      "client/src/**/*.test.{ts,tsx}",
+      "server/**/*.test.{ts,tsx}",
+      "scripts/**/*.test.{ts,tsx}",
+    ],
     clearMocks: true,
   },
 });

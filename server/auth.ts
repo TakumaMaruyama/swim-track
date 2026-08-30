@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { db, pool } from "db";
 import { users } from "db/schema";
@@ -7,18 +8,21 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import configuration from "./config";
 import { normalizeFullName } from "./fullName";
+import { validateNewPassword } from "./passwordPolicy";
+
 export { normalizeFullName };
 
-export type AuthState = "initial_setup" | "active" | "temp_password";
+export type CredentialState = "setup_required" | "temporary" | "active";
 
 declare module "express-session" {
   interface SessionData {
     userId?: number;
     role?: string;
-    sessionVersion?: number;
-    authState?: AuthState;
+    authVersion?: number;
+    credentialState?: CredentialState;
     pendingSetupUserId?: number;
-    pendingSetupVersion?: number;
+    pendingSetupAuthVersion?: number;
+    pendingSetupIssuedAt?: number;
   }
 }
 
@@ -28,28 +32,36 @@ declare global {
       authUser?: {
         id: number;
         role: string;
-        authState: AuthState;
-        sessionVersion: number;
+        gender: string;
+        credentialState: CredentialState;
+        authVersion: number;
       };
     }
   }
 }
 
 const GENERIC_AUTH_FAILURE = "認証に失敗しました";
-const PASSWORD_MIN_LENGTH = 6;
 const SESSION_COOKIE_NAME = "swimtrack.sid";
 const SESSION_TABLE_NAME = "swimtrack_sessions";
+const SETUP_SESSION_TTL_MS = 10 * 60 * 1000;
+const AUTH_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
+const AUTH_ATTEMPT_LIMIT = 20;
+const IP_AUTH_ATTEMPT_LIMIT = 100;
+const AUTH_IDENTITY_MAX_CHARACTERS = 100;
 
-function publicUser<T extends { password: string }>(user: T) {
-  const { password: _password, ...safe } = user;
-  return safe;
+function isCredentialState(value: string): value is CredentialState {
+  return value === "setup_required" || value === "temporary" || value === "active";
 }
 
-function authResponseUser<T extends { password: string; authState: string }>(user: T) {
+function authResponseUser(user: typeof users.$inferSelect) {
   return {
-    ...publicUser(user),
-    mustChangePassword: user.authState === "temp_password",
-    passwordState: user.authState === "temp_password" ? "temporary" : user.authState,
+    id: user.id,
+    username: user.username,
+    role: user.role,
+    isActive: user.isActive,
+    gender: user.gender,
+    credentialState: user.credentialState,
+    mustChangePassword: user.credentialState === "temporary",
   };
 }
 
@@ -71,14 +83,70 @@ function destroy(req: Request): Promise<void> {
   );
 }
 
+function clearPendingSetup(req: Request) {
+  const hadPending = req.session.pendingSetupUserId !== undefined;
+  delete req.session.pendingSetupUserId;
+  delete req.session.pendingSetupAuthVersion;
+  delete req.session.pendingSetupIssuedAt;
+  return hadPending;
+}
+
+async function consumeAuthAttempt(
+  req: Request,
+  identity: unknown,
+) {
+  const rawIdentity = typeof identity === "string" ? Array.from(identity) : [];
+  const normalizedIdentity = rawIdentity.length > AUTH_IDENTITY_MAX_CHARACTERS
+    ? "<too-long>"
+    : normalizeFullName(rawIdentity.join("")) || "<invalid>";
+  const ip = req.ip || req.socket.remoteAddress || "unknown";
+  const hashes = [
+    createHash("sha256").update(`ip:${ip}`).digest("hex"),
+    createHash("sha256").update(`identity:${ip}:${normalizedIdentity}`).digest("hex"),
+  ];
+  const result = await pool.query<{ key_hash: string; attempt_count: number }>(`
+    WITH purged AS (
+      DELETE FROM swimtrack_auth_attempts
+      WHERE reset_at < now() - interval '1 day'
+    )
+    INSERT INTO swimtrack_auth_attempts (key_hash, attempt_count, reset_at)
+    VALUES
+      ($1, 1, now() + ($3::bigint * interval '1 millisecond')),
+      ($2, 1, now() + ($3::bigint * interval '1 millisecond'))
+    ON CONFLICT (key_hash) DO UPDATE SET
+      attempt_count = CASE
+        WHEN swimtrack_auth_attempts.reset_at <= now() THEN 1
+        ELSE swimtrack_auth_attempts.attempt_count + 1
+      END,
+      reset_at = CASE
+        WHEN swimtrack_auth_attempts.reset_at <= now()
+          THEN now() + ($3::bigint * interval '1 millisecond')
+        ELSE swimtrack_auth_attempts.reset_at
+      END
+    RETURNING key_hash, attempt_count
+  `, [hashes[0], hashes[1], AUTH_ATTEMPT_WINDOW_MS]);
+  const attemptsByKey = new Map(result.rows.map((row) => [row.key_hash, Number(row.attempt_count)]));
+  return (
+    (attemptsByKey.get(hashes[0]) ?? IP_AUTH_ATTEMPT_LIMIT + 1) > IP_AUTH_ATTEMPT_LIMIT ||
+    (attemptsByKey.get(hashes[1]) ?? AUTH_ATTEMPT_LIMIT + 1) > AUTH_ATTEMPT_LIMIT
+  );
+}
+
+function rateLimited(res: Response) {
+  res.setHeader("Retry-After", String(Math.ceil(AUTH_ATTEMPT_WINDOW_MS / 1000)));
+  return res.status(429).json({ ok: false, message: GENERIC_AUTH_FAILURE });
+}
+
 async function findUniqueStudentByFullName(fullName: unknown) {
-  if (typeof fullName !== "string" || !normalizeFullName(fullName)) return null;
-  const normalized = normalizeFullName(fullName);
-  const candidates = await db
+  if (typeof fullName !== "string") return null;
+  if (Array.from(fullName).length > AUTH_IDENTITY_MAX_CHARACTERS) return null;
+  const loginKey = normalizeFullName(fullName);
+  if (!loginKey) return null;
+  const matches = await db
     .select()
     .from(users)
-    .where(and(eq(users.role, "student"), eq(users.loginKey, normalized)));
-  const matches = candidates.filter((user) => user.loginKey === normalized);
+    .where(and(eq(users.role, "student"), eq(users.loginKey, loginKey)))
+    .limit(2);
   return matches.length === 1 ? matches[0] : null;
 }
 
@@ -86,13 +154,13 @@ async function establishSession(req: Request, user: typeof users.$inferSelect) {
   await regenerate(req);
   req.session.userId = user.id;
   req.session.role = user.role;
-  req.session.sessionVersion = user.sessionVersion;
-  req.session.authState = user.authState as AuthState;
+  req.session.authVersion = user.authVersion;
+  req.session.credentialState = user.credentialState as CredentialState;
   await save(req);
 }
 
 export async function revalidateSession(req: Request) {
-  if (!req.session.userId || req.session.sessionVersion === undefined) return null;
+  if (!req.session.userId || req.session.authVersion === undefined) return null;
   const [user] = await db
     .select()
     .from(users)
@@ -101,7 +169,8 @@ export async function revalidateSession(req: Request) {
   if (
     !user ||
     !user.isActive ||
-    user.sessionVersion !== req.session.sessionVersion ||
+    !isCredentialState(user.credentialState) ||
+    user.authVersion !== req.session.authVersion ||
     user.role !== req.session.role
   ) {
     await destroy(req).catch(() => undefined);
@@ -110,8 +179,9 @@ export async function revalidateSession(req: Request) {
   req.authUser = {
     id: user.id,
     role: user.role,
-    authState: user.authState as AuthState,
-    sessionVersion: user.sessionVersion,
+    gender: user.gender,
+    credentialState: user.credentialState,
+    authVersion: user.authVersion,
   };
   return user;
 }
@@ -120,10 +190,10 @@ export async function requireAuthenticated(req: Request, res: Response, next: Ne
   try {
     const user = await revalidateSession(req);
     if (!user) return res.status(401).json({ ok: false, message: "未認証です" });
-    if (user.authState === "temp_password") {
+    if (user.credentialState !== "active") {
       return res.status(403).json({
         ok: false,
-        state: "temp_password",
+        credentialState: user.credentialState,
         message: "パスワードの変更が必要です",
       });
     }
@@ -143,12 +213,8 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
 }
 
 export const configureAuth = (app: Express, options?: { store?: session.Store }) => {
-  if (!configuration.sessionSecret) {
-    throw new Error("SESSION_SECRET is required");
-  }
-  if (!configuration.databaseUrl) {
-    throw new Error("DATABASE_URL is required");
-  }
+  if (!configuration.sessionSecret) throw new Error("SESSION_SECRET is required");
+  if (!configuration.databaseUrl) throw new Error("DATABASE_URL is required");
 
   if (configuration.nodeEnv === "production") app.set("trust proxy", 1);
   const PgStore = connectPgSimple(session);
@@ -172,18 +238,20 @@ export const configureAuth = (app: Express, options?: { store?: session.Store })
     }),
   );
 
-  // A temporary-password session is deliberately useful only for completing
-  // its mandatory password change, checking state, or logging out.
   app.use("/api/auth", async (req, res, next) => {
     if (!req.session.userId) return next();
     try {
       const user = await revalidateSession(req);
       if (!user) return res.status(401).json({ ok: false, message: "未認証です" });
       if (
-        user.authState === "temp_password" &&
-        !["/change-password", "/change-temp-password", "/logout", "/session"].includes(req.path)
+        user.credentialState === "temporary" &&
+        !["/athlete/password", "/logout", "/session"].includes(req.path)
       ) {
-        return res.status(403).json({ ok: false, state: "temp_password", message: "パスワードの変更が必要です" });
+        return res.status(403).json({
+          ok: false,
+          credentialState: "temporary",
+          message: "パスワードの変更が必要です",
+        });
       }
       next();
     } catch {
@@ -191,138 +259,194 @@ export const configureAuth = (app: Express, options?: { store?: session.Store })
     }
   });
 
-  const identityCheck = async (req: Request, res: Response) => {
+  app.post("/api/auth/athlete/start", async (req, res) => {
     try {
-      const fullName = req.body.fullName ?? req.body.username;
+      const fullName = req.body.fullName;
+      if (await consumeAuthAttempt(req, fullName)) return rateLimited(res);
+      const hadPending = clearPendingSetup(req);
       const user = await findUniqueStudentByFullName(fullName);
-      if (!user || !user.isActive) {
+      if (!user || !user.isActive || !isCredentialState(user.credentialState)) {
+        if (hadPending) await save(req);
         return res.status(401).json({ ok: false, message: GENERIC_AUTH_FAILURE });
       }
-      if (user.authState !== "initial_setup") {
-        return res.json({ ok: true, authState: "active", requiresPasswordSetup: false });
+      if (user.credentialState !== "setup_required") {
+        if (hadPending) await save(req);
+        return res.json({
+          ok: true,
+          credentialState: user.credentialState,
+          requiresPasswordSetup: false,
+        });
       }
       await regenerate(req);
       req.session.pendingSetupUserId = user.id;
-      req.session.pendingSetupVersion = user.sessionVersion;
+      req.session.pendingSetupAuthVersion = user.authVersion;
+      req.session.pendingSetupIssuedAt = Date.now();
       await save(req);
-      res.json({
+      return res.json({
         ok: true,
-        state: "initial_setup",
-        authState: "initial_setup",
+        credentialState: "setup_required",
         requiresPasswordSetup: true,
       });
     } catch {
       res.status(500).json({ ok: false, message: "認証処理中にエラーが発生しました" });
     }
-  };
-  app.post("/api/auth/identity-check", identityCheck);
-  app.post("/api/auth/check-identity", identityCheck);
-  app.post("/api/auth/identify", identityCheck);
+  });
 
-  const initialPassword = async (req: Request, res: Response) => {
+  app.post("/api/auth/athlete/login", async (req, res) => {
     try {
-      const { password, passwordConfirmation, confirmPassword } = req.body;
-      const confirmation = passwordConfirmation ?? confirmPassword;
-      if (typeof password !== "string" || password.length < PASSWORD_MIN_LENGTH || password !== confirmation) {
-        return res.status(400).json({ ok: false, message: "パスワードは6文字以上で確認入力と一致させてください" });
-      }
-      if (!req.session.pendingSetupUserId || req.session.pendingSetupVersion === undefined) {
+      const { fullName, password } = req.body;
+      if (await consumeAuthAttempt(req, fullName)) return rateLimited(res);
+      const hadPending = clearPendingSetup(req);
+      const user = await findUniqueStudentByFullName(fullName);
+      if (
+        !user ||
+        !user.isActive ||
+        user.credentialState === "setup_required" ||
+        typeof password !== "string" ||
+        !(await bcrypt.compare(password, user.password))
+      ) {
+        if (hadPending) await save(req);
         return res.status(401).json({ ok: false, message: GENERIC_AUTH_FAILURE });
       }
-      const [user] = await db
-        .update(users)
-        .set({
-          password: await hashPassword(password),
-          authState: "active",
-          passwordUpdatedAt: new Date(),
-          passwordSetBy: req.session.pendingSetupUserId,
-          sessionVersion: req.session.pendingSetupVersion + 1,
-        })
-        .where(and(
-          eq(users.id, req.session.pendingSetupUserId),
-          eq(users.sessionVersion, req.session.pendingSetupVersion),
-          eq(users.authState, "initial_setup"),
-          eq(users.isActive, true),
-        ))
-        .returning();
-      if (!user) return res.status(401).json({ ok: false, message: GENERIC_AUTH_FAILURE });
       await establishSession(req, user);
-      res.json({ ok: true, user: authResponseUser(user), authState: user.authState });
-    } catch {
-      res.status(500).json({ ok: false, message: "パスワード設定中にエラーが発生しました" });
-    }
-  };
-  app.post("/api/auth/initial-password", initialPassword);
-  app.post("/api/auth/setup-password", initialPassword);
-
-  app.post("/api/auth/login", async (req: Request, res: Response) => {
-    try {
-      const identity = req.body.fullName ?? req.body.username;
-      const password = req.body.password;
-      if (typeof identity !== "string" || typeof password !== "string") {
-        return res.status(401).json({ ok: false, message: GENERIC_AUTH_FAILURE });
-      }
-      let user;
-      const student = await findUniqueStudentByFullName(identity);
-      if (student) {
-        user = student;
-      } else if (req.body.fullName === undefined) {
-        const admins = await db.select().from(users).where(and(eq(users.username, identity), eq(users.role, "admin"))).limit(1);
-        user = admins[0];
-      }
-      if (!user || !user.isActive || user.authState === "initial_setup" || !(await bcrypt.compare(password, user.password))) {
-        return res.status(401).json({ ok: false, message: GENERIC_AUTH_FAILURE });
-      }
-      const [updated] = await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id)).returning();
-      await establishSession(req, updated);
       res.json({
         ok: true,
-        user: authResponseUser(updated),
-        state: updated.authState,
-        authState: updated.authState,
-        mustChangePassword: updated.authState === "temp_password",
+        user: authResponseUser(user),
+        credentialState: user.credentialState,
+        mustChangePassword: user.credentialState === "temporary",
       });
     } catch {
       res.status(500).json({ ok: false, message: "ログイン処理中にエラーが発生しました" });
     }
   });
 
-  const changeTempPassword = async (req: Request, res: Response) => {
+  app.post("/api/auth/athlete/password", async (req, res) => {
     try {
-      const user = await revalidateSession(req);
-      if (!user || user.authState !== "temp_password") {
+      const confirmation = req.body.passwordConfirmation ?? req.body.confirmPassword;
+      const validationError = validateNewPassword(req.body.password, confirmation);
+      if (validationError) return res.status(400).json({ ok: false, message: validationError });
+
+      const authenticated = await revalidateSession(req);
+      if (authenticated) {
+        if (authenticated.role !== "student" || authenticated.credentialState !== "temporary") {
+          return res.status(401).json({ ok: false, message: GENERIC_AUTH_FAILURE });
+        }
+        const [updated] = await db
+          .update(users)
+          .set({
+            password: await hashPassword(req.body.password),
+            credentialState: "active",
+            passwordSetBy: authenticated.id,
+            authVersion: authenticated.authVersion + 1,
+          })
+          .where(and(
+            eq(users.id, authenticated.id),
+            eq(users.role, "student"),
+            eq(users.authVersion, authenticated.authVersion),
+            eq(users.credentialState, "temporary"),
+            eq(users.isActive, true),
+          ))
+          .returning();
+        if (!updated) return res.status(401).json({ ok: false, message: GENERIC_AUTH_FAILURE });
+        await establishSession(req, updated);
+        return res.json({
+          ok: true,
+          user: authResponseUser(updated),
+          credentialState: "active",
+          mustChangePassword: false,
+        });
+      }
+
+      const pendingUserId = req.session.pendingSetupUserId;
+      const pendingVersion = req.session.pendingSetupAuthVersion;
+      const issuedAt = req.session.pendingSetupIssuedAt;
+      if (
+        !pendingUserId ||
+        pendingVersion === undefined ||
+        issuedAt === undefined ||
+        Date.now() - issuedAt > SETUP_SESSION_TTL_MS
+      ) {
+        clearPendingSetup(req);
+        await save(req).catch(() => undefined);
         return res.status(401).json({ ok: false, message: GENERIC_AUTH_FAILURE });
       }
-      const { password, passwordConfirmation, confirmPassword } = req.body;
-      const confirmation = passwordConfirmation ?? confirmPassword;
-      if (typeof password !== "string" || password.length < PASSWORD_MIN_LENGTH || password !== confirmation) {
-        return res.status(400).json({ ok: false, message: "パスワードは6文字以上で確認入力と一致させてください" });
+      const [updated] = await db
+        .update(users)
+        .set({
+          password: await hashPassword(req.body.password),
+          credentialState: "active",
+          passwordSetBy: pendingUserId,
+          authVersion: pendingVersion + 1,
+        })
+        .where(and(
+          eq(users.id, pendingUserId),
+          eq(users.role, "student"),
+          eq(users.authVersion, pendingVersion),
+          eq(users.credentialState, "setup_required"),
+          eq(users.isActive, true),
+        ))
+        .returning();
+      if (!updated) {
+        clearPendingSetup(req);
+        await save(req).catch(() => undefined);
+        return res.status(401).json({ ok: false, message: GENERIC_AUTH_FAILURE });
       }
-      const [updated] = await db.update(users).set({
-        password: await hashPassword(password),
-        authState: "active",
-        passwordUpdatedAt: new Date(),
-        passwordSetBy: user.id,
-        sessionVersion: user.sessionVersion + 1,
-      }).where(and(eq(users.id, user.id), eq(users.sessionVersion, user.sessionVersion))).returning();
-      if (!updated) return res.status(401).json({ ok: false, message: GENERIC_AUTH_FAILURE });
       await establishSession(req, updated);
-      res.json({ ok: true, user: authResponseUser(updated), authState: updated.authState });
+      return res.json({
+        ok: true,
+        user: authResponseUser(updated),
+        credentialState: "active",
+        mustChangePassword: false,
+      });
     } catch {
-      res.status(500).json({ ok: false, message: "パスワード変更中にエラーが発生しました" });
+      res.status(500).json({ ok: false, message: "パスワード設定中にエラーが発生しました" });
     }
-  };
-  app.post("/api/auth/change-temp-password", changeTempPassword);
-  app.post("/api/auth/change-password", changeTempPassword);
+  });
+
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      if (await consumeAuthAttempt(req, username)) return rateLimited(res);
+      if (typeof username !== "string" || typeof password !== "string") {
+        return res.status(401).json({ ok: false, message: GENERIC_AUTH_FAILURE });
+      }
+      const [admin] = await db
+        .select()
+        .from(users)
+        .where(and(eq(users.username, username), eq(users.role, "admin")))
+        .limit(1);
+      if (
+        !admin ||
+        !admin.isActive ||
+        admin.credentialState !== "active" ||
+        !(await bcrypt.compare(password, admin.password))
+      ) {
+        return res.status(401).json({ ok: false, message: GENERIC_AUTH_FAILURE });
+      }
+      await establishSession(req, admin);
+      res.json({ ok: true, user: authResponseUser(admin), credentialState: "active" });
+    } catch {
+      res.status(500).json({ ok: false, message: "ログイン処理中にエラーが発生しました" });
+    }
+  });
 
   app.post("/api/auth/logout", async (req, res) => {
-    await destroy(req).catch(() => undefined);
+    let destroyError: unknown;
+    try {
+      await destroy(req);
+    } catch (error) {
+      destroyError = error;
+    }
     res.clearCookie(SESSION_COOKIE_NAME, {
       httpOnly: true,
       sameSite: "lax",
       secure: configuration.nodeEnv === "production",
       path: "/",
     });
+    if (destroyError) {
+      console.error("Failed to destroy SwimTrack session");
+      return res.status(500).json({ ok: false, message: "ログアウトに失敗しました" });
+    }
     res.json({ ok: true, message: "ログアウトしました" });
   });
 
@@ -333,9 +457,8 @@ export const configureAuth = (app: Express, options?: { store?: session.Store })
       res.json({
         ok: true,
         user: authResponseUser(user),
-        state: user.authState,
-        authState: user.authState,
-        mustChangePassword: user.authState === "temp_password",
+        credentialState: user.credentialState,
+        mustChangePassword: user.credentialState === "temporary",
       });
     } catch {
       res.status(500).json({ ok: false, message: "セッション確認中にエラーが発生しました" });
@@ -348,33 +471,43 @@ export const configureAuth = (app: Express, options?: { store?: session.Store })
       username: users.username,
       role: users.role,
       isActive: users.isActive,
-      authState: users.authState,
-      passwordUpdatedAt: users.passwordUpdatedAt,
+      credentialState: users.credentialState,
     }).from(users);
     res.json(rows);
   });
 
-  app.put("/api/users/:id/password", requireAdmin, async (req, res) => {
+  const setTemporaryPassword = async (req: Request, res: Response) => {
     const userId = Number.parseInt(req.params.id, 10);
-    const password = req.body.password;
-    if (!Number.isFinite(userId) || typeof password !== "string" || password.length < PASSWORD_MIN_LENGTH) {
-      return res.status(400).json({ message: "パスワードは6文字以上で指定してください" });
+    const validationError = validateNewPassword(req.body.password, req.body.password);
+    if (!Number.isFinite(userId) || validationError) {
+      return res.status(400).json({ message: validationError || "無効な選手IDです" });
     }
-    const [target] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-    if (!target) return res.status(404).json({ message: "ユーザーが見つかりません" });
-    const [updated] = await db.update(users).set({
-      password: await hashPassword(password),
-      authState: target.role === "student" ? "temp_password" : "active",
-      passwordUpdatedAt: new Date(),
-      passwordSetBy: req.authUser!.id,
-      sessionVersion: target.sessionVersion + 1,
-    }).where(and(eq(users.id, userId), eq(users.sessionVersion, target.sessionVersion))).returning();
-    if (!updated) return res.status(409).json({ message: "ユーザー情報が更新されました。再試行してください" });
-    res.json(authResponseUser(updated));
-  });
+    const [target] = await db
+      .select()
+      .from(users)
+      .where(and(eq(users.id, userId), eq(users.role, "student")))
+      .limit(1);
+    if (!target) return res.status(404).json({ message: "選手が見つかりません" });
+    const [updated] = await db
+      .update(users)
+      .set({
+        password: await hashPassword(req.body.password),
+        credentialState: "temporary",
+        passwordSetBy: req.authUser!.id,
+        authVersion: target.authVersion + 1,
+      })
+      .where(and(
+        eq(users.id, userId),
+        eq(users.role, "student"),
+        eq(users.authVersion, target.authVersion),
+      ))
+      .returning();
+    if (!updated) return res.status(409).json({ message: "選手情報が更新されました。再試行してください" });
+    return res.json(authResponseUser(updated));
+  };
+  app.put("/api/admin/athletes/:id/temporary-password", requireAdmin, setTemporaryPassword);
+  app.put("/api/users/:id/password", requireAdmin, setTemporaryPassword);
 
-  // Public read APIs remain public for backward compatibility. Every write is
-  // authenticated and DB-revalidated here before route-specific role/ownership checks.
   app.use("/api", (req, res, next) => {
     if (!["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) return next();
     return requireAuthenticated(req, res, next);

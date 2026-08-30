@@ -1,4 +1,16 @@
-import { pgTable, text, integer, timestamp, boolean } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import {
+  type AnyPgColumn,
+  char,
+  pgTable,
+  text,
+  integer,
+  timestamp,
+  boolean,
+  check,
+  index,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -8,11 +20,9 @@ export const users = pgTable("users", {
   loginKey: text("login_key"),
   nameKana: text("name_kana"),
   password: text("password").notNull(),
-  authState: text("auth_state").notNull().default("active"),
-  sessionVersion: integer("session_version").notNull().default(1),
-  passwordUpdatedAt: timestamp("password_updated_at"),
-  passwordSetBy: integer("password_set_by"),
-  lastLoginAt: timestamp("last_login_at"),
+  credentialState: text("credential_state").notNull().default("active"),
+  authVersion: integer("auth_version").notNull().default(1),
+  passwordSetBy: integer("password_set_by").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
   role: text("role").notNull().default("student"),
   isActive: boolean("is_active").notNull().default(true),
   gender: text("gender").notNull().default("male"),
@@ -20,7 +30,20 @@ export const users = pgTable("users", {
   joinDate: timestamp("join_date"),
   allTimeStartDate: timestamp("all_time_start_date"),
   createdAt: timestamp("created_at").defaultNow()
-});
+}, (table) => [
+  check("users_credential_state_check", sql`${table.credentialState} in ('setup_required', 'temporary', 'active')`),
+  check("users_student_login_key_check", sql`${table.role} <> 'student' OR ${table.loginKey} IS NOT NULL`),
+  uniqueIndex("users_student_login_key_unique").on(table.loginKey).where(sql`${table.role} = 'student' AND ${table.loginKey} IS NOT NULL`),
+]);
+
+export const authAttempts = pgTable("swimtrack_auth_attempts", {
+  keyHash: char("key_hash", { length: 64 }).primaryKey(),
+  attemptCount: integer("attempt_count").notNull(),
+  resetAt: timestamp("reset_at", { withTimezone: true }).notNull(),
+}, (table) => [
+  check("swimtrack_auth_attempts_count_check", sql`${table.attemptCount} > 0`),
+  index("swimtrack_auth_attempts_reset_idx").on(table.resetAt),
+]);
 
 export const announcements = pgTable("announcements", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
