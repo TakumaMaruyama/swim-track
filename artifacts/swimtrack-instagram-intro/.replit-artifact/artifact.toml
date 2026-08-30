@@ -1,7 +1,7 @@
 kind = "video"
 previewPath = "/swimtrack-instagram-intro"
 title = "SwimTrack Instagram Intro"
-description = "A vertical Instagram Reel introducing SwimTrack's athlete records, competition goals, and IM rankings with anonymized UI visuals."
+description = "A vertical Instagram Reel introducing SwimTrack's athlete records, time improvements, and IM rankings with anonymized UI visuals."
 version = "1.0.0"
 id = "artifacts/swimtrack-instagram-intro"
 router = "path"
