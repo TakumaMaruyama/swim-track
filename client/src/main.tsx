@@ -7,6 +7,7 @@ import { Toaster } from "./components/ui/toaster";
 import { setupErrorHandlers } from "./lib/error-handler";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { PasswordChangeRoute } from "./components/AuthRoute";
+import { SessionDataBoundary } from "./components/SessionDataBoundary";
 import "./index.css";
 
 // Initialize error handlers
@@ -74,6 +75,7 @@ root.render(
           },
         }}
       >
+        <SessionDataBoundary fallback={<LoadingSpinner />}>
         <Switch>
           <Route path="/">
             <Suspense fallback={<LoadingSpinner />}><ErrorBoundary><Dashboard /></ErrorBoundary></Suspense>
@@ -118,6 +120,7 @@ root.render(
           <Route>404 ページが見つかりません</Route>
         </Switch>
         <Toaster />
+        </SessionDataBoundary>
       </SWRConfig>
     </ErrorBoundary>
   </StrictMode>

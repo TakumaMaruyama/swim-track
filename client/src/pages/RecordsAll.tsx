@@ -1,5 +1,5 @@
 import React from 'react';
-import { useSwimRecords } from '@/hooks/use-swim-records';
+import useSWR from 'swr';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
@@ -65,7 +65,7 @@ const Record: React.FC<{ record: GroupedRecord }> = React.memo(({ record }) => {
 Record.displayName = "Record";
 
 function RecordsAll(): JSX.Element {
-  const { records, isLoading, error, mutate } = useSwimRecords();
+  const { data: records, isLoading, error } = useSWR<GroupedRecord[]>('/api/records/all-time');
 
   const [poolLengthFilter, setPoolLengthFilter] = React.useState<string>("25");
   const [genderFilter, setGenderFilter] = React.useState<'male' | 'female'>('male');
@@ -79,17 +79,7 @@ function RecordsAll(): JSX.Element {
           return false;
         }
 
-        // 選手ごとの反映開始日がある場合は、それ以前の記録を除外
-        if (record.athleteAllTimeStartDate) {
-          if (!record.date) return false;
-
-          const startDate = new Date(record.athleteAllTimeStartDate);
-          const recordDate = new Date(record.date);
-          if (recordDate < startDate) {
-            return false;
-          }
-        }
-
+        // The all-time API applies each athlete's reflection start date.
         return true;
       });
 

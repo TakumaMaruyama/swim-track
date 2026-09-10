@@ -1,6 +1,6 @@
-import useSWR from "swr";
 import { useCallback } from "react";
 import { useLocation } from "wouter";
+import { useAuthSession } from "@/components/SessionDataBoundary";
 
 export interface AuthUser {
   id: number;
@@ -29,7 +29,7 @@ export interface AuthResponse<T = AuthUser> {
 }
 
 export function useAuth() {
-  const { data, error, mutate } = useSWR<AuthResponse | null>("/api/auth/session");
+  const { data, error, mutate } = useAuthSession();
   const [, setLocation] = useLocation();
 
   const postAuth = useCallback(async (url: string, body: object) => {

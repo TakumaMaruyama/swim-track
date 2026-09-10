@@ -1,5 +1,5 @@
 import { Express } from "express";
-import { and, asc, count, desc, eq, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, isNull, or, sql } from "drizzle-orm";
 
 import { db, pool } from "db";
 import { announcements, competitions, swimRecords, users } from "db/schema";
@@ -100,6 +100,12 @@ function requireAdmin(authUser: Express.Request["authUser"]) {
   return authUser?.role === "admin";
 }
 
+function visibleAthleteCondition(authUser: Express.Request["authUser"]) {
+  return requireAdmin(authUser)
+    ? undefined
+    : and(eq(users.role, "student"), eq(users.isActive, true));
+}
+
 function parseOptionalDate(value: unknown) {
   if (typeof value !== "string" || value.trim().length === 0) {
     return null;
@@ -189,12 +195,12 @@ function normalizeCompetitionPayload(body: Record<string, unknown>) {
 }
 
 export function registerRoutes(app: Express) {
-  app.get("/api/athletes", async (_req, res) => {
+  app.get("/api/athletes", async (req, res) => {
     try {
       const athletes = await db
         .select(athleteListFields)
         .from(users)
-        .where(eq(users.role, "student"))
+        .where(and(eq(users.role, "student"), visibleAthleteCondition(req.authUser)))
         .orderBy(sql`COALESCE(${users.nameKana}, ${users.username})`);
 
       res.json(athletes);
@@ -205,7 +211,7 @@ export function registerRoutes(app: Express) {
         const legacyAthletes = await db
           .select(legacyAthleteListFields)
           .from(users)
-          .where(eq(users.role, "student"))
+          .where(and(eq(users.role, "student"), visibleAthleteCondition(req.authUser)))
           .orderBy(sql`COALESCE(${users.nameKana}, ${users.username})`);
 
         return res.json(legacyAthletes.map((athlete) => withLegacyBirthDate(athlete)));
@@ -334,7 +340,43 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/records", async (_req, res) => {
+  // Historical bests remain public after an athlete is deactivated. Return only
+  // each event's best, rather than opening their full history or profile.
+  app.get("/api/records/all-time", async (_req, res) => {
+    try {
+      const groups = [swimRecords.style, swimRecords.distance, swimRecords.poolLength, users.gender];
+      const records = await db
+        .selectDistinctOn(groups, {
+          id: swimRecords.id,
+          style: swimRecords.style,
+          distance: swimRecords.distance,
+          time: swimRecords.time,
+          date: swimRecords.date,
+          poolLength: swimRecords.poolLength,
+          studentId: swimRecords.studentId,
+          athleteName: users.username,
+          gender: users.gender,
+        })
+        .from(swimRecords)
+        .innerJoin(users, eq(swimRecords.studentId, users.id))
+        .where(and(
+          eq(users.role, "student"),
+          or(isNull(users.allTimeStartDate), gte(swimRecords.date, users.allTimeStartDate)),
+        ))
+        .orderBy(
+          ...groups,
+          sql`split_part(${swimRecords.time}, ':', 1)::numeric * 60 + split_part(${swimRecords.time}, ':', 2)::numeric`,
+          desc(swimRecords.date),
+          desc(swimRecords.id),
+        );
+      res.json(records);
+    } catch (error) {
+      console.error("Error fetching all-time records:", error);
+      res.status(500).json({ message: "歴代記録の取得に失敗しました" });
+    }
+  });
+
+  app.get("/api/records", async (req, res) => {
     try {
       const records = await db
         .select({
@@ -355,7 +397,7 @@ export function registerRoutes(app: Express) {
         })
         .from(swimRecords)
         .leftJoin(users, eq(swimRecords.studentId, users.id))
-        .where(sql`${swimRecords.studentId} is not null`)
+        .where(and(sql`${swimRecords.studentId} is not null`, visibleAthleteCondition(req.authUser)))
         .orderBy(desc(swimRecords.date));
 
       res.json(
@@ -374,12 +416,16 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/competitions", async (_req, res) => {
+  app.get("/api/competitions", async (req, res) => {
     try {
       const rows = await db
-        .select(competitionListFields)
+        .select({
+          ...competitionListFields,
+          recordCount: requireAdmin(req.authUser) ? count(swimRecords.id) : count(users.id),
+        })
         .from(competitions)
         .leftJoin(swimRecords, eq(swimRecords.competitionId, competitions.id))
+        .leftJoin(users, and(eq(swimRecords.studentId, users.id), visibleAthleteCondition(req.authUser)))
         .groupBy(competitions.id)
         .orderBy(asc(competitions.date), asc(competitions.name));
 
@@ -462,6 +508,13 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ message: "months は 1, 3, 6 のいずれかで指定してください" });
       }
 
+      const [athlete] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(and(eq(users.id, athleteId), eq(users.role, "student"), visibleAthleteCondition(req.authUser)))
+        .limit(1);
+      if (!athlete) return res.status(404).json({ message: "選手が見つかりません" });
+
       const records = await db
         .select({
           id: swimRecords.id,
@@ -473,7 +526,8 @@ export function registerRoutes(app: Express) {
           poolLength: swimRecords.poolLength,
         })
         .from(swimRecords)
-        .where(eq(swimRecords.studentId, athleteId))
+        .leftJoin(users, eq(swimRecords.studentId, users.id))
+        .where(and(eq(swimRecords.studentId, athleteId), visibleAthleteCondition(req.authUser)))
         .orderBy(desc(swimRecords.date));
 
       res.json(
@@ -689,7 +743,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/recent-activities", async (_req, res) => {
+  app.get("/api/recent-activities", async (req, res) => {
     try {
       const recentRecords = await db
         .select({
@@ -703,6 +757,7 @@ export function registerRoutes(app: Express) {
         })
         .from(swimRecords)
         .leftJoin(users, eq(swimRecords.studentId, users.id))
+        .where(visibleAthleteCondition(req.authUser))
         .orderBy(desc(swimRecords.date))
         .limit(5);
 
@@ -901,7 +956,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/records/download", async (_req, res) => {
+  app.get("/api/records/download", async (req, res) => {
     try {
       res.setTimeout(30000);
 
@@ -917,6 +972,7 @@ export function registerRoutes(app: Express) {
         })
         .from(swimRecords)
         .leftJoin(users, eq(swimRecords.studentId, users.id))
+        .where(visibleAthleteCondition(req.authUser))
         .orderBy(desc(swimRecords.date));
 
       const csvHeader = [

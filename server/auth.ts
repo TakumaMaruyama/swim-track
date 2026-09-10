@@ -570,7 +570,17 @@ export const configureAuth = (app: Express, options?: { store?: session.Store })
   app.put("/api/admin/athletes/:id/temporary-password", requireAdmin, setTemporaryPassword);
   app.put("/api/users/:id/password", requireAdmin, setTemporaryPassword);
 
-  app.use("/api", (req, res, next) => {
+  app.use("/api", async (req, res, next) => {
+    if (["GET", "HEAD"].includes(req.method)) {
+      try {
+        // Public reads still need a current, verified identity for admin-only data.
+        await revalidateSession(req);
+        if (req.authUser?.credentialState !== "active") req.authUser = undefined;
+        return next();
+      } catch {
+        return res.status(500).json({ ok: false, message: "認証状態を確認できませんでした" });
+      }
+    }
     if (!["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) return next();
     return requireAuthenticated(req, res, next);
   });
