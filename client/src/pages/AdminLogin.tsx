@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/use-auth";
+import { PasswordRecoveryLink } from "@/components/PasswordRecoveryLink";
 
 export default function AdminLogin() {
   const [username, setUsername] = useState("");
@@ -85,6 +86,7 @@ export default function AdminLogin() {
             >
               {loading ? "ログイン中..." : "ログイン"}
             </Button>
+            <PasswordRecoveryLink />
             <Button
               type="button"
               variant="outline"

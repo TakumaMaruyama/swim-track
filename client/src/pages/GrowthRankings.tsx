@@ -11,9 +11,10 @@ import {
 import { useSwimRecords } from '@/hooks/use-swim-records';
 import {
   calculateGrowthRankings,
+  type GrowthRankingsData,
   type GrowthRecord,
 } from '@/lib/rankingCalculations';
-import { generateRankingsPDF } from '@/lib/pdfGenerator';
+import { generateRankingsPDF, pdfDateStamp } from '@/lib/pdfGenerator';
 
 // タイムをフォーマット
 function formatTime(time: string): string {
@@ -25,6 +26,8 @@ function formatTime(time: string): string {
 export default function GrowthRankings() {
   const [, navigate] = useLocation();
   const { records, isLoading, error } = useSwimRecords();
+  const [isGeneratingPDF, setIsGeneratingPDF] = React.useState(false);
+  const isGeneratingPDFRef = React.useRef(false);
 
   // 伸び率ランキングを計算
   const growthRankings = React.useMemo(() => {
@@ -33,16 +36,34 @@ export default function GrowthRankings() {
   }, [records]);
 
   // PDF出力ハンドラ
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     if (!growthRankings?.rankings) {
       alert('データが不足しているため、PDFを生成できません');
       return;
     }
+    if (isGeneratingPDFRef.current) return;
 
     const growthMonth = `${growthRankings.periods.current.year}年${growthRankings.periods.current.month}月`;
-    const timestamp = new Date().toISOString().split('T')[0];
-    generateRankingsPDF('growth-rankings-content', `IM伸び率ランキング_${growthMonth}_${timestamp}.pdf`);
+    isGeneratingPDFRef.current = true;
+    setIsGeneratingPDF(true);
+    try {
+      await generateRankingsPDF(
+        { kind: 'growth', rankings: growthRankings, monthLabel: growthMonth },
+        `IM伸び率ランキング_${growthMonth}_${pdfDateStamp()}.pdf`,
+      );
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      alert('PDFの生成中にエラーが発生しました。もう一度お試しください。');
+    } finally {
+      isGeneratingPDFRef.current = false;
+      setIsGeneratingPDF(false);
+    }
   };
+
+  const hasRankings = (data: GrowthRankingsData | null) =>
+    !!data && Object.values(data.rankings).some((distance) =>
+      Object.values(distance).some((group) => group.length > 0),
+    );
 
   const GrowthTable: React.FC<{
     title: string;
@@ -72,22 +93,22 @@ export default function GrowthRankings() {
             {rankings.map((record) => (
               <div
                 key={record.studentId}
-                className="inline-flex items-center p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                className="flex w-full items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
               >
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold text-sm">
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold text-sm shrink-0">
                     {record.rank}
                   </div>
-                  <div>
-                    <p className="font-medium">{record.athleteName}</p>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                      <span>自己ベスト: {formatTime(record.bestTime)}</span>
-                      <span>→</span>
-                      <span>今回: {formatTime(record.currentTime)}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium break-words">{record.athleteName}</p>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground mt-1">
+                      <span className="shrink-0 break-words">自己ベスト: {formatTime(record.bestTime)}</span>
+                      <span className="shrink-0">→</span>
+                      <span className="shrink-0 break-words">今回: {formatTime(record.currentTime)}</span>
                     </div>
                   </div>
                 </div>
-                <div className="text-right ml-4">
+                <div className="text-right ml-auto shrink-0">
                   <div className={`flex items-center gap-1 font-bold ${getGrowthColor(record.growthRate)}`}>
                     {getGrowthIcon(record.growthRate)}
                     <span>{record.growthRate > 0 ? '+' : ''}{record.growthRate.toFixed(2)}%</span>
@@ -194,16 +215,16 @@ export default function GrowthRankings() {
             <Button
               onClick={handleDownloadPDF}
               className="shrink-0 hidden sm:flex"
-              disabled={!growthRankings}
+              disabled={!hasRankings(growthRankings) || isGeneratingPDF}
             >
               <Download className="h-4 w-4 mr-2" />
-              PDF出力
+              {isGeneratingPDF ? 'PDF作成中...' : 'PDF出力'}
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      <main className="max-w-7xl mx-auto py-8 pb-28 px-4 sm:px-6 lg:px-8">
         <div id="growth-rankings-content" className="space-y-6">
           {/* PDFタイトル */}
           <div className="text-center mb-6">
@@ -251,10 +272,10 @@ export default function GrowthRankings() {
         <Button
           onClick={handleDownloadPDF}
           className="w-full"
-          disabled={!growthRankings}
+          disabled={!hasRankings(growthRankings) || isGeneratingPDF}
         >
           <Download className="h-4 w-4 mr-2" />
-          PDF出力
+          {isGeneratingPDF ? 'PDF作成中...' : 'PDF出力'}
         </Button>
       </div>
     </div>

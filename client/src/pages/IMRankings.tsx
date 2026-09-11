@@ -12,9 +12,10 @@ import { useSwimRecords } from '@/hooks/use-swim-records';
 import {
   getLatestEvenMonth,
   calculateIMRankings,
+  type IMRankingsData,
   type RankingRecord,
 } from '@/lib/rankingCalculations';
-import { generateRankingsPDF } from '@/lib/pdfGenerator';
+import { generateRankingsPDF, pdfDateStamp } from '@/lib/pdfGenerator';
 
 // タイムをフォーマット
 function formatTime(time: string): string {
@@ -29,6 +30,8 @@ export default function IMRankings() {
 
   const { year, month } = getLatestEvenMonth();
   const targetMonthName = `${year}年${month}月`;
+  const [isGeneratingPDF, setIsGeneratingPDF] = React.useState(false);
+  const isGeneratingPDFRef = React.useRef(false);
 
   // IM測定記録を抽出してランキングを作成
   const rankings = React.useMemo(() => {
@@ -37,15 +40,34 @@ export default function IMRankings() {
   }, [records, year, month]);
 
   // PDF出力ハンドラ
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     if (!rankings) {
       alert('データが不足しているため、PDFを生成できません');
       return;
     }
+    if (isGeneratingPDFRef.current) return;
 
-    const timestamp = new Date().toISOString().split('T')[0];
-    generateRankingsPDF('im-rankings-content', `IM測定ランキング_${targetMonthName}_${timestamp}.pdf`);
+    isGeneratingPDFRef.current = true;
+    setIsGeneratingPDF(true);
+    try {
+      await generateRankingsPDF(
+        { kind: 'measurement', rankings, monthLabel: targetMonthName },
+        `IM測定ランキング_${targetMonthName}_${pdfDateStamp()}.pdf`,
+      );
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      alert('PDFの生成中にエラーが発生しました。もう一度お試しください。');
+    } finally {
+      isGeneratingPDFRef.current = false;
+      setIsGeneratingPDF(false);
+    }
   };
+
+  const hasRankings = (data: IMRankingsData | null) =>
+    !!data && Object.values(data).some((distance) =>
+      Object.values(distance).some((group) => group.length > 0),
+    );
+  const canDownloadPDF = hasRankings(rankings);
 
   const RankingTable: React.FC<{
     title: string;
@@ -74,16 +96,16 @@ export default function IMRankings() {
                 key={record.rank}
                 className="flex items-center gap-6 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex min-w-0 flex-1 items-center gap-3">
                   <Medal className={`h-5 w-5 ${getMedalColor(record.rank)}`} />
-                  <div>
-                    <p className="font-medium">{record.athleteName}</p>
+                  <div className="min-w-0">
+                    <p className="font-medium min-w-0 break-words">{record.athleteName}</p>
                     <p className="text-xs text-muted-foreground">
                       {new Date(record.date).toLocaleDateString('ja-JP')}
                     </p>
                   </div>
                 </div>
-                <p className="text-lg font-bold text-primary">
+                <p className="text-lg font-bold text-primary shrink-0">
                   {formatTime(record.time)}
                 </p>
               </div>
@@ -137,16 +159,16 @@ export default function IMRankings() {
             <Button
               onClick={handleDownloadPDF}
               className="shrink-0 hidden sm:flex"
-              disabled={!rankings}
+              disabled={!canDownloadPDF || isGeneratingPDF}
             >
               <Download className="h-4 w-4 mr-2" />
-              PDF出力
+              {isGeneratingPDF ? 'PDF作成中...' : 'PDF出力'}
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      <main className="max-w-7xl mx-auto py-8 pb-28 px-4 sm:px-6 lg:px-8">
         <div id="im-rankings-content" className="space-y-6">
           {/* PDFタイトル */}
           <div className="text-center mb-6">
@@ -194,10 +216,10 @@ export default function IMRankings() {
         <Button
           onClick={handleDownloadPDF}
           className="w-full"
-          disabled={!rankings}
+          disabled={!canDownloadPDF || isGeneratingPDF}
         >
           <Download className="h-4 w-4 mr-2" />
-          PDF出力
+          {isGeneratingPDF ? 'PDF作成中...' : 'PDF出力'}
         </Button>
       </div>
     </div>

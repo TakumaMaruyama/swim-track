@@ -4,6 +4,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PasswordRecoveryLink } from "@/components/PasswordRecoveryLink";
 import { useAuth } from "@/hooks/use-auth";
 
 type Step = "start" | "login" | "setup";
@@ -99,6 +100,7 @@ export default function AthleteLogin() {
             <Button className="w-full" type="submit" disabled={loading || !fullName.trim()}>
               {loading ? "処理中..." : step === "start" ? "次へ" : step === "setup" ? "設定してログイン" : "ログイン"}
             </Button>
+            {step !== "setup" && <PasswordRecoveryLink />}
             {step !== "start" && <Button className="w-full" type="button" variant="ghost" onClick={resetIdentity} disabled={loading}>氏名入力に戻る</Button>}
             <Button className="w-full" type="button" variant="outline" onClick={() => navigate("/admin/login")}>管理者ログイン</Button>
           </form>
