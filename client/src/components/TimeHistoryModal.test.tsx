@@ -21,9 +21,13 @@ describe("TimeHistoryModal", () => {
     );
 
     const dialog = screen.getByRole("dialog", { name: "山田太郎の記録履歴" });
-    const displayClasses = dialog.className.split(/\s+/);
+    const historyBody = screen.getByRole("button", { name: "タイムの変化を見る" })
+      .closest("section")!.parentElement!;
+    const displayClasses = historyBody.className.split(/\s+/);
 
     expect(displayClasses).toContain("block");
     expect(displayClasses).not.toContain("grid");
+    expect(historyBody.contains(screen.getByRole("button", { name: "閉じる" }))).toBe(false);
+    expect(dialog.className.split(/\s+/)).toContain("overflow-hidden");
   });
 });

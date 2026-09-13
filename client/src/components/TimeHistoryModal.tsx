@@ -263,280 +263,282 @@ export function TimeHistoryModal({
         setEditingRecord(null);
         onClose();
       }}>
-        <DialogContent className="block max-w-4xl h-[90vh] sm:h-[80vh] overflow-y-auto p-4 sm:p-6">
-          <DialogHeader className="mb-4">
+        <DialogContent className="flex flex-col max-w-4xl h-[90vh] sm:h-[80vh] gap-0 overflow-hidden p-0">
+          <DialogHeader className="shrink-0 p-4 pr-14 sm:p-6 sm:pr-16">
             <DialogTitle className="text-xl sm:text-2xl">{athleteName}の記録履歴</DialogTitle>
             <DialogDescription>
               選手の記録の推移と詳細を表示します
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-col sm:flex-row gap-4 mb-4">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Select value={styleFilter} onValueChange={setStyleFilter}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <SelectValue placeholder="種目で絞り込み" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">すべての種目</SelectItem>
-                  {swimStyles.map(style => (
-                    <SelectItem key={style} value={style}>{style}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div className="block min-h-0 flex-1 overflow-y-auto px-4 pb-4 sm:px-6 sm:pb-6">
+            <div className="flex flex-col sm:flex-row gap-4 mb-4">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Select value={styleFilter} onValueChange={setStyleFilter}>
+                  <SelectTrigger className="w-full sm:w-[180px]">
+                    <SelectValue placeholder="種目で絞り込み" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">すべての種目</SelectItem>
+                    {swimStyles.map(style => (
+                      <SelectItem key={style} value={style}>{style}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-              <Select value={periodFilter} onValueChange={setPeriodFilter}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <SelectValue placeholder="期間で絞り込み" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">すべての期間</SelectItem>
-                  <SelectItem value="1month">過去1ヶ月</SelectItem>
-                  <SelectItem value="3months">過去3ヶ月</SelectItem>
-                  <SelectItem value="6months">過去6ヶ月</SelectItem>
-                  <SelectItem value="1year">過去1年</SelectItem>
-                  <SelectItem value="custom">カスタム期間</SelectItem>
-                </SelectContent>
-              </Select>
+                <Select value={periodFilter} onValueChange={setPeriodFilter}>
+                  <SelectTrigger className="w-full sm:w-[180px]">
+                    <SelectValue placeholder="期間で絞り込み" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">すべての期間</SelectItem>
+                    <SelectItem value="1month">過去1ヶ月</SelectItem>
+                    <SelectItem value="3months">過去3ヶ月</SelectItem>
+                    <SelectItem value="6months">過去6ヶ月</SelectItem>
+                    <SelectItem value="1year">過去1年</SelectItem>
+                    <SelectItem value="custom">カスタム期間</SelectItem>
+                  </SelectContent>
+                </Select>
 
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <SelectValue placeholder="並び替え" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="date_desc">日付 (新しい順)</SelectItem>
-                  <SelectItem value="date_asc">日付 (古い順)</SelectItem>
-                  <SelectItem value="time_asc">タイム (速い順)</SelectItem>
-                  <SelectItem value="time_desc">タイム (遅い順)</SelectItem>
-                </SelectContent>
-              </Select>
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-full sm:w-[180px]">
+                    <SelectValue placeholder="並び替え" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="date_desc">日付 (新しい順)</SelectItem>
+                    <SelectItem value="date_asc">日付 (古い順)</SelectItem>
+                    <SelectItem value="time_asc">タイム (速い順)</SelectItem>
+                    <SelectItem value="time_desc">タイム (遅い順)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {periodFilter === "custom" && (
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    className="w-full sm:w-auto px-3 py-2 border rounded"
+                    placeholder="開始日"
+                  />
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    className="w-full sm:w-auto px-3 py-2 border rounded"
+                    placeholder="終了日"
+                  />
+                </div>
+              )}
             </div>
 
-            {periodFilter === "custom" && (
-              <div className="flex flex-col sm:flex-row gap-2">
-                <input
-                  type="date"
-                  value={customStartDate}
-                  onChange={(e) => setCustomStartDate(e.target.value)}
-                  className="w-full sm:w-auto px-3 py-2 border rounded"
-                  placeholder="開始日"
-                />
-                <input
-                  type="date"
-                  value={customEndDate}
-                  onChange={(e) => setCustomEndDate(e.target.value)}
-                  className="w-full sm:w-auto px-3 py-2 border rounded"
-                  placeholder="終了日"
-                />
-              </div>
-            )}
-          </div>
+            <TimeImprovementSummary athleteId={athleteId} isActive={isOpen} />
 
-          <TimeImprovementSummary athleteId={athleteId} isActive={isOpen} />
+            <div className="space-y-6">
+              {Object.entries(groupedAndFilteredRecords).map(([key, records]) => {
+                const [style, distance] = key.split('-');
 
-          <div className="space-y-6">
-            {Object.entries(groupedAndFilteredRecords).map(([key, records]) => {
-              const [style, distance] = key.split('-');
-              
-              return (
-                <Card key={key}>
-                  <CardContent className="pt-6">
-                    <div className="mb-4">
-                      <h3 className="text-base sm:text-lg font-semibold">
-                        {style} {distance}m
-                      </h3>
-                    </div>
-                    
-                    <ErrorBoundary
-                      fallback={
-                        <div className="w-full h-[200px] sm:h-[300px] lg:h-[400px] flex items-center justify-center text-destructive">
-                          グラフの読み込み中にエラーが発生しました
-                        </div>
-                      }
-                    >
-                      <Suspense 
+                return (
+                  <Card key={key}>
+                    <CardContent className="pt-6">
+                      <div className="mb-4">
+                        <h3 className="text-base sm:text-lg font-semibold">
+                          {style} {distance}m
+                        </h3>
+                      </div>
+
+                      <ErrorBoundary
                         fallback={
-                          <div className="w-full h-[200px] sm:h-[300px] lg:h-[400px] flex items-center justify-center">
-                            <div className="flex flex-col items-center gap-2">
-                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                              <p className="text-sm text-muted-foreground">グラフを読み込んでいます...</p>
-                            </div>
+                          <div className="w-full h-[200px] sm:h-[300px] lg:h-[400px] flex items-center justify-center text-destructive">
+                            グラフの読み込み中にエラーが発生しました
                           </div>
                         }
                       >
-                        <TimeProgressChart 
-                          records={records} 
-                          style={style} 
-                          distance={parseInt(distance)}
-                        />
-                      </Suspense>
-                    </ErrorBoundary>
-
-                    <div className="space-y-3 mt-4">
-                      {(() => {
-                        // Group records by pool length
-                        const recordsByPool = records.reduce((acc, record) => {
-                          const poolKey = `${record.poolLength}`;
-                          if (!acc[poolKey]) {
-                            acc[poolKey] = [];
+                        <Suspense
+                          fallback={
+                            <div className="w-full h-[200px] sm:h-[300px] lg:h-[400px] flex items-center justify-center">
+                              <div className="flex flex-col items-center gap-2">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                                <p className="text-sm text-muted-foreground">グラフを読み込んでいます...</p>
+                              </div>
+                            </div>
                           }
-                          acc[poolKey].push(record);
-                          return acc;
-                        }, {} as {[key: string]: ExtendedSwimRecord[]});
+                        >
+                          <TimeProgressChart
+                            records={records}
+                            style={style}
+                            distance={parseInt(distance)}
+                          />
+                        </Suspense>
+                      </ErrorBoundary>
 
-                        return Object.entries(recordsByPool).map(([poolLength, poolRecords]) => {
-                          const poolLengthKey = `${style}-${distance}-${poolLength}`;
-                          const bestRecord = poolRecords.find(r => r.time === personalBests[poolLengthKey]);
-                          const otherRecords = poolRecords.filter(r => r.time !== personalBests[poolLengthKey]);
-                          const sectionKey = `${key}-${poolLength}`;
-                          const isOpen = openSections[sectionKey] ?? false;
-                          const poolColor = poolRecordColors[poolLength] ?? "border-border bg-muted/20";
+                      <div className="space-y-3 mt-4">
+                        {(() => {
+                          // Group records by pool length
+                          const recordsByPool = records.reduce((acc, record) => {
+                            const poolKey = `${record.poolLength}`;
+                            if (!acc[poolKey]) {
+                              acc[poolKey] = [];
+                            }
+                            acc[poolKey].push(record);
+                            return acc;
+                          }, {} as {[key: string]: ExtendedSwimRecord[]});
 
-                          return (
-                            <div key={poolLength} className="space-y-2">
-                              {bestRecord && (
-                                <div className={`p-3 rounded-lg border-l-2 ${poolColor} flex flex-col gap-2 md:flex-row md:justify-between md:items-center`}>
-                                  <div className="flex flex-col gap-2">
-                                    <span className="text-xl font-bold">{bestRecord.time}</span>
-                                    <div className="flex flex-wrap gap-2">
-                                      <Badge variant="secondary" className="flex items-center gap-1">
-                                        <Trophy className="h-3 w-3" />
-                                        自己ベスト ({
-                                          bestRecord.poolLength === 15 ? "15m" : 
-                                          bestRecord.poolLength === 25 ? "25m（短水路）" : 
-                                          "50m（長水路）"
-                                        })
-                                      </Badge>
-                                      {bestRecord.isCompetition && bestRecord.competitionName && (
-                                        <Badge variant="outline" className="flex items-center gap-1">
-                                          {bestRecord.competitionName}
+                          return Object.entries(recordsByPool).map(([poolLength, poolRecords]) => {
+                            const poolLengthKey = `${style}-${distance}-${poolLength}`;
+                            const bestRecord = poolRecords.find(r => r.time === personalBests[poolLengthKey]);
+                            const otherRecords = poolRecords.filter(r => r.time !== personalBests[poolLengthKey]);
+                            const sectionKey = `${key}-${poolLength}`;
+                            const isOpen = openSections[sectionKey] ?? false;
+                            const poolColor = poolRecordColors[poolLength] ?? "border-border bg-muted/20";
+
+                            return (
+                              <div key={poolLength} className="space-y-2">
+                                {bestRecord && (
+                                  <div className={`p-3 rounded-lg border-l-2 ${poolColor} flex flex-col gap-2 md:flex-row md:justify-between md:items-center`}>
+                                    <div className="flex flex-col gap-2">
+                                      <span className="text-xl font-bold">{bestRecord.time}</span>
+                                      <div className="flex flex-wrap gap-2">
+                                        <Badge variant="secondary" className="flex items-center gap-1">
+                                          <Trophy className="h-3 w-3" />
+                                          自己ベスト ({
+                                            bestRecord.poolLength === 15 ? "15m" :
+                                            bestRecord.poolLength === 25 ? "25m（短水路）" :
+                                            "50m（長水路）"
+                                          })
                                         </Badge>
+                                        {bestRecord.isCompetition && bestRecord.competitionName && (
+                                          <Badge variant="outline" className="flex items-center gap-1">
+                                            {bestRecord.competitionName}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="flex flex-col items-start md:items-end gap-1">
+                                      <div className="text-sm text-muted-foreground">
+                                        {formatDate(bestRecord.date)}
+                                      </div>
+                                      <div className="text-sm text-muted-foreground">
+                                        {bestRecord.poolLength === 15 ? "15m" :
+                                        bestRecord.poolLength === 25 ? "25m（短水路）" :
+                                        "50m（長水路）"}
+                                      </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                      {canManageRecords && (
+                                        <>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => setEditingRecord(bestRecord)}
+                                            disabled={isDeleting}
+                                          >
+                                            <Edit2 className="h-4 w-4" />
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => setDeletingRecord(bestRecord.id)}
+                                            disabled={isDeleting}
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                        </>
                                       )}
                                     </div>
                                   </div>
-                                  <div className="flex flex-col items-start md:items-end gap-1">
-                                    <div className="text-sm text-muted-foreground">
-                                      {formatDate(bestRecord.date)}
-                                    </div>
-                                    <div className="text-sm text-muted-foreground">
-                                      {bestRecord.poolLength === 15 ? "15m" : 
-                                      bestRecord.poolLength === 25 ? "25m（短水路）" : 
-                                      "50m（長水路）"}
-                                    </div>
-                                  </div>
-                                  <div className="flex gap-2">
-                                    {canManageRecords && (
-                                      <>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          onClick={() => setEditingRecord(bestRecord)}
-                                          disabled={isDeleting}
-                                        >
-                                          <Edit2 className="h-4 w-4" />
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          onClick={() => setDeletingRecord(bestRecord.id)}
-                                          disabled={isDeleting}
-                                        >
-                                          <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
+                                )}
 
-                              {otherRecords.length > 0 && (
-                                <Collapsible
-                                  open={isOpen}
-                                  onOpenChange={(open) => {
-                                    setOpenSections(prev => ({
-                                      ...prev,
-                                      [sectionKey]: open
-                                    }));
-                                  }}
-                                >
-                                  <CollapsibleTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="w-full justify-between"
-                                    >
-                                      <span className="text-sm text-muted-foreground">
-                                        他の記録を{isOpen ? '隠す' : '表示'} ({otherRecords.length}件)
-                                      </span>
-                                      <ChevronDown
-                                        className={`h-4 w-4 transition-transform ${
-                                          isOpen ? 'transform rotate-180' : ''
-                                        }`}
-                                      />
-                                    </Button>
-                                  </CollapsibleTrigger>
-                                  <CollapsibleContent className="space-y-2 mt-2">
-                                    {otherRecords.map((record) => (
-                                      <div
-                                        key={record.id}
-                                        className={`p-3 rounded-lg border-l-2 ${poolColor} flex flex-col gap-2 md:flex-row md:justify-between md:items-center`}
+                                {otherRecords.length > 0 && (
+                                  <Collapsible
+                                    open={isOpen}
+                                    onOpenChange={(open) => {
+                                      setOpenSections(prev => ({
+                                        ...prev,
+                                        [sectionKey]: open
+                                      }));
+                                    }}
+                                  >
+                                    <CollapsibleTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="w-full justify-between"
                                       >
-                                        <div className="flex flex-col gap-2">
-                                          <span className="text-xl font-bold">{record.time}</span>
-                                          <div className="flex flex-wrap gap-2">
-                                            {record.isCompetition && record.competitionName && (
-                                              <Badge variant="outline" className="flex items-center gap-1">
-                                                {record.competitionName}
-                                              </Badge>
+                                        <span className="text-sm text-muted-foreground">
+                                          他の記録を{isOpen ? '隠す' : '表示'} ({otherRecords.length}件)
+                                        </span>
+                                        <ChevronDown
+                                          className={`h-4 w-4 transition-transform ${
+                                            isOpen ? 'transform rotate-180' : ''
+                                          }`}
+                                        />
+                                      </Button>
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent className="space-y-2 mt-2">
+                                      {otherRecords.map((record) => (
+                                        <div
+                                          key={record.id}
+                                          className={`p-3 rounded-lg border-l-2 ${poolColor} flex flex-col gap-2 md:flex-row md:justify-between md:items-center`}
+                                        >
+                                          <div className="flex flex-col gap-2">
+                                            <span className="text-xl font-bold">{record.time}</span>
+                                            <div className="flex flex-wrap gap-2">
+                                              {record.isCompetition && record.competitionName && (
+                                                <Badge variant="outline" className="flex items-center gap-1">
+                                                  {record.competitionName}
+                                                </Badge>
+                                              )}
+                                            </div>
+                                          </div>
+                                          <div className="flex flex-col items-start md:items-end gap-1">
+                                            <div className="text-sm text-muted-foreground">
+                                              {formatDate(record.date)}
+                                            </div>
+                                            <div className="text-sm text-muted-foreground">
+                                              {record.poolLength === 15 ? "15m" :
+                                              record.poolLength === 25 ? "25m（短水路）" :
+                                              "50m（長水路）"}
+                                            </div>
+                                          </div>
+                                          <div className="flex gap-2">
+                                            {canManageRecords && (
+                                              <>
+                                                <Button
+                                                  variant="ghost"
+                                                  size="icon"
+                                                  onClick={() => setEditingRecord(record)}
+                                                  disabled={isDeleting}
+                                                >
+                                                  <Edit2 className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                  variant="ghost"
+                                                  size="icon"
+                                                  onClick={() => setDeletingRecord(record.id)}
+                                                  disabled={isDeleting}
+                                                >
+                                                  <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                              </>
                                             )}
                                           </div>
                                         </div>
-                                        <div className="flex flex-col items-start md:items-end gap-1">
-                                          <div className="text-sm text-muted-foreground">
-                                            {formatDate(record.date)}
-                                          </div>
-                                          <div className="text-sm text-muted-foreground">
-                                            {record.poolLength === 15 ? "15m" : 
-                                            record.poolLength === 25 ? "25m（短水路）" : 
-                                            "50m（長水路）"}
-                                          </div>
-                                        </div>
-                                        <div className="flex gap-2">
-                                          {canManageRecords && (
-                                            <>
-                                              <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => setEditingRecord(record)}
-                                                disabled={isDeleting}
-                                              >
-                                                <Edit2 className="h-4 w-4" />
-                                              </Button>
-                                              <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => setDeletingRecord(record.id)}
-                                                disabled={isDeleting}
-                                              >
-                                                <Trash2 className="h-4 w-4" />
-                                              </Button>
-                                            </>
-                                          )}
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </CollapsibleContent>
-                                </Collapsible>
-                              )}
-                            </div>
-                          );
-                        });
-                      })()}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                                      ))}
+                                    </CollapsibleContent>
+                                  </Collapsible>
+                                )}
+                              </div>
+                            );
+                          });
+                        })()}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
           </div>
         </DialogContent>
       </Dialog>
