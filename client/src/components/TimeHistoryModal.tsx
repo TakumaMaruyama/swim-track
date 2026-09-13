@@ -65,6 +65,12 @@ const swimStyles = [
   "個人メドレー"
 ];
 
+const poolRecordColors: Record<string, string> = {
+  "15": "border-orange-200 bg-orange-50/70 dark:border-orange-900 dark:bg-orange-950/20",
+  "25": "border-rose-200 bg-rose-50/70 dark:border-rose-900 dark:bg-rose-950/20",
+  "50": "border-sky-200 bg-sky-50/70 dark:border-sky-900 dark:bg-sky-950/20",
+};
+
 const formatDate = (date: string | Date | null) => {
   if (!date) return '';
   return new Date(date).toLocaleDateString('ja-JP');
@@ -384,11 +390,12 @@ export function TimeHistoryModal({
                           const otherRecords = poolRecords.filter(r => r.time !== personalBests[poolLengthKey]);
                           const sectionKey = `${key}-${poolLength}`;
                           const isOpen = openSections[sectionKey] ?? false;
+                          const poolColor = poolRecordColors[poolLength] ?? "border-border bg-muted/20";
 
                           return (
                             <div key={poolLength} className="space-y-2">
                               {bestRecord && (
-                                <div className="p-3 rounded-lg bg-muted/30 flex flex-col gap-2 md:flex-row md:justify-between md:items-center">
+                                <div className={`p-3 rounded-lg border-l-2 ${poolColor} flex flex-col gap-2 md:flex-row md:justify-between md:items-center`}>
                                   <div className="flex flex-col gap-2">
                                     <span className="text-xl font-bold">{bestRecord.time}</span>
                                     <div className="flex flex-wrap gap-2">
@@ -472,7 +479,7 @@ export function TimeHistoryModal({
                                     {otherRecords.map((record) => (
                                       <div
                                         key={record.id}
-                                        className="p-3 rounded-lg bg-muted/10 flex flex-col gap-2 md:flex-row md:justify-between md:items-center"
+                                        className={`p-3 rounded-lg border-l-2 ${poolColor} flex flex-col gap-2 md:flex-row md:justify-between md:items-center`}
                                       >
                                         <div className="flex flex-col gap-2">
                                           <span className="text-xl font-bold">{record.time}</span>
