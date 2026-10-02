@@ -274,6 +274,9 @@ export const configureAuth = (app: Express, options?: { store?: session.Store })
   if (configuration.nodeEnv === "production") app.set("trust proxy", 1);
   const PgStore = connectPgSimple(session);
   app.use(
+    // Public HTML/assets do not depend on identity. Avoid a PostgreSQL session
+    // lookup on every PWA navigation, script, stylesheet and icon request.
+    "/api",
     session({
       name: SESSION_COOKIE_NAME,
       secret: configuration.sessionSecret,

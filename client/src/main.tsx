@@ -30,7 +30,12 @@ const retryImport = async (importFn: () => Promise<any>, retries = 3) => {
 };
 
 // Lazy load pages
-const Dashboard = lazy(() => retryImport(() => import("./pages/Dashboard")));
+const loadDashboard = () => retryImport(() => import("./pages/Dashboard"));
+// Download the home page in parallel with session verification. The session
+// boundary still controls rendering and all identity-scoped data requests.
+const dashboardPreload = window.location.pathname === "/" ? loadDashboard() : undefined;
+void dashboardPreload?.catch(() => undefined); // The lazy boundary handles failures.
+const Dashboard = lazy(() => dashboardPreload ?? loadDashboard());
 const Athletes = lazy(() => retryImport(() => import("./pages/Athletes")));
 const RecordsAll = lazy(() => retryImport(() => import("./pages/RecordsAll")));
 const Competitions = lazy(() => retryImport(() => import("./pages/Competitions")));

@@ -169,6 +169,26 @@ describe("athlete authentication and authorization", () => {
       .send({ fullName: "不明" })).status).toBe(401);
   });
 
+  it("serves the public shell and assets without consulting the session store", async () => {
+    const { createApp } = await import("./app");
+    const store = new expressSession.MemoryStore();
+    const app = createApp({ sessionStore: store });
+    app.get(["/", "/athletes", "/assets/app.js", "/sw.js", "/manifest.json"], (_req, res) => res.send("static"));
+    const agent = request.agent(app);
+    state.selected.push([admin()]);
+    expect((await agent.post("/api/auth/login").send({ username: "admin", password: "correct-password" })).status).toBe(200);
+
+    const get = vi.spyOn(store, "get");
+    for (const url of ["/", "/athletes", "/assets/app.js", "/sw.js", "/manifest.json", "/health"]) {
+      expect((await agent.get(url)).status, url).toBe(200);
+    }
+    expect(get).not.toHaveBeenCalled();
+
+    state.selected.push([admin()], [admin()]);
+    expect((await agent.get("/api/auth/session")).status).toBe(200);
+    expect(get).toHaveBeenCalledTimes(1);
+  });
+
   it("uses one generic failure for missing, inactive, and invalid-password athletes", async () => {
     const app = await makeApp();
     state.selected.push([], [student({ isActive: false })], [student()]);

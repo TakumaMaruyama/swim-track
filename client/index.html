@@ -11,9 +11,13 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
     <title>SwimTrack</title>
+    <style>
+      .startup { min-height: 100dvh; margin: 0; display: grid; place-content: center; gap: 12px; text-align: center; font: 16px system-ui, sans-serif; color: #475569; background: #f8fafc; }
+      .startup strong { font-size: 28px; color: #2563eb; }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div class="startup" role="status"><strong>SwimTrack</strong><span>読み込み中...</span><noscript>JavaScriptを有効にして開いてください。</noscript></div></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
