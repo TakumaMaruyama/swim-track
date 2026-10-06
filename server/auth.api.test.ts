@@ -189,6 +189,20 @@ describe("athlete authentication and authorization", () => {
     expect(get).toHaveBeenCalledTimes(1);
   });
 
+  it("never permits caching authenticated API responses through case-insensitive routes", async () => {
+    const app = await makeApp();
+    const agent = request.agent(app);
+    state.selected.push([admin()]);
+    expect((await agent.post("/api/auth/login").send({ username: "admin", password: "correct-password" })).status).toBe(200);
+
+    for (const path of ["/API/records", "/Api/records", "/API/users/passwords"]) {
+      state.selected.push([admin()], []);
+      const response = await agent.get(path);
+      expect(response.status, path).toBe(200);
+      expect(response.headers["cache-control"], path).toContain("no-store");
+    }
+  });
+
   it("uses one generic failure for missing, inactive, and invalid-password athletes", async () => {
     const app = await makeApp();
     state.selected.push([], [student({ isActive: false })], [student()]);
