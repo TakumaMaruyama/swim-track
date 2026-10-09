@@ -40,7 +40,9 @@ export function sameOriginOnly(req: Request, res: Response, next: NextFunction) 
 
 function responsePolicy(req: Request, res: Response, next: NextFunction) {
   if (req.method === "GET") {
-    if (req.url.startsWith("/api/") || req.url === "/" || req.url.endsWith(".html")) {
+    // Express routes are case-insensitive; all equivalent API URLs must remain private.
+    const pathname = req.path.toLowerCase();
+    if (pathname.startsWith("/api/") || pathname === "/" || pathname.endsWith(".html")) {
       res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       res.setHeader("Pragma", "no-cache");
       res.setHeader("Expires", "0");
