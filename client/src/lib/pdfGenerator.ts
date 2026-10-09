@@ -8,7 +8,7 @@ export type RankingPDFRequest =
 
 type PDFRow = { cells: string[]; tone?: 'improved' | 'regressed' };
 type PDFGroup = { title: string; rows: PDFRow[] };
-type PDFPage = { element: HTMLElement; body: HTMLElement; footer: HTMLElement; rowCount: number };
+type PDFPage = { element: HTMLElement; body: HTMLElement; rowCount: number };
 
 // Render one fixed-size A4 page at a time, independent of the screen width.
 const PAGE_WIDTH = 794;
@@ -50,33 +50,42 @@ function node<K extends keyof HTMLElementTagNameMap>(tag: K, style: string, text
   return element;
 }
 
-function createPage(host: HTMLElement, request: RankingPDFRequest): PDFPage {
-  const element = node('div', `box-sizing:border-box;width:${PAGE_WIDTH}px;height:${PAGE_HEIGHT}px;padding:40px;background:#fff;color:${INK};font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;`);
+function createPage(host: HTMLElement, request: RankingPDFRequest, firstPage: boolean): PDFPage {
+  const topPadding = firstPage ? 40 : 20;
+  const headerHeight = firstPage ? 92 : 0;
+  // Keep the same horizontal alignment, with a small printable edge for joining sheets.
+  const element = node('div', `box-sizing:border-box;width:${PAGE_WIDTH}px;height:${PAGE_HEIGHT}px;padding:${topPadding}px 40px 20px;background:#fff;color:${INK};font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;`);
   element.dataset.rankingPdfPage = '';
-  const header = node('header', 'box-sizing:border-box;height:76px;margin-bottom:16px;border-bottom:2px solid #2563eb;');
-  header.append(node('h1', 'margin:0 0 6px;font-size:23px;line-height:30px;font-weight:700;', request.kind === 'measurement' ? 'IM測定ランキング' : 'IM伸び率ランキング'));
-  header.append(node('p', 'margin:0;font-size:13px;line-height:19px;', `${request.monthLabel}測定結果${request.kind === 'growth' ? ' / 過去の自己ベストとの比較' : ' / 各種目・男女別 上位3名'}`));
-  const body = node('main', 'height:920px;overflow:hidden;');
-  const footer = node('footer', 'box-sizing:border-box;height:31px;padding-top:10px;border-top:1px solid #dbe3ef;display:flex;justify-content:space-between;font-size:10px;line-height:14px;color:#64748b;');
-  element.append(header, body, footer);
+  if (firstPage) {
+    const header = node('header', 'box-sizing:border-box;height:76px;margin-bottom:16px;border-bottom:2px solid #2563eb;');
+    header.append(node('h1', 'margin:0 0 6px;font-size:23px;line-height:30px;font-weight:700;', request.kind === 'measurement' ? 'IM測定ランキング' : 'IM伸び率ランキング'));
+    header.append(node('p', 'margin:0;font-size:13px;line-height:19px;', `${request.monthLabel}測定結果${request.kind === 'growth' ? ' / 過去の自己ベストとの比較' : ' / 各種目・男女別 上位3名'}`));
+    element.append(header);
+  }
+  const body = node('main', `height:${PAGE_HEIGHT - topPadding - 20 - headerHeight}px;overflow:hidden;`);
+  element.append(body);
   host.append(element);
-  return { element, body, footer, rowCount: 0 };
+  return { element, body, rowCount: 0 };
 }
 
 function createGroup(page: PDFPage, title: string, continued: boolean, growth: boolean) {
   const section = node('section', 'margin:0 0 16px;');
-  section.append(node('h2', 'margin:0 0 7px;font-size:16px;line-height:23px;font-weight:700;', `${title}${continued ? '（続き）' : ''}`));
+  if (!continued) section.append(node('h2', 'margin:0 0 7px;font-size:16px;line-height:23px;font-weight:700;', title));
   const table = node('table', 'width:100%;border-collapse:collapse;table-layout:fixed;');
   const widths = growth ? [7, 33, 16, 16, 14, 14] : [7, 45, 23, 25];
   const columns = growth ? ['順位', '選手名', '自己ベスト', '今回', '伸び率', 'タイム差'] : ['順位', '選手名', 'タイム', '測定日'];
   const colgroup = node('colgroup', '');
   widths.forEach((width) => colgroup.append(node('col', `width:${width}%;`)));
-  const thead = node('thead', '');
-  const headerRow = node('tr', '');
-  columns.forEach((label, index) => headerRow.append(node('th', `padding:6px 7px;background:#eaf0f8;font-size:11px;line-height:17px;text-align:${index === 1 ? 'left' : 'center'};font-weight:700;`, label)));
-  thead.append(headerRow);
+  table.append(colgroup);
+  if (!continued) {
+    const thead = node('thead', '');
+    const headerRow = node('tr', '');
+    columns.forEach((label, index) => headerRow.append(node('th', `padding:6px 7px;background:#eaf0f8;font-size:11px;line-height:17px;text-align:${index === 1 ? 'left' : 'center'};font-weight:700;`, label)));
+    thead.append(headerRow);
+    table.append(thead);
+  }
   const tbody = node('tbody', '');
-  table.append(colgroup, thead, tbody);
+  table.append(tbody);
   section.append(table);
   page.body.append(section);
   return { section, tbody, columnCount: columns.length };
@@ -98,12 +107,12 @@ function createRow(row: PDFRow | null, index: number, columnCount: number): HTML
   return tr;
 }
 
-// Measure actual rows with the browser fonts. Keep headings with at least one row,
-// and repeat the event, gender and column headings on every continuation page.
+// Measure actual rows with the browser fonts. Keep new group headings with at
+// least one row, but continue the same table without repeating headings at a page break.
 export function layoutRankingPages(host: HTMLElement, request: RankingPDFRequest): PDFPage[] {
   const groups = groupsFor(request);
   if (groups.every((group) => group.rows.length === 0)) throw new Error('出力するランキングがありません');
-  const pages = [createPage(host, request)];
+  const pages = [createPage(host, request, true)];
   let page = pages[0];
   for (const group of groups) {
     let block = createGroup(page, group.title, false, request.kind === 'growth');
@@ -115,7 +124,7 @@ export function layoutRankingPages(host: HTMLElement, request: RankingPDFRequest
         row.remove();
         if (!block.tbody.children.length) block.section.remove();
         if (page.rowCount === 0) throw new Error('1行の内容がA4用紙に収まりません');
-        page = createPage(host, request);
+        page = createPage(host, request, false);
         pages.push(page);
         block = createGroup(page, group.title, index > 0, request.kind === 'growth');
         block.tbody.append(row);
@@ -126,7 +135,6 @@ export function layoutRankingPages(host: HTMLElement, request: RankingPDFRequest
       page.rowCount++;
     }
   }
-  pages.forEach((page, index) => page.footer.append(node('span', '', 'SwimTrack'), node('span', '', `${index + 1} / ${pages.length}`)));
   return pages;
 }
 
