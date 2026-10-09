@@ -28,7 +28,8 @@ function mockPageCapacity(height: number) {
     if (this.tagName === 'MAIN') bottom = height;
     if (this.tagName === 'SECTION') {
       for (const section of Array.from(this.parentElement!.children)) {
-        bottom += 60 + section.querySelectorAll('tbody tr').length * 35;
+        bottom += (section.querySelector('h2') ? 30 : 0) + (section.querySelector('thead') ? 30 : 0)
+          + section.querySelectorAll('tbody tr').length * 35;
         if (section === this) break;
         bottom += 16;
       }
@@ -41,7 +42,7 @@ describe('ranking PDF pagination', () => {
   beforeEach(() => { vi.clearAllMocks(); mockPageCapacity(240); });
   afterEach(() => { vi.restoreAllMocks(); document.body.replaceChildren(); });
 
-  it('keeps every row once, with event/gender and column headings on every page', () => {
+  it('keeps every row once and omits repeated page, group and column headings at continuation breaks', () => {
     const host = document.createElement('div');
     document.body.append(host);
     const pages = layoutRankingPages(host, growthRequest(7));
@@ -49,17 +50,30 @@ describe('ranking PDF pagination', () => {
     const expected = ['60男', '60女', '120男', '120女'].flatMap((prefix) => Array.from({ length: 7 }, (_, i) => `${prefix}${i + 1}`));
     expect(names).toEqual(expected);
     expect(pages.length).toBeGreaterThan(1);
-    for (const page of pages) {
+    for (const [index, page] of pages.entries()) {
       expect(page.rowCount).toBeGreaterThan(0);
+      expect(page.element.querySelectorAll('header')).toHaveLength(index === 0 ? 1 : 0);
+      expect(page.element.querySelector('footer')).toBeNull();
+      if (index > 0) expect(page.element.style.paddingTop).toBe('20px');
       for (const section of Array.from(page.body.children)) {
-        expect(section.querySelector('h2')?.textContent).toMatch(/個人メドレー \/ [男女]子/);
-        expect(section.querySelectorAll('th')).toHaveLength(6);
+        if (section.querySelector('h2')) {
+          expect(section.querySelector('h2')?.textContent).toMatch(/個人メドレー \/ [男女]子/);
+          expect(section.querySelectorAll('th')).toHaveLength(6);
+        } else {
+          expect(section.querySelectorAll('th')).toHaveLength(0);
+        }
+        expect(section.querySelectorAll('col')).toHaveLength(6);
         expect(section.querySelectorAll('tbody tr').length).toBeGreaterThan(0);
         expect(section.getBoundingClientRect().bottom).toBeLessThanOrEqual(240);
       }
     }
-    expect(host.textContent).toContain('（続き）');
-    expect(pages.at(-1)!.footer.textContent).toBe(`SwimTrack${pages.length} / ${pages.length}`);
+    expect(host.querySelectorAll('header')).toHaveLength(1);
+    expect(host.querySelectorAll('h2')).toHaveLength(4);
+    expect(host.querySelectorAll('thead')).toHaveLength(4);
+    expect(host.textContent).not.toContain('（続き）');
+    const secondPageFirstGroup = pages[1].body.firstElementChild!;
+    expect(secondPageFirstGroup.querySelector('h2')).toBeNull();
+    expect(secondPageFirstGroup.querySelector('thead')).toBeNull();
   });
 
   it('moves a new group with its first row and preserves exact time precision', () => {
@@ -111,5 +125,11 @@ describe('ranking PDF pagination', () => {
   it('uses the Japanese calendar date for filenames around midnight', () => {
     expect(pdfDateStamp(new Date('2026-09-10T14:59:59Z'))).toBe('2026-09-10');
     expect(pdfDateStamp(new Date('2026-09-10T15:00:00Z'))).toBe('2026-09-11');
+  });
+
+  it('rejects a row that cannot fit without splitting it across pages', () => {
+    mockPageCapacity(25);
+    expect(() => layoutRankingPages(document.createElement('div'), growthRequest(1)))
+      .toThrow('1行の内容がA4用紙に収まりません');
   });
 });
